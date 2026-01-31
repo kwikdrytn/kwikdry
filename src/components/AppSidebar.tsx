@@ -1,23 +1,10 @@
-import { 
-  LayoutDashboard, 
-  Package, 
-  ClipboardCheck, 
-  Wrench, 
-  Phone, 
-  Map, 
-  MapPin, 
-  Settings,
-  LogOut
-} from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { getNavItemsForRole } from "@/config/navigation";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -27,32 +14,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Inventory", url: "/inventory", icon: Package },
-  { title: "Checklists", url: "/checklists", icon: ClipboardCheck },
-  { title: "Equipment", url: "/equipment", icon: Wrench },
-  { title: "Calls", url: "/calls", icon: Phone },
-  { title: "Job Map", url: "/job-map", icon: Map },
-  { title: "Users Locations", url: "/users-locations", icon: MapPin },
-  { title: "Settings", url: "/settings", icon: Settings },
-];
-
 export function AppSidebar() {
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const { state } = useSidebar();
   const location = useLocation();
   const isCollapsed = state === "collapsed";
 
-  const getInitials = (firstName?: string | null, lastName?: string | null) => {
-    const first = firstName?.[0] ?? '';
-    const last = lastName?.[0] ?? '';
-    return (first + last).toUpperCase() || 'U';
-  };
-
-  const getFullName = (firstName?: string | null, lastName?: string | null) => {
-    return [firstName, lastName].filter(Boolean).join(' ') || 'User';
-  };
+  const navItems = getNavItemsForRole(profile?.role ?? null);
 
   return (
     <Sidebar collapsible="icon">
@@ -93,37 +61,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="border-t border-sidebar-border">
-        <div className="flex items-center gap-3 px-2 py-3">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={profile?.avatar_url ?? undefined} />
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm">
-              {getInitials(profile?.first_name, profile?.last_name)}
-            </AvatarFallback>
-          </Avatar>
-          {!isCollapsed && (
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <span className="truncate text-sm font-medium text-sidebar-foreground">
-                {getFullName(profile?.first_name, profile?.last_name)}
-              </span>
-              <span className="truncate text-xs text-sidebar-foreground/60">
-                {profile?.email}
-              </span>
-            </div>
-          )}
-          {!isCollapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={signOut}
-              className="h-8 w-8 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </SidebarFooter>
     </Sidebar>
   );
 }
