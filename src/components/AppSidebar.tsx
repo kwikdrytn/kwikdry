@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import kwikDryLogo from "@/assets/KwikDryLogo.png";
 
 export function AppSidebar() {
   const { profile } = useAuth();
@@ -26,11 +27,16 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
-            <span className="text-sm font-bold text-white">KD</span>
-          </div>
-          {!isCollapsed && (
-            <span className="text-lg font-bold text-sidebar-foreground">KwikDry</span>
+          {isCollapsed ? (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
+              <span className="text-sm font-bold text-white">KD</span>
+            </div>
+          ) : (
+            <img 
+              src={kwikDryLogo} 
+              alt="KwikDry Total Cleaning" 
+              className="h-10 w-auto"
+            />
           )}
         </div>
       </SidebarHeader>
