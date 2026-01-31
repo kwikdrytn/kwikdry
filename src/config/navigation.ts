@@ -28,7 +28,7 @@ export const navItems: NavItem[] = [
   },
   { 
     title: "Inventory", 
-    url: "/inventory", 
+    url: "/admin/inventory", 
     icon: Package,
     allowedRoles: ['admin', 'technician']
   },
