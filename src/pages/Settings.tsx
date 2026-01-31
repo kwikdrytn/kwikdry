@@ -8,15 +8,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 
 export default function Settings() {
-  const { user, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = (firstName?: string | null, lastName?: string | null) => {
+    const first = firstName?.[0] ?? '';
+    const last = lastName?.[0] ?? '';
+    return (first + last).toUpperCase() || 'U';
+  };
+
+  const getFullName = (firstName?: string | null, lastName?: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(' ') || 'User';
   };
 
   return (
@@ -30,15 +31,17 @@ export default function Settings() {
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={user?.avatar_url} />
+                <AvatarImage src={profile?.avatar_url ?? undefined} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                  {user?.full_name ? getInitials(user.full_name) : "U"}
+                  {getInitials(profile?.first_name, profile?.last_name)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-medium">{user?.full_name}</h3>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
-                <p className="text-xs text-muted-foreground capitalize">Role: {user?.role}</p>
+                <h3 className="font-medium">{getFullName(profile?.first_name, profile?.last_name)}</h3>
+                <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  Role: {profile?.role?.replace('_', ' ') ?? 'N/A'}
+                </p>
               </div>
             </div>
 
@@ -47,11 +50,11 @@ export default function Settings() {
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" defaultValue={user?.full_name} disabled />
+                <Input id="name" defaultValue={getFullName(profile?.first_name, profile?.last_name)} disabled />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue={user?.email} disabled />
+                <Input id="email" type="email" defaultValue={profile?.email ?? ''} disabled />
               </div>
             </div>
 

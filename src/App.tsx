@@ -15,6 +15,7 @@ import Calls from "./pages/Calls";
 import JobMap from "./pages/JobMap";
 import UsersLocations from "./pages/UsersLocations";
 import Settings from "./pages/Settings";
+import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
             <Route
               path="/dashboard"
               element={
