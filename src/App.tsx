@@ -14,7 +14,7 @@ import Checklists from "./pages/Checklists";
 import Equipment from "./pages/Equipment";
 import Calls from "./pages/Calls";
 import JobMap from "./pages/JobMap";
-import UsersPage from "./pages/Users";
+import UserManagement from "./pages/admin/UserManagement";
 import LocationsPage from "./pages/Locations";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
@@ -78,11 +78,11 @@ const App = () => (
               }
             />
             <Route
-              path="/users"
+              path="/admin/users"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin']}>
-                    <UsersPage />
+                    <UserManagement />
                   </RoleGuard>
                 </ProtectedRoute>
               }
@@ -129,6 +129,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            
+            {/* Legacy route redirect */}
+            <Route path="/users" element={<Navigate to="/admin/users" replace />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
