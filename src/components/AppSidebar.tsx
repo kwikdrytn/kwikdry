@@ -7,8 +7,7 @@ import {
   Map, 
   MapPin, 
   Settings,
-  LogOut,
-  ChevronLeft
+  LogOut
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -25,10 +24,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -42,18 +39,19 @@ const navItems = [
 ];
 
 export function AppSidebar() {
-  const { user, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const { state } = useSidebar();
   const location = useLocation();
   const isCollapsed = state === "collapsed";
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = (firstName?: string | null, lastName?: string | null) => {
+    const first = firstName?.[0] ?? '';
+    const last = lastName?.[0] ?? '';
+    return (first + last).toUpperCase() || 'U';
+  };
+
+  const getFullName = (firstName?: string | null, lastName?: string | null) => {
+    return [firstName, lastName].filter(Boolean).join(' ') || 'User';
   };
 
   return (
@@ -99,18 +97,18 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-3">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user?.avatar_url} />
+            <AvatarImage src={profile?.avatar_url ?? undefined} />
             <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm">
-              {user?.full_name ? getInitials(user.full_name) : "U"}
+              {getInitials(profile?.first_name, profile?.last_name)}
             </AvatarFallback>
           </Avatar>
           {!isCollapsed && (
             <div className="flex flex-1 flex-col overflow-hidden">
               <span className="truncate text-sm font-medium text-sidebar-foreground">
-                {user?.full_name}
+                {getFullName(profile?.first_name, profile?.last_name)}
               </span>
               <span className="truncate text-xs text-sidebar-foreground/60">
-                {user?.email}
+                {profile?.email}
               </span>
             </div>
           )}
