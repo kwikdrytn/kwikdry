@@ -15,6 +15,8 @@ import Equipment from "./pages/Equipment";
 import Calls from "./pages/Calls";
 import JobMap from "./pages/JobMap";
 import UserManagement from "./pages/admin/UserManagement";
+import InventoryManagement from "./pages/admin/InventoryManagement";
+import InventoryDetail from "./pages/admin/InventoryDetail";
 import LocationsPage from "./pages/Locations";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
@@ -44,17 +46,32 @@ const App = () => (
               }
             />
             
-            {/* Admin and Technician routes */}
+            {/* Admin Inventory Management */}
             <Route
-              path="/inventory"
+              path="/admin/inventory"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin', 'technician']}>
-                    <Inventory />
+                    <InventoryManagement />
                   </RoleGuard>
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/inventory/:id"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                    <InventoryDetail />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Legacy inventory route redirect */}
+            <Route path="/inventory" element={<Navigate to="/admin/inventory" replace />} />
+            
+            {/* Admin and Technician routes */}
             <Route
               path="/checklists"
               element={

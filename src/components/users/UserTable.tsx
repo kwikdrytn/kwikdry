@@ -125,7 +125,7 @@ export function UserTable({ users, isLoading, onEdit, onDeactivate }: UserTableP
                 <Badge
                   variant={user.is_active ? 'default' : 'secondary'}
                   className={user.is_active 
-                    ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20' 
+                    ? 'bg-primary/10 text-primary hover:bg-primary/20' 
                     : 'bg-muted text-muted-foreground'
                   }
                 >
