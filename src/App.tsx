@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { RoleGuard } from "@/components/RoleGuard";
 
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -13,7 +14,8 @@ import Checklists from "./pages/Checklists";
 import Equipment from "./pages/Equipment";
 import Calls from "./pages/Calls";
 import JobMap from "./pages/JobMap";
-import UsersLocations from "./pages/UsersLocations";
+import UsersPage from "./pages/Users";
+import LocationsPage from "./pages/Locations";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -31,6 +33,8 @@ const App = () => (
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+            
+            {/* All roles can access Dashboard */}
             <Route
               path="/dashboard"
               element={
@@ -39,11 +43,15 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            
+            {/* Admin and Technician routes */}
             <Route
               path="/inventory"
               element={
                 <ProtectedRoute>
-                  <Inventory />
+                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                    <Inventory />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
@@ -51,39 +59,41 @@ const App = () => (
               path="/checklists"
               element={
                 <ProtectedRoute>
-                  <Checklists />
+                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                    <Checklists />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
+            
+            {/* Admin only routes */}
             <Route
               path="/equipment"
               element={
                 <ProtectedRoute>
-                  <Equipment />
+                  <RoleGuard allowedRoles={['admin']}>
+                    <Equipment />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/calls"
+              path="/users"
               element={
                 <ProtectedRoute>
-                  <Calls />
+                  <RoleGuard allowedRoles={['admin']}>
+                    <UsersPage />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/job-map"
+              path="/locations"
               element={
                 <ProtectedRoute>
-                  <JobMap />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/users-locations"
-              element={
-                <ProtectedRoute>
-                  <UsersLocations />
+                  <RoleGuard allowedRoles={['admin']}>
+                    <LocationsPage />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
@@ -91,10 +101,35 @@ const App = () => (
               path="/settings"
               element={
                 <ProtectedRoute>
-                  <Settings />
+                  <RoleGuard allowedRoles={['admin']}>
+                    <Settings />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
+            
+            {/* Admin and Call Staff routes */}
+            <Route
+              path="/calls"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin', 'call_staff']}>
+                    <Calls />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/job-map"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin', 'call_staff']}>
+                    <JobMap />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
