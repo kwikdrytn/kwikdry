@@ -348,25 +348,23 @@ export default function IntegrationSettings() {
   // RingCentral OAuth constants
   const RC_CLIENT_ID = 'd54LY9v6MLKawusT9IfF98';
   const RC_AUTH_URL = 'https://platform.ringcentral.com/restapi/oauth/authorize';
-  const RC_REDIRECT_URI = 'https://kwikdry.lovable.app';
+  const RC_REDIRECT_URI = 'https://kwikdry.lovable.app/oauth-callback.html';
 
-  // Handle OAuth callback - check URL for auth code on mount
+  // Handle OAuth callback via postMessage from popup
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      // Verify origin - accept from both preview and published domains
+      if (!event.origin.includes('lovable.app') && !event.origin.includes('lovableproject.com')) {
+        return;
+      }
       
-      if (code && state === 'rc_oauth') {
+      if (event.data?.type === 'rc_oauth_callback' && event.data?.code) {
         setIsConnectingRc(true);
-        
-        // Clear the URL parameters
-        window.history.replaceState({}, document.title, window.location.pathname);
         
         try {
           const { data, error } = await supabase.functions.invoke('rc-oauth-callback', {
             body: {
-              code,
+              code: event.data.code,
               organization_id: profile?.organization_id,
             }
           });
@@ -399,10 +397,11 @@ export default function IntegrationSettings() {
       }
     };
     
-    handleOAuthCallback();
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
   }, [profile?.organization_id, queryClient]);
 
-  // Start OAuth flow
+  // Start OAuth flow in popup window
   const handleConnectRingCentral = () => {
     const authUrl = new URL(RC_AUTH_URL);
     authUrl.searchParams.set('response_type', 'code');
@@ -410,7 +409,17 @@ export default function IntegrationSettings() {
     authUrl.searchParams.set('redirect_uri', RC_REDIRECT_URI);
     authUrl.searchParams.set('state', 'rc_oauth');
     
-    window.location.href = authUrl.toString();
+    // Open in a popup window instead of redirecting (avoids iframe issues)
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    window.open(
+      authUrl.toString(),
+      'ringcentral_oauth',
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
+    );
   };
 
   // Disconnect RingCentral
