@@ -7,6 +7,8 @@ const corsHeaders = {
 
 const HCP_BASE_URL = 'https://api.housecallpro.com';
 
+const MAPBOX_GEOCODE_BASE_URL = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
+
 interface HCPJob {
   id: string;
   customer?: {
@@ -78,6 +80,60 @@ interface HCPServiceZone {
   };
   boundary?: Array<{ lat: number; lng: number }>;
   vertices?: Array<{ lat: number; lng: number }>;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function coerceNumber(value: unknown): number | null {
+  if (isFiniteNumber(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function extractLatLngFromJob(job: unknown): { lat: number; lng: number } | null {
+  const j = job as Record<string, any>;
+
+  const candidates: Array<{ lat: unknown; lng: unknown }> = [
+    // Common shapes
+    { lat: j?.location?.lat, lng: j?.location?.lng },
+    { lat: j?.location?.latitude, lng: j?.location?.longitude },
+    { lat: j?.coordinates?.lat, lng: j?.coordinates?.lng },
+    { lat: j?.coordinates?.latitude, lng: j?.coordinates?.longitude },
+    { lat: j?.address?.lat, lng: j?.address?.lng },
+    { lat: j?.address?.latitude, lng: j?.address?.longitude },
+  ];
+
+  for (const c of candidates) {
+    const lat = coerceNumber(c.lat);
+    const lng = coerceNumber(c.lng);
+    if (lat !== null && lng !== null) return { lat, lng };
+  }
+
+  return null;
+}
+
+async function geocodeAddress(
+  address: string,
+  mapboxToken: string,
+): Promise<{ lat: number; lng: number } | null> {
+  const url = `${MAPBOX_GEOCODE_BASE_URL}/${encodeURIComponent(address)}.json?access_token=${encodeURIComponent(mapboxToken)}&limit=1`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.log('Mapbox geocode failed:', res.status, address);
+    return null;
+  }
+  const data = await res.json();
+  const center = data?.features?.[0]?.center;
+  if (!Array.isArray(center) || center.length < 2) return null;
+  const lng = coerceNumber(center[0]);
+  const lat = coerceNumber(center[1]);
+  if (lat === null || lng === null) return null;
+  return { lat, lng };
 }
 
 // Convert HCP zone boundary to GeoJSON Polygon format
@@ -400,25 +456,30 @@ Deno.serve(async (req) => {
 
     // Upsert jobs
     if (jobs.length > 0) {
-      const jobRecords = jobs.map(job => {
+      const mapboxToken = Deno.env.get('VITE_MAPBOX_TOKEN') || '';
+      const geocodeCache = new Map<string, { lat: number; lng: number }>();
+      let geocodedCount = 0;
+      const GEOCODE_LIMIT = 75; // safety cap per sync
+
+      for (const job of jobs) {
         const scheduledStart = job.schedule?.scheduled_start;
         const scheduledEnd = job.schedule?.scheduled_end;
-        
-        let scheduledDate = null;
-        let scheduledTime = null;
-        let scheduledEndTime = null;
-        
+
+        let scheduledDate: string | null = null;
+        let scheduledTime: string | null = null;
+        let scheduledEndTime: string | null = null;
+
         if (scheduledStart) {
           const startDate = new Date(scheduledStart);
           scheduledDate = startDate.toISOString().split('T')[0];
           scheduledTime = startDate.toTimeString().substring(0, 8);
         }
-        
+
         if (scheduledEnd) {
           const endDate = new Date(scheduledEnd);
           scheduledEndTime = endDate.toTimeString().substring(0, 8);
         }
-        
+
         const assignedEmployee = job.assigned_employees?.[0];
         const services = job.line_items?.map(item => ({
           name: item.name,
@@ -427,39 +488,65 @@ Deno.serve(async (req) => {
           quantity: item.quantity,
         })) || [];
 
-        return {
+        const extracted = extractLatLngFromJob(job);
+        let lat: number | null = extracted?.lat ?? null;
+        let lng: number | null = extracted?.lng ?? null;
+
+        const addressParts = [job.address?.street, job.address?.city, job.address?.state, job.address?.zip]
+          .filter(Boolean)
+          .join(', ');
+
+        if ((lat === null || lng === null) && mapboxToken && addressParts && geocodedCount < GEOCODE_LIMIT) {
+          const cached = geocodeCache.get(addressParts);
+          if (cached) {
+            lat = cached.lat;
+            lng = cached.lng;
+          } else {
+            const geocoded = await geocodeAddress(addressParts, mapboxToken);
+            if (geocoded) {
+              lat = geocoded.lat;
+              lng = geocoded.lng;
+              geocodeCache.set(addressParts, geocoded);
+              geocodedCount++;
+            }
+          }
+        }
+
+        const record = {
           organization_id,
           location_id: location_id || null,
           hcp_job_id: job.id,
           customer_hcp_id: job.customer?.id || null,
-          customer_name: job.customer ? 
-            [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') || 
+          customer_name: job.customer ?
+            [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') ||
             job.customer.company || 'Unknown' : null,
           address: job.address?.street || null,
           city: job.address?.city || null,
           state: job.address?.state || null,
           zip: job.address?.zip || null,
-          lat: job.location?.lat || null,
-          lng: job.location?.lng || null,
+          lat,
+          lng,
           scheduled_date: scheduledDate,
           scheduled_time: scheduledTime,
           scheduled_end: scheduledEndTime,
           technician_hcp_id: assignedEmployee?.id || null,
-          technician_name: assignedEmployee ? 
+          technician_name: assignedEmployee ?
             [assignedEmployee.first_name, assignedEmployee.last_name].filter(Boolean).join(' ') : null,
           status: job.work_status || null,
           total_amount: job.total_amount || null,
           services,
           synced_at: now,
         };
-      });
 
-      for (const record of jobRecords) {
         const { error } = await supabase
           .from('hcp_jobs')
           .upsert(record, { onConflict: 'organization_id,hcp_job_id' });
         
         if (!error) jobsSynced++;
+      }
+
+      if (geocodedCount > 0) {
+        console.log(`Geocoded ${geocodedCount} jobs missing coordinates via Mapbox`);
       }
     }
 
