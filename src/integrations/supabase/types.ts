@@ -442,6 +442,44 @@ export type Database = {
           },
         ]
       }
+      custom_roles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       equipment: {
         Row: {
           assigned_to: string | null
@@ -1337,6 +1375,7 @@ export type Database = {
           avatar_url: string | null
           city: string | null
           created_at: string | null
+          custom_role_id: string | null
           deleted_at: string | null
           email: string | null
           fcm_token: string | null
@@ -1360,6 +1399,7 @@ export type Database = {
           avatar_url?: string | null
           city?: string | null
           created_at?: string | null
+          custom_role_id?: string | null
           deleted_at?: string | null
           email?: string | null
           fcm_token?: string | null
@@ -1383,6 +1423,7 @@ export type Database = {
           avatar_url?: string | null
           city?: string | null
           created_at?: string | null
+          custom_role_id?: string | null
           deleted_at?: string | null
           email?: string | null
           fcm_token?: string | null
@@ -1402,6 +1443,13 @@ export type Database = {
           zip?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_custom_role_id_fkey"
+            columns: ["custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_location_id_fkey"
             columns: ["location_id"]
@@ -1460,6 +1508,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "technician_checklist_compliance"
             referencedColumns: ["technician_id"]
+          },
+        ]
+      }
+      role_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          permission: Database["public"]["Enums"]["permission_key"]
+          role_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          permission: Database["public"]["Enums"]["permission_key"]
+          role_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          permission?: Database["public"]["Enums"]["permission_key"]
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "custom_roles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1570,6 +1647,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      has_permission: {
+        Args: { p_permission: Database["public"]["Enums"]["permission_key"] }
+        Returns: boolean
+      }
       is_admin: { Args: never; Returns: boolean }
       restore_record: {
         Args: { p_record_id: string; p_table_name: string }
@@ -1608,6 +1689,28 @@ export type Database = {
         | "replacement"
         | "cleaning"
       match_confidence: "exact" | "partial" | "none"
+      permission_key:
+        | "dashboard.view"
+        | "dashboard.view_metrics"
+        | "inventory.view"
+        | "inventory.manage"
+        | "inventory.adjust_stock"
+        | "checklists.submit"
+        | "checklists.view_submissions"
+        | "checklists.manage_templates"
+        | "equipment.view"
+        | "equipment.manage"
+        | "calls.view"
+        | "calls.view_metrics"
+        | "calls.manage"
+        | "job_map.view"
+        | "job_map.use_ai_suggestions"
+        | "users.view"
+        | "users.manage"
+        | "locations.view"
+        | "locations.manage"
+        | "settings.view"
+        | "settings.manage_integrations"
       processing_status: "pending" | "processing" | "completed" | "failed"
       transaction_type:
         | "restock"
@@ -1777,6 +1880,29 @@ export const Constants = {
         "cleaning",
       ],
       match_confidence: ["exact", "partial", "none"],
+      permission_key: [
+        "dashboard.view",
+        "dashboard.view_metrics",
+        "inventory.view",
+        "inventory.manage",
+        "inventory.adjust_stock",
+        "checklists.submit",
+        "checklists.view_submissions",
+        "checklists.manage_templates",
+        "equipment.view",
+        "equipment.manage",
+        "calls.view",
+        "calls.view_metrics",
+        "calls.manage",
+        "job_map.view",
+        "job_map.use_ai_suggestions",
+        "users.view",
+        "users.manage",
+        "locations.view",
+        "locations.manage",
+        "settings.view",
+        "settings.manage_integrations",
+      ],
       processing_status: ["pending", "processing", "completed", "failed"],
       transaction_type: ["restock", "usage", "transfer", "adjustment", "count"],
       user_role: ["admin", "call_staff", "technician"],

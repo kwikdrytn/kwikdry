@@ -16,6 +16,7 @@ export interface UserProfile {
   organization_id: string;
   location_id: string | null;
   is_active: boolean | null;
+  custom_role_id: string | null;
 }
 
 interface AuthState {

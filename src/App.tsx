@@ -10,14 +10,12 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { OAuthCallbackHandler } from "@/components/OAuthCallbackHandler";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Inventory from "./pages/Inventory";
 import Checklists from "./pages/Checklists";
 import Equipment from "./pages/Equipment";
 import JobMap from "./pages/JobMap";
 import UserManagement from "./pages/admin/UserManagement";
 import InventoryManagement from "./pages/admin/InventoryManagement";
 import InventoryDetail from "./pages/admin/InventoryDetail";
-import ChecklistReview from "./pages/admin/ChecklistReview";
 import ChecklistSubmissionDetail from "./pages/admin/ChecklistSubmissionDetail";
 import WeeklyChecklist from "./pages/technician/WeeklyChecklist";
 import LocationManagement from "./pages/admin/LocationManagement";
@@ -44,7 +42,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             
-            {/* All roles can access Dashboard */}
+            {/* Dashboard - All roles */}
             <Route
               path="/dashboard"
               element={
@@ -54,9 +52,9 @@ const App = () => (
               }
             />
             
-            {/* Admin Inventory Management */}
+            {/* Inventory - Admin and Technicians */}
             <Route
-              path="/admin/inventory"
+              path="/inventory"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin', 'technician']}>
@@ -66,7 +64,7 @@ const App = () => (
               }
             />
             <Route
-              path="/admin/inventory/:id"
+              path="/inventory/:id"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin', 'technician']}>
@@ -75,11 +73,11 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Legacy route redirect */}
+            <Route path="/admin/inventory" element={<Navigate to="/inventory" replace />} />
+            <Route path="/admin/inventory/:id" element={<Navigate to="/inventory/:id" replace />} />
             
-            {/* Legacy inventory route redirect */}
-            <Route path="/inventory" element={<Navigate to="/admin/inventory" replace />} />
-            
-            {/* Admin and Technician routes */}
+            {/* Checklists - Role-based tabs within page */}
             <Route
               path="/checklists"
               element={
@@ -91,29 +89,7 @@ const App = () => (
               }
             />
             <Route
-              path="/technician/checklist/weekly"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin', 'technician']}>
-                    <WeeklyChecklist />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
-            
-            {/* Admin Checklist Review */}
-            <Route
-              path="/admin/checklists"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
-                    <ChecklistReview />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/checklists/:submissionId"
+              path="/checklists/:submissionId"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin']}>
@@ -122,8 +98,22 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/checklists/weekly"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                    <WeeklyChecklist />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            {/* Legacy route redirects */}
+            <Route path="/admin/checklists" element={<Navigate to="/checklists" replace />} />
+            <Route path="/admin/checklists/:submissionId" element={<Navigate to="/checklists/:submissionId" replace />} />
+            <Route path="/technician/checklist/weekly" element={<Navigate to="/checklists/weekly" replace />} />
             
-            {/* Admin only routes */}
+            {/* Equipment - Admin only */}
             <Route
               path="/equipment"
               element={
@@ -134,50 +124,10 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/users"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
-                    <UserManagement />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/locations"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
-                    <LocationManagement />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
-                    <Settings />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings/integrations"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
-                    <IntegrationSettings />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
             
-            {/* Admin and Call Staff routes */}
+            {/* Calls - Admin and Call Staff */}
             <Route
-              path="/admin/calls"
+              path="/calls"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin', 'call_staff']}>
@@ -187,7 +137,7 @@ const App = () => (
               }
             />
             <Route
-              path="/admin/calls/metrics"
+              path="/calls/metrics"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin']}>
@@ -196,8 +146,11 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Legacy calls route redirect */}
-            <Route path="/calls" element={<Navigate to="/admin/calls" replace />} />
+            {/* Legacy route redirects */}
+            <Route path="/admin/calls" element={<Navigate to="/calls" replace />} />
+            <Route path="/admin/calls/metrics" element={<Navigate to="/calls/metrics" replace />} />
+            
+            {/* Job Map - Admin and Call Staff */}
             <Route
               path="/job-map"
               element={
@@ -209,8 +162,55 @@ const App = () => (
               }
             />
             
+            {/* Users - Admin only */}
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <UserManagement />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
             {/* Legacy route redirect */}
-            <Route path="/users" element={<Navigate to="/admin/users" replace />} />
+            <Route path="/admin/users" element={<Navigate to="/users" replace />} />
+            
+            {/* Locations - Admin only */}
+            <Route
+              path="/locations"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <LocationManagement />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Settings - Admin only */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <Settings />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/integrations"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <IntegrationSettings />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            {/* Legacy route redirect */}
+            <Route path="/admin/settings/integrations" element={<Navigate to="/settings/integrations" replace />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
