@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocationStore } from "@/stores/useLocationStore";
-import { Check, ChevronsUpDown, MapPin } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Command,
   CommandEmpty,
@@ -13,6 +14,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -41,27 +43,38 @@ export function LocationSelector() {
         .from('locations')
         .select('id, name, city, state')
         .eq('organization_id', profile.organization_id)
-        .eq('is_active', true)
         .is('deleted_at', null)
         .order('name');
 
       if (error) throw error;
       return data as Location[];
     },
-    enabled: !!profile?.organization_id && profile?.role === 'admin',
+    enabled: !!profile?.organization_id,
   });
 
-  // Set default location if none selected
+  // Set default to 'all' for admins, or user's location for others
   useEffect(() => {
-    if (!selectedLocationId && locations.length > 0) {
-      setSelectedLocationId(locations[0].id);
+    if (profile?.role === 'admin' && selectedLocationId === null) {
+      setSelectedLocationId('all');
+    } else if (profile?.role !== 'admin' && profile?.location_id) {
+      setSelectedLocationId(profile.location_id);
     }
-  }, [locations, selectedLocationId, setSelectedLocationId]);
+  }, [profile, selectedLocationId, setSelectedLocationId]);
 
   const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
+  const isAllLocations = selectedLocationId === 'all';
 
+  // Non-admin users just see their assigned location as a badge
   if (profile?.role !== 'admin') {
-    return null;
+    const userLocation = locations.find(loc => loc.id === profile?.location_id);
+    if (!userLocation) return null;
+    
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted">
+        <MapPin className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">{userLocation.name}</span>
+      </div>
+    );
   }
 
   return (
@@ -75,13 +88,19 @@ export function LocationSelector() {
           disabled={isLoading}
         >
           <div className="flex items-center gap-2 truncate">
-            <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+            {isAllLocations ? (
+              <Building2 className="h-4 w-4 shrink-0 text-primary" />
+            ) : (
+              <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
             <span className="truncate">
               {isLoading 
                 ? "Loading..." 
-                : selectedLocation 
-                  ? selectedLocation.name 
-                  : "Select location"}
+                : isAllLocations
+                  ? "All Locations"
+                  : selectedLocation 
+                    ? selectedLocation.name 
+                    : "Select location"}
             </span>
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -93,6 +112,28 @@ export function LocationSelector() {
           <CommandList>
             <CommandEmpty>No location found.</CommandEmpty>
             <CommandGroup>
+              <CommandItem
+                value="all-locations"
+                onSelect={() => {
+                  setSelectedLocationId('all');
+                  setOpen(false);
+                }}
+                className="cursor-pointer"
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    isAllLocations ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <span className="font-medium">All Locations</span>
+                </div>
+              </CommandItem>
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup heading="Locations">
               {locations.map((location) => (
                 <CommandItem
                   key={location.id}
