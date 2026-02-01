@@ -34,6 +34,14 @@ export interface ServiceZone {
   } | null;
 }
 
+export interface TechnicianLocation {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  address: string;
+}
+
 export interface MapFilters {
   startDate: Date;
   weekView: boolean;
@@ -41,6 +49,7 @@ export interface MapFilters {
   serviceTypes: string[]; // 'all' | service names
   statuses: string[]; // 'all' | status values
   showZones: boolean;
+  showTechLocations: boolean;
 }
 
 export const DEFAULT_FILTERS: MapFilters = {
@@ -50,6 +59,7 @@ export const DEFAULT_FILTERS: MapFilters = {
   serviceTypes: ['all'],
   statuses: ['all'],
   showZones: true,
+  showTechLocations: true,
 };
 
 // Status options
@@ -185,6 +195,38 @@ export function useTechnicians() {
   });
 }
 
+export function useTechnicianLocations() {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ['technician-locations-map', profile?.organization_id],
+    queryFn: async () => {
+      if (!profile?.organization_id) return [];
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, home_lat, home_lng, address, city, state, zip')
+        .eq('organization_id', profile.organization_id)
+        .eq('role', 'technician')
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .not('home_lat', 'is', null)
+        .not('home_lng', 'is', null);
+
+      if (error) throw error;
+
+      return (data || []).map((tech) => ({
+        id: tech.id,
+        name: `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || 'Unknown',
+        lat: tech.home_lat as number,
+        lng: tech.home_lng as number,
+        address: [tech.address, tech.city, tech.state, tech.zip].filter(Boolean).join(', '),
+      })) as TechnicianLocation[];
+    },
+    enabled: !!profile?.organization_id
+  });
+}
+
 export function useServiceTypes() {
   const { profile } = useAuth();
 
@@ -258,6 +300,7 @@ export function filtersToSearchParams(filters: MapFilters): URLSearchParams {
     params.set('statuses', filters.statuses.join(','));
   }
   if (!filters.showZones) params.set('zones', '0');
+  if (!filters.showTechLocations) params.set('techLocs', '0');
   
   return params;
 }
@@ -285,6 +328,7 @@ export function searchParamsToFilters(params: URLSearchParams): Partial<MapFilte
   if (statuses) result.statuses = statuses.split(',');
   
   if (params.get('zones') === '0') result.showZones = false;
+  if (params.get('techLocs') === '0') result.showTechLocations = false;
   
   return result;
 }

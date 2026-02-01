@@ -18,6 +18,15 @@ interface JobSuggestionRequest {
   serviceName?: string;
 }
 
+interface TechnicianWithLocation {
+  id: string;
+  name: string;
+  home_lat: number;
+  home_lng: number;
+  address: string;
+  distanceFromJob?: number;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -76,6 +85,41 @@ serve(async (req) => {
     if (zonesError) {
       console.error("Error fetching zones:", zonesError);
     }
+
+    // Fetch technicians with home locations
+    const { data: technicians, error: techError } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name, home_lat, home_lng, address, city, state, zip")
+      .eq("organization_id", organizationId)
+      .eq("role", "technician")
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .not("home_lat", "is", null)
+      .not("home_lng", "is", null);
+
+    if (techError) {
+      console.error("Error fetching technicians:", techError);
+    }
+
+    // Process technicians with distances
+    const techsWithDistance: TechnicianWithLocation[] = (technicians || []).map((tech) => {
+      const name = `${tech.first_name || ""} ${tech.last_name || ""}`.trim() || "Unknown";
+      const techAddress = [tech.address, tech.city, tech.state, tech.zip].filter(Boolean).join(", ");
+      const distance = haversineDistance(
+        coordinates.lat,
+        coordinates.lng,
+        tech.home_lat,
+        tech.home_lng
+      );
+      return {
+        id: tech.id,
+        name,
+        home_lat: tech.home_lat,
+        home_lng: tech.home_lng,
+        address: techAddress,
+        distanceFromJob: distance,
+      };
+    }).sort((a, b) => (a.distanceFromJob || 999) - (b.distanceFromJob || 999));
 
     // Determine which zone the new address is in (simple point-in-polygon check)
     let matchingZone = null;
@@ -145,14 +189,25 @@ serve(async (req) => {
       })
       .join("\n\n");
 
+    // Build technician location context
+    const techLocationContext = techsWithDistance.length > 0
+      ? `TECHNICIAN HOME LOCATIONS (sorted by distance from job):
+${techsWithDistance.slice(0, 5).map((tech) => 
+  `- ${tech.name}: ${tech.distanceFromJob?.toFixed(1)} miles from job location (${tech.address})`
+).join("\n")}
+
+Consider these technicians for optimal routing - technicians living closer can start the day with this job or end their day here with less travel time.`
+      : "No technician home locations available.";
+
     const systemPrompt = `You are a job scheduling assistant for a service company. Analyze the existing job schedule and suggest optimal times for a new job.
 
 Consider these factors:
 1. Minimize drive time by clustering jobs in similar areas
-2. Avoid scheduling conflicts
-3. Balance workload across days
-4. Honor time preferences and restrictions
-5. Consider typical service windows (morning, midday, afternoon)
+2. IMPORTANT: Consider technician home locations when suggesting times - jobs closer to a tech's home are ideal for first or last appointments of the day
+3. Avoid scheduling conflicts
+4. Balance workload across days
+5. Honor time preferences and restrictions
+6. Consider typical service windows (morning, midday, afternoon)
 
 Respond with a JSON object containing:
 {
@@ -161,12 +216,13 @@ Respond with a JSON object containing:
       "date": "YYYY-MM-DD",
       "dayName": "Monday",
       "timeSlot": "09:00-11:00",
-      "reason": "Brief explanation",
+      "reason": "Brief explanation including which technician might be best suited based on home location",
       "confidence": "high" | "medium" | "low",
-      "nearbyJobsCount": 3
+      "nearbyJobsCount": 3,
+      "suggestedTechnician": "Tech name if applicable"
     }
   ],
-  "analysis": "Brief overall analysis of the scheduling situation",
+  "analysis": "Brief overall analysis of the scheduling situation including technician routing efficiency",
   "warnings": ["Any potential issues or conflicts"]
 }
 
@@ -183,6 +239,8 @@ ${preferredDays?.length ? `- Preferred Days: ${preferredDays.join(", ")}` : ""}
 ${preferredTimeStart ? `- Preferred Time Window: ${preferredTimeStart} to ${preferredTimeEnd || "17:00"}` : ""}
 ${restrictions ? `- Restrictions/Notes: ${restrictions}` : ""}
 
+${techLocationContext}
+
 EXISTING SCHEDULE OVERVIEW (Next 14 Days):
 ${jobSummary || "No existing jobs scheduled"}
 
@@ -191,7 +249,7 @@ ${nearbyJobDetails || "No nearby jobs found"}
 
 Today's date is ${today.toISOString().split("T")[0]}.
 
-Analyze this data and suggest the optimal times to book this job.`;
+Analyze this data and suggest the optimal times to book this job. When making suggestions, factor in technician home locations for routing efficiency - suggest techs who live nearby for first or last appointments of the day.`;
 
     console.log("Calling Lovable AI for scheduling suggestions...");
 

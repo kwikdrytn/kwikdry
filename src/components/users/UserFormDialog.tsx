@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { UserProfile, UserFormData, useLocations } from "@/hooks/useUsers";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const userFormSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
@@ -36,6 +37,10 @@ const userFormSchema = z.object({
   phone: z.string().optional(),
   role: z.enum(['admin', 'call_staff', 'technician']),
   location_id: z.string().nullable(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
 });
 
 interface UserFormDialogProps {
@@ -65,6 +70,10 @@ export function UserFormDialog({
       phone: user?.phone ?? '',
       role: user?.role ?? 'technician',
       location_id: user?.location_id ?? null,
+      address: user?.address ?? '',
+      city: user?.city ?? '',
+      state: user?.state ?? '',
+      zip: user?.zip ?? '',
     },
   });
 
@@ -87,6 +96,10 @@ export function UserFormDialog({
         phone: user.phone ?? '',
         role: user.role,
         location_id: user.location_id,
+        address: user.address ?? '',
+        city: user.city ?? '',
+        state: user.state ?? '',
+        zip: user.zip ?? '',
       });
     }
   }
@@ -100,7 +113,7 @@ export function UserFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-background">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-background flex flex-col">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit User' : 'Add New User'}</DialogTitle>
           <DialogDescription>
@@ -111,129 +124,213 @@ export function UserFormDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="first_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="John" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 overflow-hidden">
+            <ScrollArea className="flex-1 pr-4 -mr-4">
+              <div className="space-y-4 pr-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="first_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="last_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                  <FormField
+                    control={form.control}
+                    name="last_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="email" 
-                      placeholder="john.doe@example.com" 
-                      {...field} 
-                      disabled={isEditing}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="tel" 
-                      placeholder="(555) 123-4567" 
-                      {...field} 
-                      value={field.value ?? ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
+                        <Input 
+                          type="email" 
+                          placeholder="john.doe@example.com" 
+                          {...field} 
+                          disabled={isEditing}
+                        />
                       </FormControl>
-                      <SelectContent className="bg-popover">
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="call_staff">Call Staff</SelectItem>
-                        <SelectItem value="technician">Technician</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="location_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value ?? undefined}
-                    >
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
+                        <Input 
+                          type="tel" 
+                          placeholder="(555) 123-4567" 
+                          {...field} 
+                          value={field.value ?? ''}
+                        />
                       </FormControl>
-                      <SelectContent className="bg-popover">
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <DialogFooter className="pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-popover">
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="call_staff">Call Staff</SelectItem>
+                            <SelectItem value="technician">Technician</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="location_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          value={field.value ?? undefined}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-popover">
+                            {locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Address Section */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium mb-3 text-muted-foreground">Home Address (for route planning)</h4>
+                  
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Street Address</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="123 Main Street" 
+                            {...field} 
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-6 gap-3 mt-3">
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem className="col-span-3">
+                          <FormLabel>City</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="City" 
+                              {...field} 
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem className="col-span-1">
+                          <FormLabel>State</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="ST" 
+                              maxLength={2}
+                              {...field} 
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="zip"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>ZIP</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="12345" 
+                              {...field} 
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+
+            <DialogFooter className="pt-4 mt-4 border-t">
               <Button
                 type="button"
                 variant="outline"

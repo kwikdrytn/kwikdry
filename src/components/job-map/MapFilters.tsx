@@ -9,7 +9,8 @@ import {
   CalendarDays,
   User,
   Wrench,
-  CircleDot
+  CircleDot,
+  Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,10 @@ export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClear
     onFiltersChange({ ...filters, showZones: checked });
   };
 
+  const handleShowTechLocationsChange = (checked: boolean) => {
+    onFiltersChange({ ...filters, showTechLocations: checked });
+  };
+
   const toggleTechnician = (id: string) => {
     let newTechs: string[];
     
@@ -132,6 +137,7 @@ export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClear
       ...DEFAULT_FILTERS,
       startDate: filters.startDate, // Keep the date
       showZones: filters.showZones, // Keep zones toggle
+      showTechLocations: filters.showTechLocations, // Keep tech locations toggle
     });
   };
 
@@ -389,6 +395,20 @@ export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClear
                   id="show-zones"
                   checked={filters.showZones}
                   onCheckedChange={handleShowZonesChange}
+                  className="scale-75"
+                />
+              </div>
+
+              {/* Show Tech Locations Toggle */}
+              <div className="flex items-center justify-between">
+                <Label htmlFor="show-tech-locs" className="text-xs cursor-pointer flex items-center gap-1.5">
+                  <Home className="h-3 w-3" />
+                  Tech Home Locations
+                </Label>
+                <Switch
+                  id="show-tech-locs"
+                  checked={filters.showTechLocations}
+                  onCheckedChange={handleShowTechLocationsChange}
                   className="scale-75"
                 />
               </div>
