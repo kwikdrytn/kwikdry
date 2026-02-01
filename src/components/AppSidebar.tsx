@@ -2,7 +2,7 @@ import { useLocation, Link } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { getNavItemsForRole } from "@/config/navigation";
-import { Settings } from "lucide-react";
+import { Settings, PanelLeft } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -14,14 +14,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import kwikDryLogo from "@/assets/KwikDryLogo.png";
 
 export function AppSidebar() {
   const { profile } = useAuth();
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const location = useLocation();
   const isCollapsed = state === "collapsed";
 
@@ -131,12 +130,11 @@ export function AppSidebar() {
           {/* Collapse/Expand Button */}
           <SidebarMenuItem>
             <SidebarMenuButton 
-              asChild
+              onClick={toggleSidebar}
               tooltip="Collapse"
             >
-              <SidebarTrigger className="w-full justify-start gap-3">
-                <span>Collapse</span>
-              </SidebarTrigger>
+              <PanelLeft className="h-5 w-5" />
+              <span>Collapse</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
