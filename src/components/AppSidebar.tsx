@@ -72,7 +72,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        <SidebarTrigger className="w-full justify-center text-white hover:text-white hover:bg-sidebar-accent" />
+        <SidebarTrigger className="w-full justify-start text-white hover:text-white hover:bg-sidebar-accent" />
       </SidebarFooter>
     </Sidebar>
   );
