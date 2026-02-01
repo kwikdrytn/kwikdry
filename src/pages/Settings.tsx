@@ -11,11 +11,14 @@ import { Link } from "react-router-dom";
 import { Users, MapPin, Plug, ChevronRight, Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AvatarCropDialog } from "@/components/settings/AvatarCropDialog";
 
 export default function Settings() {
   const { profile, signOut, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string>("");
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.[0] ?? '';
@@ -31,7 +34,7 @@ export default function Settings() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !profile) return;
 
@@ -47,19 +50,35 @@ export default function Settings() {
       return;
     }
 
+    // Create object URL for cropping
+    const imageUrl = URL.createObjectURL(file);
+    setSelectedImageSrc(imageUrl);
+    setCropDialogOpen(true);
+
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!profile) return;
+
     setIsUploading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/avatar.${fileExt}`;
+      const filePath = `${user.id}/avatar.jpg`;
 
-      // Upload to storage
+      // Upload cropped image to storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, croppedBlob, { 
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
 
       if (uploadError) throw uploadError;
 
@@ -80,15 +99,24 @@ export default function Settings() {
       // Refresh profile to show new avatar
       await refreshProfile?.();
       toast.success('Profile picture updated');
+      setCropDialogOpen(false);
+      
+      // Clean up object URL
+      URL.revokeObjectURL(selectedImageSrc);
+      setSelectedImageSrc("");
     } catch (error) {
       console.error('Error uploading avatar:', error);
       toast.error('Failed to upload profile picture');
     } finally {
       setIsUploading(false);
-      // Reset input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+    }
+  };
+
+  const handleCropDialogClose = (open: boolean) => {
+    if (!open && !isUploading) {
+      setCropDialogOpen(false);
+      URL.revokeObjectURL(selectedImageSrc);
+      setSelectedImageSrc("");
     }
   };
 
@@ -210,6 +238,14 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
+
+      <AvatarCropDialog
+        open={cropDialogOpen}
+        onOpenChange={handleCropDialogClose}
+        imageSrc={selectedImageSrc}
+        onCropComplete={handleCropComplete}
+        isUploading={isUploading}
+      />
     </DashboardLayout>
   );
 }
