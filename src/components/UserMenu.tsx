@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, User, Settings, ChevronDown } from "lucide-react";
+import { LogOut, Settings, ChevronDown, Download, Smartphone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,10 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 export function UserMenu() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const { isInstallable, install, dismiss } = usePWAInstall();
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.[0] ?? '';
@@ -31,6 +31,10 @@ export function UserMenu() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleInstall = async () => {
+    await install();
   };
 
   return (
@@ -62,6 +66,18 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {isInstallable && (
+          <>
+            <DropdownMenuItem 
+              onClick={handleInstall}
+              className="cursor-pointer"
+            >
+              <Smartphone className="mr-2 h-4 w-4" />
+              Install App
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem 
           onClick={() => navigate('/settings')}
           className="cursor-pointer"
