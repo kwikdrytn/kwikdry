@@ -118,8 +118,8 @@ export function UserFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-background flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-background flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{isEditing ? 'Edit User' : 'Add New User'}</DialogTitle>
           <DialogDescription>
             {isEditing
@@ -129,9 +129,9 @@ export function UserFormDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 overflow-hidden">
-            <ScrollArea className="flex-1 pr-4 -mr-4">
-              <div className="space-y-4 pr-2">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-4 pr-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -338,7 +338,7 @@ export function UserFormDialog({
               </div>
             </ScrollArea>
 
-            <DialogFooter className="pt-4 mt-4 border-t">
+            <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
               <Button
                 type="button"
                 variant="outline"
