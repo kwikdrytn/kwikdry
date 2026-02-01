@@ -49,7 +49,7 @@ export const DEFAULT_FILTERS: MapFilters = {
   technicians: ['all'],
   serviceTypes: ['all'],
   statuses: ['all'],
-  showZones: true,
+  showZones: false, // Hidden by default until real zone boundaries exist
 };
 
 // Status options
