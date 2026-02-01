@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { SyncResult, SyncProgress } from "@/lib/housecallpro";
+import { EmployeeLinking } from "@/components/integrations/EmployeeLinking";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -261,10 +262,11 @@ export default function IntegrationSettings() {
           details: `Synced ${data.synced?.jobs || 0} jobs, ${data.synced?.customers || 0} customers, ${data.synced?.employees || 0} employees, ${data.synced?.serviceZones || 0} zones`,
         });
         
-        // Refresh counts and zones
+        // Refresh counts, zones, and employees
         refetchCounts();
         refetchLastSync();
         refetchZones();
+        queryClient.invalidateQueries({ queryKey: ['hcp-employees-with-links'] });
         
         toast({
           title: "Sync complete",
@@ -627,6 +629,11 @@ export default function IntegrationSettings() {
                     </div>
                   )}
                 </div>
+
+                <Separator />
+
+                {/* Employee Linking */}
+                <EmployeeLinking />
               </CardContent>
             </Card>
           </TabsContent>
