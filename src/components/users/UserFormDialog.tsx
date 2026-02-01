@@ -37,7 +37,7 @@ const userFormSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().optional(),
   role: z.enum(['admin', 'call_staff', 'technician']),
-  custom_role_id: z.string().nullable(),
+  custom_role_id: z.string().min(1, "Role is required"),
   location_id: z.string().nullable(),
   address: z.string().optional(),
   city: z.string().optional(),
@@ -72,7 +72,7 @@ export function UserFormDialog({
       email: user?.email ?? '',
       phone: user?.phone ?? '',
       role: user?.role ?? 'technician',
-      custom_role_id: user?.custom_role_id ?? null,
+      custom_role_id: user?.custom_role_id ?? '',
       location_id: user?.location_id ?? null,
       address: user?.address ?? '',
       city: user?.city ?? '',
@@ -200,59 +200,33 @@ export function UserFormDialog({
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Base Role</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="bg-popover">
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="call_staff">Call Staff</SelectItem>
-                            <SelectItem value="technician">Technician</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="custom_role_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Custom Role</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(value === 'none' ? null : value)} 
-                          value={field.value ?? 'none'}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="None" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="bg-popover">
-                            <SelectItem value="none">None</SelectItem>
-                            {customRoles.map((role) => (
-                              <SelectItem key={role.id} value={role.id}>
-                                {role.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="custom_role_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value ?? ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-popover">
+                          {customRoles.map((role) => (
+                            <SelectItem key={role.id} value={role.id}>
+                              {role.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
