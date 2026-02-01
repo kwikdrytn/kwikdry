@@ -2,15 +2,18 @@ import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { getNavItemsForRole } from "@/config/navigation";
+import { PanelLeft } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import kwikDryLogo from "@/assets/KwikDryLogo.png";
@@ -67,6 +70,10 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border">
+        <SidebarTrigger className="w-full justify-center text-white hover:text-white hover:bg-sidebar-accent" />
+      </SidebarFooter>
     </Sidebar>
   );
 }
