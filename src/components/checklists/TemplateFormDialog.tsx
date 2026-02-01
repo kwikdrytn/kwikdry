@@ -342,17 +342,17 @@ export function TemplateFormDialog({ open, onOpenChange, template }: TemplateFor
                           className="border rounded-lg px-4"
                         >
                           <AccordionTrigger className="hover:no-underline py-3">
-                            <div className="flex items-center gap-3 flex-1 text-left">
-                              <GripVertical className="h-4 w-4 text-muted-foreground" />
-                              <Badge variant="outline" className="gap-1">
+                            <div className="flex items-center gap-3 flex-1 text-left min-w-0 overflow-hidden">
+                              <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <Badge variant="outline" className="gap-1 flex-shrink-0">
                                 <Icon className="h-3 w-3" />
                                 {itemTypeLabels[item.type]}
                               </Badge>
-                              <span className="truncate">
+                              <span className="truncate flex-1 min-w-0">
                                 {item.label || <span className="text-muted-foreground italic">Untitled</span>}
                               </span>
                               {item.required && (
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="text-xs flex-shrink-0">
                                   Required
                                 </Badge>
                               )}
