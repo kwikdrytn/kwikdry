@@ -2,17 +2,28 @@ import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Upload, Pencil, X, CheckSquare } from "lucide-react";
+import { Plus, Package, Upload, Pencil, X, CheckSquare, Trash2 } from "lucide-react";
 import { InventoryTable } from "@/components/inventory/InventoryTable";
 import { InventoryFilters } from "@/components/inventory/InventoryFilters";
 import { InventoryFormDialog } from "@/components/inventory/InventoryFormDialog";
 import { CsvImportDialog } from "@/components/inventory/CsvImportDialog";
 import { BulkEditDialog, BulkEditUpdates } from "@/components/inventory/BulkEditDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   useInventoryItems, 
   useCreateInventoryItem,
   useBulkCreateInventoryItems,
   useBulkUpdateInventoryItems,
+  useBulkDeleteInventoryItems,
   InventoryItemFormData,
   BulkImportItem,
 } from "@/hooks/useInventory";
@@ -24,6 +35,7 @@ export default function InventoryManagement() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
@@ -37,6 +49,7 @@ export default function InventoryManagement() {
   const createItem = useCreateInventoryItem();
   const bulkCreateItems = useBulkCreateInventoryItems();
   const bulkUpdateItems = useBulkUpdateInventoryItems();
+  const bulkDeleteItems = useBulkDeleteInventoryItems();
 
   const handleCreateItem = (data: InventoryItemFormData) => {
     createItem.mutate(data, {
@@ -72,6 +85,18 @@ export default function InventoryManagement() {
   const handleCancelSelection = () => {
     setSelectionMode(false);
     setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    
+    bulkDeleteItems.mutate(Array.from(selectedIds), {
+      onSuccess: () => {
+        setIsBulkDeleteOpen(false);
+        setSelectedIds(new Set());
+        setSelectionMode(false);
+      },
+    });
   };
 
   const lowStockCount = useMemo(() => 
@@ -130,6 +155,16 @@ export default function InventoryManagement() {
                 >
                   <Pencil className="h-4 w-4" />
                   Edit Selected
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                  disabled={selectedIds.size === 0}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Selected
                 </Button>
                 <Button
                   variant="ghost"
@@ -223,6 +258,26 @@ export default function InventoryManagement() {
         onSave={handleBulkEdit}
         isLoading={bulkUpdateItems.isPending}
       />
+
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the selected inventory items. This action can be undone by an administrator.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleteItems.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
