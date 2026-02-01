@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { UserProfile, UserFormData, useLocations } from "@/hooks/useUsers";
+import { useCustomRoles } from "@/hooks/useRoles";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const userFormSchema = z.object({
@@ -36,6 +37,7 @@ const userFormSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().optional(),
   role: z.enum(['admin', 'call_staff', 'technician']),
+  custom_role_id: z.string().nullable(),
   location_id: z.string().nullable(),
   address: z.string().optional(),
   city: z.string().optional(),
@@ -59,6 +61,7 @@ export function UserFormDialog({
   isLoading,
 }: UserFormDialogProps) {
   const { data: locations = [] } = useLocations();
+  const { data: customRoles = [] } = useCustomRoles();
   const isEditing = !!user;
 
   const form = useForm<UserFormData>({
@@ -69,6 +72,7 @@ export function UserFormDialog({
       email: user?.email ?? '',
       phone: user?.phone ?? '',
       role: user?.role ?? 'technician',
+      custom_role_id: user?.custom_role_id ?? null,
       location_id: user?.location_id ?? null,
       address: user?.address ?? '',
       city: user?.city ?? '',
@@ -95,6 +99,7 @@ export function UserFormDialog({
         email: user.email ?? '',
         phone: user.phone ?? '',
         role: user.role,
+        custom_role_id: user.custom_role_id,
         location_id: user.location_id,
         address: user.address ?? '',
         city: user.city ?? '',
@@ -201,7 +206,7 @@ export function UserFormDialog({
                     name="role"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Role</FormLabel>
+                        <FormLabel>Base Role</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -221,23 +226,24 @@ export function UserFormDialog({
 
                   <FormField
                     control={form.control}
-                    name="location_id"
+                    name="custom_role_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Location</FormLabel>
+                        <FormLabel>Custom Role</FormLabel>
                         <Select 
-                          onValueChange={field.onChange} 
-                          value={field.value ?? undefined}
+                          onValueChange={(value) => field.onChange(value === 'none' ? null : value)} 
+                          value={field.value ?? 'none'}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select location" />
+                              <SelectValue placeholder="None" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="bg-popover">
-                            {locations.map((location) => (
-                              <SelectItem key={location.id} value={location.id}>
-                                {location.name}
+                            <SelectItem value="none">None</SelectItem>
+                            {customRoles.map((role) => (
+                              <SelectItem key={role.id} value={role.id}>
+                                {role.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -247,6 +253,34 @@ export function UserFormDialog({
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="location_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value ?? undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select location" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-popover">
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {/* Address Section */}
                 <div className="border-t pt-4 mt-4">

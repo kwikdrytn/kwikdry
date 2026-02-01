@@ -11,6 +11,7 @@ export interface UserProfile {
   email: string | null;
   phone: string | null;
   role: 'admin' | 'call_staff' | 'technician';
+  custom_role_id: string | null;
   location_id: string | null;
   organization_id: string;
   is_active: boolean | null;
@@ -26,6 +27,10 @@ export interface UserProfile {
     id: string;
     name: string;
   } | null;
+  custom_role?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 export interface UserFormData {
@@ -34,6 +39,7 @@ export interface UserFormData {
   email: string;
   phone: string;
   role: 'admin' | 'call_staff' | 'technician';
+  custom_role_id: string | null;
   location_id: string | null;
   address?: string;
   city?: string;
@@ -59,6 +65,7 @@ export function useUsers(filters?: { locationId?: string | null; role?: string |
           email,
           phone,
           role,
+          custom_role_id,
           location_id,
           organization_id,
           is_active,
@@ -71,6 +78,10 @@ export function useUsers(filters?: { locationId?: string | null; role?: string |
           home_lat,
           home_lng,
           locations:location_id (
+            id,
+            name
+          ),
+          custom_roles:custom_role_id (
             id,
             name
           )
@@ -94,6 +105,7 @@ export function useUsers(filters?: { locationId?: string | null; role?: string |
       return data.map((user: any) => ({
         ...user,
         location: user.locations,
+        custom_role: user.custom_roles,
       })) as UserProfile[];
     },
     enabled: !!profile?.organization_id,
@@ -185,6 +197,7 @@ export function useCreateUser() {
           email: data.email,
           phone: data.phone,
           role: data.role,
+          custom_role_id: data.custom_role_id,
           location_id: data.location_id,
           address: data.address || null,
           city: data.city || null,

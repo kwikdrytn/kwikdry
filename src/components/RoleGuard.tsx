@@ -1,16 +1,19 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/stores/useAuthStore";
+import { useUserPermissions, PermissionKey } from "@/hooks/useRoles";
 
 interface RoleGuardProps {
   children: React.ReactNode;
-  allowedRoles: UserRole[];
+  allowedRoles?: UserRole[];
+  requiredPermission?: PermissionKey;
 }
 
-export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
+export function RoleGuard({ children, allowedRoles, requiredPermission }: RoleGuardProps) {
   const { profile, isLoading } = useAuth();
+  const { data: permissions, isLoading: permissionsLoading } = useUserPermissions();
 
-  if (isLoading) {
+  if (isLoading || permissionsLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -22,7 +25,18 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (!allowedRoles.includes(profile.role)) {
+  // Admins always have access
+  if (profile.role === 'admin') {
+    return <>{children}</>;
+  }
+
+  // Check legacy role-based access
+  if (allowedRoles && !allowedRoles.includes(profile.role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  // Check granular permission if specified
+  if (requiredPermission && !permissions?.includes(requiredPermission)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
