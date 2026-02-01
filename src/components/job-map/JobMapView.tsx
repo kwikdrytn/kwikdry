@@ -220,20 +220,70 @@ export function JobMapView() {
     };
   }, []);
 
-  // Update map center based on first job
+  // Fit map to service zones on initial load
+  const hasInitiallyFit = useRef(false);
+  
   useEffect(() => {
-    if (!map.current || !mapLoaded) return;
+    if (!map.current || !mapLoaded || hasInitiallyFit.current) return;
+    if (!map.current.isStyleLoaded()) return;
 
+    // Priority 1: Fit to all service zones
+    if (zones && zones.length > 0) {
+      const zonesWithPolygons = zones.filter(z => z.polygon_geojson?.coordinates?.[0]);
+      
+      if (zonesWithPolygons.length > 0) {
+        let minLng = Infinity, maxLng = -Infinity;
+        let minLat = Infinity, maxLat = -Infinity;
+
+        zonesWithPolygons.forEach(zone => {
+          const coords = zone.polygon_geojson!.coordinates[0];
+          coords.forEach(([lng, lat]) => {
+            if (lng < minLng) minLng = lng;
+            if (lng > maxLng) maxLng = lng;
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+          });
+        });
+
+        if (minLng !== Infinity) {
+          map.current.fitBounds(
+            [[minLng, minLat], [maxLng, maxLat]],
+            { padding: 50, duration: 1000 }
+          );
+          hasInitiallyFit.current = true;
+          return;
+        }
+      }
+    }
+
+    // Priority 2: Fit to jobs if no zones
     const jobsWithCoords = jobs?.filter(j => j.lat && j.lng) || [];
     if (jobsWithCoords.length > 0) {
-      const firstJob = jobsWithCoords[0];
-      map.current.flyTo({
-        center: [firstJob.lng!, firstJob.lat!],
-        zoom: 10,
-        duration: 1000,
+      let minLng = Infinity, maxLng = -Infinity;
+      let minLat = Infinity, maxLat = -Infinity;
+
+      jobsWithCoords.forEach(job => {
+        if (job.lng! < minLng) minLng = job.lng!;
+        if (job.lng! > maxLng) maxLng = job.lng!;
+        if (job.lat! < minLat) minLat = job.lat!;
+        if (job.lat! > maxLat) maxLat = job.lat!;
       });
+
+      if (jobsWithCoords.length === 1) {
+        map.current.flyTo({
+          center: [jobsWithCoords[0].lng!, jobsWithCoords[0].lat!],
+          zoom: 12,
+          duration: 1000,
+        });
+      } else {
+        map.current.fitBounds(
+          [[minLng, minLat], [maxLng, maxLat]],
+          { padding: 50, duration: 1000 }
+        );
+      }
+      hasInitiallyFit.current = true;
     }
-  }, [jobs, mapLoaded]);
+  }, [zones, jobs, mapLoaded]);
 
   // Add service zone polygons with labels and hover
   useEffect(() => {
