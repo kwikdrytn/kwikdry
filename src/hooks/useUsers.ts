@@ -187,14 +187,12 @@ export function useCreateUser() {
         }
       }
 
-      // Note: In a real app, you'd create the auth user first via an edge function
-      // For now, we'll just create the profile (assuming user_id would come from auth)
-      const { data: newUser, error } = await supabase
-        .from('profiles')
-        .insert({
+      // Call edge function to invite user and create profile
+      const { data: result, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: data.email,
           first_name: data.first_name,
           last_name: data.last_name,
-          email: data.email,
           phone: data.phone,
           role: data.role,
           custom_role_id: data.custom_role_id,
@@ -205,20 +203,18 @@ export function useCreateUser() {
           zip: data.zip || null,
           home_lat,
           home_lng,
-          organization_id: profile.organization_id,
-          user_id: crypto.randomUUID(), // Placeholder - in real app, this comes from auth
-          is_active: true,
-        })
-        .select()
-        .single();
+        },
+      });
 
       if (error) throw error;
-      return newUser;
+      if (result?.error) throw new Error(result.error);
+
+      return result.profile;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['technicians-with-locations'] });
-      toast.success('User created successfully');
+      toast.success(`User invited successfully. An email has been sent to ${variables.email}`);
     },
     onError: (error) => {
       toast.error(`Failed to create user: ${error.message}`);
