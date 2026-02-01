@@ -458,6 +458,36 @@ export function useUpdateInventoryItem() {
   });
 }
 
+export function useBulkUpdateInventoryItems() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      ids, 
+      updates 
+    }: { 
+      ids: string[]; 
+      updates: Partial<InventoryItemFormData>; 
+    }) => {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update(updates)
+        .in('id', ids);
+
+      if (error) throw error;
+      return { updatedCount: ids.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-item'] });
+      toast.success(`Successfully updated ${result.updatedCount} item${result.updatedCount !== 1 ? 's' : ''}`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update items: ${error.message}`);
+    },
+  });
+}
+
 export function useAdjustStock() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
