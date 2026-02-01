@@ -11,7 +11,9 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  X
+  X,
+  Car,
+  User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,12 +51,21 @@ interface Suggestion {
   reason: string;
   confidence: "high" | "medium" | "low";
   nearbyJobsCount?: number;
+  suggestedTechnician?: string;
+}
+
+interface TechnicianDistance {
+  name: string;
+  drivingDistanceMiles?: number;
+  drivingDurationMinutes?: number;
+  straightLineDistance?: number;
 }
 
 interface SuggestionResponse {
   suggestions: Suggestion[];
   analysis: string;
   warnings?: string[];
+  technicians?: TechnicianDistance[];
 }
 
 const DAYS_OF_WEEK = [
@@ -145,6 +156,16 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
       default:
         return null;
     }
+  };
+
+  const formatDrivingDistance = (tech: TechnicianDistance) => {
+    if (tech.drivingDistanceMiles !== undefined && tech.drivingDurationMinutes !== undefined) {
+      return `${tech.drivingDistanceMiles.toFixed(1)} mi • ${Math.round(tech.drivingDurationMinutes)} min`;
+    }
+    if (tech.straightLineDistance !== undefined) {
+      return `~${tech.straightLineDistance.toFixed(1)} mi`;
+    }
+    return "Unknown";
   };
 
   if (!searchedLocation) return null;
@@ -305,6 +326,29 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Technician Driving Distances */}
+              {suggestions.technicians && suggestions.technicians.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Car className="h-4 w-4" />
+                    Technician Driving Distances
+                  </Label>
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                    {suggestions.technicians.map((tech, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>{tech.name}</span>
+                        </div>
+                        <span className="text-muted-foreground font-mono text-xs">
+                          {formatDrivingDistance(tech)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Analysis Summary */}
               {suggestions.analysis && (
                 <div className="bg-muted/50 rounded-lg p-3 text-sm">
@@ -354,6 +398,12 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                             </span>
                           )}
                         </div>
+                        {suggestion.suggestedTechnician && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-primary">
+                            <User className="h-3 w-3" />
+                            <span>{suggestion.suggestedTechnician}</span>
+                          </div>
+                        )}
                         <p className="text-xs text-muted-foreground mt-2">
                           {suggestion.reason}
                         </p>
