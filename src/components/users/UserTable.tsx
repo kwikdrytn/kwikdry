@@ -26,18 +26,6 @@ interface UserTableProps {
   onDeactivate: (user: UserProfile) => void;
 }
 
-const roleLabels: Record<string, string> = {
-  admin: 'Admin',
-  call_staff: 'Call Staff',
-  technician: 'Technician',
-};
-
-const roleVariants: Record<string, 'default' | 'secondary' | 'outline'> = {
-  admin: 'default',
-  call_staff: 'secondary',
-  technician: 'outline',
-};
-
 export function UserTable({ users, isLoading, onEdit, onDeactivate }: UserTableProps) {
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.[0] ?? '';
@@ -112,8 +100,8 @@ export function UserTable({ users, isLoading, onEdit, onDeactivate }: UserTableP
                 </div>
               </TableCell>
               <TableCell>
-                <Badge variant={roleVariants[user.role] ?? 'outline'}>
-                  {roleLabels[user.role] ?? user.role}
+                <Badge variant="outline">
+                  {user.custom_role?.name ?? '—'}
                 </Badge>
               </TableCell>
               <TableCell>
