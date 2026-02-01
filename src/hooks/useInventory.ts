@@ -301,64 +301,130 @@ export function useBulkCreateInventoryItems() {
     mutationFn: async (items: BulkImportItem[]) => {
       if (!profile?.organization_id) throw new Error('No organization');
 
-      const itemsWithOrg = items.map(item => ({
-        name: item.name,
-        description: item.description,
-        notes: item.notes,
-        expiration_date: item.expiration_date,
-        category: item.category,
-        unit: item.unit,
-        reorder_threshold: item.reorder_threshold,
-        par_level: item.par_level,
-        organization_id: profile.organization_id,
-        is_active: true,
-      }));
-
-      // Insert inventory items
-      const { data: createdItems, error } = await supabase
+      // Get all existing items for this organization to match by name
+      const { data: existingItems, error: fetchError } = await supabase
         .from('inventory_items')
-        .insert(itemsWithOrg)
-        .select();
+        .select('id, name')
+        .eq('organization_id', profile.organization_id)
+        .is('deleted_at', null);
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
-      // Create stock records for items that have quantity and location
-      const stockRecords: Array<{
-        item_id: string;
-        location_id: string;
-        quantity: number;
-        technician_id: null;
-      }> = [];
+      // Create a map of lowercase name -> item for case-insensitive matching
+      const existingByName = new Map<string, { id: string; name: string }>();
+      existingItems?.forEach(item => {
+        existingByName.set(item.name.toLowerCase().trim(), item);
+      });
 
-      createdItems.forEach((createdItem, index) => {
-        const originalItem = items[index];
-        if (originalItem.quantity && originalItem.quantity > 0 && originalItem.location_id) {
-          stockRecords.push({
-            item_id: createdItem.id,
-            location_id: originalItem.location_id,
-            quantity: originalItem.quantity,
-            technician_id: null,
-          });
+      const itemsToCreate: BulkImportItem[] = [];
+      const itemsToUpdate: Array<{ existingId: string; importItem: BulkImportItem }> = [];
+
+      // Separate items into create vs update
+      items.forEach(item => {
+        const existing = existingByName.get(item.name.toLowerCase().trim());
+        if (existing) {
+          itemsToUpdate.push({ existingId: existing.id, importItem: item });
+        } else {
+          itemsToCreate.push(item);
         }
       });
 
-      if (stockRecords.length > 0) {
-        const { error: stockError } = await supabase
-          .from('inventory_stock')
-          .insert(stockRecords);
+      let createdCount = 0;
+      let updatedCount = 0;
 
-        if (stockError) {
-          console.error('Failed to create stock records:', stockError);
-          // Don't throw - items were created successfully
+      // Create new items
+      if (itemsToCreate.length > 0) {
+        const newItemsData = itemsToCreate.map(item => ({
+          name: item.name,
+          description: item.description,
+          notes: item.notes,
+          expiration_date: item.expiration_date,
+          category: item.category,
+          unit: item.unit,
+          reorder_threshold: item.reorder_threshold,
+          par_level: item.par_level,
+          organization_id: profile.organization_id,
+          is_active: true,
+        }));
+
+        const { data: createdItems, error } = await supabase
+          .from('inventory_items')
+          .insert(newItemsData)
+          .select();
+
+        if (error) throw error;
+        createdCount = createdItems?.length || 0;
+
+        // Create stock records for new items
+        const stockRecords: Array<{
+          item_id: string;
+          location_id: string;
+          quantity: number;
+          technician_id: null;
+        }> = [];
+
+        createdItems?.forEach((createdItem, index) => {
+          const originalItem = itemsToCreate[index];
+          if (originalItem.quantity && originalItem.quantity > 0 && originalItem.location_id) {
+            stockRecords.push({
+              item_id: createdItem.id,
+              location_id: originalItem.location_id,
+              quantity: originalItem.quantity,
+              technician_id: null,
+            });
+          }
+        });
+
+        if (stockRecords.length > 0) {
+          await supabase.from('inventory_stock').insert(stockRecords);
         }
       }
 
-      return createdItems;
+      // Update existing items' stock
+      for (const { existingId, importItem } of itemsToUpdate) {
+        if (importItem.quantity && importItem.quantity > 0 && importItem.location_id) {
+          // Check if stock record exists for this item + location
+          const { data: existingStock } = await supabase
+            .from('inventory_stock')
+            .select('id, quantity')
+            .eq('item_id', existingId)
+            .eq('location_id', importItem.location_id)
+            .is('technician_id', null)
+            .is('deleted_at', null)
+            .maybeSingle();
+
+          if (existingStock) {
+            // Update existing stock - add to current quantity
+            await supabase
+              .from('inventory_stock')
+              .update({ 
+                quantity: existingStock.quantity + importItem.quantity,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingStock.id);
+          } else {
+            // Create new stock record for existing item
+            await supabase.from('inventory_stock').insert({
+              item_id: existingId,
+              location_id: importItem.location_id,
+              quantity: importItem.quantity,
+              technician_id: null,
+            });
+          }
+          updatedCount++;
+        }
+      }
+
+      return { createdCount, updatedCount };
     },
-    onSuccess: (data) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['item-stock'] });
-      toast.success(`Successfully imported ${data.length} item(s)`);
+      
+      const messages: string[] = [];
+      if (result.createdCount > 0) messages.push(`${result.createdCount} created`);
+      if (result.updatedCount > 0) messages.push(`${result.updatedCount} updated`);
+      toast.success(`Successfully imported: ${messages.join(', ')}`);
     },
     onError: (error) => {
       toast.error(`Failed to import items: ${error.message}`);
