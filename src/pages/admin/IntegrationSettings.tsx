@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,7 +21,7 @@ import {
   XCircle, 
   Loader2, 
   RefreshCw, 
-  Eye, 
+  Eye,
   EyeOff,
   Save,
   Zap,
@@ -87,12 +87,7 @@ export default function IntegrationSettings() {
   });
 
   // RingCentral state
-  const [rcClientId, setRcClientId] = useState("");
-  const [rcClientSecret, setRcClientSecret] = useState("");
-  const [rcJwtToken, setRcJwtToken] = useState("");
-  const [showRcSecret, setShowRcSecret] = useState(false);
-  const [showRcJwt, setShowRcJwt] = useState(false);
-  const [hasRcChanges, setHasRcChanges] = useState(false);
+  const [isConnectingRc, setIsConnectingRc] = useState(false);
   const [rcSyncProgress, setRcSyncProgress] = useState<RCSyncProgress>({
     stage: 'idle',
     message: '',
@@ -115,9 +110,6 @@ export default function IntegrationSettings() {
       if (data) {
         setApiKey(data.hcp_api_key || "");
         setCompanyId(data.hcp_company_id || "");
-        // Set initial values for RingCentral
-        setRcClientId(data.rc_client_id || "");
-        setRcClientSecret(data.rc_client_secret || "");
       }
       
       return data;
@@ -353,82 +345,99 @@ export default function IntegrationSettings() {
     }
   });
 
-  // RingCentral test connection mutation
-  const testRcConnectionMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('test-rc-connection', {
-        body: { 
-          client_id: rcClientId,
-          client_secret: rcClientSecret,
-          jwt_token: rcJwtToken
-        }
-      });
-      
-      if (error) throw error;
-      return data as RCConnectionResult;
-    },
-    onSuccess: async (data) => {
-      if (data.success) {
-        // Save the refresh token if returned
-        if (data.refresh_token && profile?.organization_id) {
-          await supabase
-            .from('organizations')
-            .update({
-              rc_refresh_token: data.refresh_token,
-              rc_account_id: data.account_id
-            })
-            .eq('id', profile.organization_id);
-          
-          queryClient.invalidateQueries({ queryKey: ['organization-integration'] });
-        }
-        
-        toast({
-          title: "Connection successful",
-          description: `Connected to: ${data.account_name}`,
-        });
-      } else {
-        toast({
-          title: "Connection failed",
-          description: data.error || "Unable to connect to RingCentral",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Connection test failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
+  // RingCentral OAuth constants
+  const RC_CLIENT_ID = 'd54LY9v6MLKawusT9IfF98';
+  const RC_AUTH_URL = 'https://platform.ringcentral.com/restapi/oauth/authorize';
+  const RC_REDIRECT_URI = 'https://kwikdry.lovable.app';
 
-  // Save RingCentral credentials mutation
-  const saveRcCredentialsMutation = useMutation({
+  // Handle OAuth callback - check URL for auth code on mount
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      
+      if (code && state === 'rc_oauth') {
+        setIsConnectingRc(true);
+        
+        // Clear the URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('rc-oauth-callback', {
+            body: {
+              code,
+              organization_id: profile?.organization_id,
+            }
+          });
+          
+          if (error) throw error;
+          
+          if (data.success) {
+            toast({
+              title: "RingCentral Connected",
+              description: `Successfully connected to ${data.account_name}`,
+            });
+            queryClient.invalidateQueries({ queryKey: ['organization-integration'] });
+          } else {
+            toast({
+              title: "Connection failed",
+              description: data.error || "Unable to connect to RingCentral",
+              variant: "destructive",
+            });
+          }
+        } catch (err) {
+          console.error('OAuth callback error:', err);
+          toast({
+            title: "Connection failed",
+            description: err instanceof Error ? err.message : "An error occurred",
+            variant: "destructive",
+          });
+        } finally {
+          setIsConnectingRc(false);
+        }
+      }
+    };
+    
+    handleOAuthCallback();
+  }, [profile?.organization_id, queryClient]);
+
+  // Start OAuth flow
+  const handleConnectRingCentral = () => {
+    const authUrl = new URL(RC_AUTH_URL);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', RC_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', RC_REDIRECT_URI);
+    authUrl.searchParams.set('state', 'rc_oauth');
+    
+    window.location.href = authUrl.toString();
+  };
+
+  // Disconnect RingCentral
+  const disconnectRcMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.organization_id) throw new Error("No organization");
       
       const { error } = await supabase
         .from('organizations')
         .update({
-          rc_client_id: rcClientId || null,
-          rc_client_secret: rcClientSecret || null
+          rc_refresh_token: null,
+          rc_account_id: null,
         })
         .eq('id', profile.organization_id);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      setHasRcChanges(false);
       queryClient.invalidateQueries({ queryKey: ['organization-integration'] });
       toast({
-        title: "Settings saved",
-        description: "RingCentral credentials have been updated",
+        title: "Disconnected",
+        description: "RingCentral has been disconnected",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to save",
+        title: "Failed to disconnect",
         description: error.message,
         variant: "destructive",
       });
@@ -558,17 +567,6 @@ export default function IntegrationSettings() {
 
   const getZoneColor = (zone: ServiceZone, index: number): string => {
     return zone.color || DEFAULT_ZONE_COLORS[index % DEFAULT_ZONE_COLORS.length];
-  };
-
-  // RingCentral handlers
-  const handleRcClientIdChange = (value: string) => {
-    setRcClientId(value);
-    setHasRcChanges(value !== (organization?.rc_client_id || "") || rcClientSecret !== (organization?.rc_client_secret || ""));
-  };
-
-  const handleRcClientSecretChange = (value: string) => {
-    setRcClientSecret(value);
-    setHasRcChanges(rcClientId !== (organization?.rc_client_id || "") || value !== (organization?.rc_client_secret || ""));
   };
 
   const isConnected = !!(organization?.hcp_api_key);
@@ -896,106 +894,57 @@ export default function IntegrationSettings() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* API Credentials */}
-                <div className="space-y-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="rc-client-id">Client ID</Label>
-                    <Input
-                      id="rc-client-id"
-                      type="text"
-                      placeholder="Enter your RingCentral Client ID"
-                      value={rcClientId}
-                      onChange={(e) => handleRcClientIdChange(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Found in your RingCentral Developer Console app settings
-                    </p>
+                {/* OAuth Connection */}
+                {isRcConnected ? (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-600">Connected to RingCentral</p>
+                          {organization?.rc_account_id && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Account ID: <span className="font-mono">{organization.rc_account_id}</span>
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => disconnectRcMutation.mutate()}
+                          disabled={disconnectRcMutation.isPending}
+                        >
+                          {disconnectRcMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Disconnect"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="rc-client-secret">Client Secret</Label>
-                    <div className="relative">
-                      <Input
-                        id="rc-client-secret"
-                        type={showRcSecret ? "text" : "password"}
-                        placeholder="Enter your RingCentral Client Secret"
-                        value={rcClientSecret}
-                        onChange={(e) => handleRcClientSecretChange(e.target.value)}
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                        onClick={() => setShowRcSecret(!showRcSecret)}
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border p-6 text-center">
+                      <Phone className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <h4 className="font-medium mb-2">Connect RingCentral</h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Connect your RingCentral account to sync call logs and recordings
+                      </p>
+                      <Button 
+                        onClick={handleConnectRingCentral}
+                        disabled={isConnectingRc}
                       >
-                        {showRcSecret ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        {isConnectingRc ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          <Zap className="h-4 w-4 mr-2" />
                         )}
+                        {isConnectingRc ? "Connecting..." : "Connect with RingCentral"}
                       </Button>
                     </div>
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="rc-jwt-token">JWT Token (for Server-to-Server Auth)</Label>
-                    <div className="relative">
-                      <Input
-                        id="rc-jwt-token"
-                        type={showRcJwt ? "text" : "password"}
-                        placeholder="Enter your RingCentral JWT token"
-                        value={rcJwtToken}
-                        onChange={(e) => setRcJwtToken(e.target.value)}
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                        onClick={() => setShowRcJwt(!showRcJwt)}
-                      >
-                        {showRcJwt ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Generate a JWT token in your RingCentral Developer Console for server-to-server authentication
-                    </p>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => saveRcCredentialsMutation.mutate()}
-                    disabled={!hasRcChanges || saveRcCredentialsMutation.isPending}
-                  >
-                    {saveRcCredentialsMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => testRcConnectionMutation.mutate()}
-                    disabled={!rcClientId || !rcClientSecret || !rcJwtToken || testRcConnectionMutation.isPending}
-                  >
-                    {testRcConnectionMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Zap className="h-4 w-4 mr-2" />
-                    )}
-                    Test Connection
-                  </Button>
-                </div>
+                )}
 
                 <Separator />
 
