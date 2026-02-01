@@ -488,6 +488,29 @@ export function useBulkUpdateInventoryItems() {
   });
 }
 
+export function useBulkDeleteInventoryItems() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ deleted_at: new Date().toISOString() })
+        .in('id', ids);
+
+      if (error) throw error;
+      return { deletedCount: ids.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      toast.success(`Successfully deleted ${result.deletedCount} item${result.deletedCount !== 1 ? 's' : ''}`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete items: ${error.message}`);
+    },
+  });
+}
+
 export function useAdjustStock() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
