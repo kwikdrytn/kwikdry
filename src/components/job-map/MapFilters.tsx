@@ -4,6 +4,7 @@ import { CalendarIcon, ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -27,6 +28,8 @@ interface MapFiltersProps {
   onTechnicianChange: (value: string) => void;
   serviceFilter: string;
   onServiceChange: (value: string) => void;
+  showZones: boolean;
+  onShowZonesChange: (value: boolean) => void;
 }
 
 export function MapFilters({
@@ -36,6 +39,8 @@ export function MapFilters({
   onTechnicianChange,
   serviceFilter,
   onServiceChange,
+  showZones,
+  onShowZonesChange,
 }: MapFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const { data: technicians } = useTechnicians();
@@ -127,6 +132,18 @@ export function MapFilters({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Show Zones Toggle */}
+            <div className="flex items-center space-x-2 pt-1">
+              <Checkbox
+                id="show-zones"
+                checked={showZones}
+                onCheckedChange={(checked) => onShowZonesChange(checked === true)}
+              />
+              <Label htmlFor="show-zones" className="text-xs cursor-pointer">
+                Show Service Zones
+              </Label>
             </div>
           </div>
         )}
