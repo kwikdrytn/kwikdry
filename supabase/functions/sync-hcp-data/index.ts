@@ -72,6 +72,37 @@ interface HCPServiceZone {
   id: string;
   name: string;
   color?: string;
+  polygon?: {
+    type?: string;
+    coordinates?: number[][][];
+  };
+  boundary?: Array<{ lat: number; lng: number }>;
+  vertices?: Array<{ lat: number; lng: number }>;
+}
+
+// Convert HCP zone boundary to GeoJSON Polygon format
+function convertToGeoJSON(zone: HCPServiceZone): object | null {
+  // Check for already GeoJSON format
+  if (zone.polygon?.type === 'Polygon' && zone.polygon?.coordinates) {
+    return zone.polygon;
+  }
+  
+  // Convert boundary array to GeoJSON
+  const points = zone.boundary || zone.vertices;
+  if (!points || points.length < 3) return null;
+  
+  // GeoJSON format: [[[lng, lat], [lng, lat], ...]]
+  const coordinates = points.map(p => [p.lng, p.lat]);
+  // Close the polygon by repeating the first point
+  if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
+      coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
+    coordinates.push(coordinates[0]);
+  }
+  
+  return {
+    type: 'Polygon',
+    coordinates: [coordinates]
+  };
 }
 
 interface HCPEmployee {
@@ -346,13 +377,17 @@ Deno.serve(async (req) => {
 
     // Upsert service zones
     if (serviceZones.length > 0) {
-      const zoneRecords = serviceZones.map(zone => ({
-        organization_id,
-        hcp_zone_id: zone.id,
-        name: zone.name,
-        color: zone.color || null,
-        synced_at: now,
-      }));
+      const zoneRecords = serviceZones.map(zone => {
+        const polygonGeoJson = convertToGeoJSON(zone);
+        return {
+          organization_id,
+          hcp_zone_id: zone.id,
+          name: zone.name,
+          color: zone.color || null,
+          polygon_geojson: polygonGeoJson,
+          synced_at: now,
+        };
+      });
 
       for (const record of zoneRecords) {
         const { error } = await supabase

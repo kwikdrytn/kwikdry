@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { SyncResult, SyncProgress } from "@/lib/housecallpro";
 import { 
@@ -22,7 +23,8 @@ import {
   EyeOff,
   Save,
   Zap,
-  AlertCircle
+  AlertCircle,
+  MapPin
 } from "lucide-react";
 
 interface HCPConnectionResult {
@@ -37,6 +39,27 @@ interface SyncCounts {
   employees: number;
   serviceZones: number;
 }
+
+interface ServiceZone {
+  id: string;
+  hcp_zone_id: string;
+  name: string;
+  color: string | null;
+  polygon_geojson: object | null;
+  synced_at: string | null;
+}
+
+// Default color palette for zones without custom colors
+const DEFAULT_ZONE_COLORS = [
+  '#3B82F6', // blue
+  '#10B981', // green
+  '#F59E0B', // amber
+  '#EF4444', // red
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#06B6D4', // cyan
+  '#F97316', // orange
+];
 
 export default function IntegrationSettings() {
   const { profile } = useAuth();
@@ -98,6 +121,24 @@ export default function IntegrationSettings() {
         employees: employeesResult.count || 0,
         serviceZones: zonesResult.count || 0
       } as SyncCounts;
+    },
+    enabled: !!profile?.organization_id
+  });
+
+  // Fetch service zones
+  const { data: serviceZones, refetch: refetchZones } = useQuery({
+    queryKey: ['hcp-service-zones', profile?.organization_id],
+    queryFn: async () => {
+      if (!profile?.organization_id) return [];
+      
+      const { data, error } = await supabase
+        .from('hcp_service_zones')
+        .select('id, hcp_zone_id, name, color, polygon_geojson, synced_at')
+        .eq('organization_id', profile.organization_id)
+        .order('name');
+      
+      if (error) throw error;
+      return (data || []) as ServiceZone[];
     },
     enabled: !!profile?.organization_id
   });
@@ -220,9 +261,10 @@ export default function IntegrationSettings() {
           details: `Synced ${data.synced?.jobs || 0} jobs, ${data.synced?.customers || 0} customers, ${data.synced?.employees || 0} employees, ${data.synced?.serviceZones || 0} zones`,
         });
         
-        // Refresh counts
+        // Refresh counts and zones
         refetchCounts();
         refetchLastSync();
+        refetchZones();
         
         toast({
           title: "Sync complete",
@@ -257,6 +299,32 @@ export default function IntegrationSettings() {
     }
   });
 
+  // Update zone color mutation
+  const updateZoneColorMutation = useMutation({
+    mutationFn: async ({ zoneId, color }: { zoneId: string; color: string }) => {
+      const { error } = await supabase
+        .from('hcp_service_zones')
+        .update({ color })
+        .eq('id', zoneId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchZones();
+      toast({
+        title: "Zone color updated",
+        description: "The zone color has been saved",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update color",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
     setHasChanges(value !== (organization?.hcp_api_key || "") || companyId !== (organization?.hcp_company_id || ""));
@@ -265,6 +333,14 @@ export default function IntegrationSettings() {
   const handleCompanyIdChange = (value: string) => {
     setCompanyId(value);
     setHasChanges(apiKey !== (organization?.hcp_api_key || "") || value !== (organization?.hcp_company_id || ""));
+  };
+
+  const handleZoneColorChange = (zoneId: string, color: string) => {
+    updateZoneColorMutation.mutate({ zoneId, color });
+  };
+
+  const getZoneColor = (zone: ServiceZone, index: number): string => {
+    return zone.color || DEFAULT_ZONE_COLORS[index % DEFAULT_ZONE_COLORS.length];
   };
 
   const isConnected = !!(organization?.hcp_api_key);
@@ -486,6 +562,70 @@ export default function IntegrationSettings() {
                   <p className="text-xs text-muted-foreground">
                     Syncs jobs scheduled for the next 30 days along with customers, employees, and service zones.
                   </p>
+                </div>
+
+                <Separator />
+
+                {/* Service Zones */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Service Zones
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Customize zone colors for map display
+                      </p>
+                    </div>
+                  </div>
+
+                  {serviceZones && serviceZones.length > 0 ? (
+                    <ScrollArea className="h-[200px] rounded-lg border">
+                      <div className="p-4 space-y-3">
+                        {serviceZones.map((zone, index) => (
+                          <div 
+                            key={zone.id} 
+                            className="flex items-center justify-between gap-4 py-2 px-3 rounded-md hover:bg-muted/50"
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div 
+                                className="w-4 h-4 rounded-full border shrink-0"
+                                style={{ backgroundColor: getZoneColor(zone, index) }}
+                              />
+                              <span className="font-medium truncate">{zone.name}</span>
+                              {zone.polygon_geojson && (
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  Has boundary
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Label htmlFor={`color-${zone.id}`} className="sr-only">
+                                Zone color
+                              </Label>
+                              <input
+                                id={`color-${zone.id}`}
+                                type="color"
+                                value={getZoneColor(zone, index)}
+                                onChange={(e) => handleZoneColorChange(zone.id, e.target.value)}
+                                className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
+                                title="Click to change zone color"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <div className="rounded-lg border p-6 text-center text-muted-foreground">
+                      <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No service zones synced yet</p>
+                      <p className="text-xs mt-1">
+                        Click "Sync Now" to fetch zones from HouseCall Pro
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
