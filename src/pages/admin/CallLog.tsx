@@ -185,7 +185,7 @@ export default function CallLog() {
       // Fetch organization credentials
       const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("rc_client_id, rc_client_secret, rc_refresh_token")
+        .select("rc_refresh_token")
         .eq("id", profile.organization_id)
         .single();
 
@@ -196,8 +196,6 @@ export default function CallLog() {
         body: {
           organization_id: profile.organization_id,
           location_id: profile.location_id,
-          client_id: org.rc_client_id,
-          client_secret: org.rc_client_secret,
           refresh_token: org.rc_refresh_token,
           hours_back: 24,
         },

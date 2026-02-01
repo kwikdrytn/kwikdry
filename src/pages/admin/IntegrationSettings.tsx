@@ -470,8 +470,6 @@ export default function IntegrationSettings() {
         body: {
           organization_id: profile.organization_id,
           location_id: profile.location_id,
-          client_id: organization.rc_client_id,
-          client_secret: organization.rc_client_secret,
           refresh_token: organization.rc_refresh_token,
           hours_back: 24,
         }
