@@ -12,7 +12,6 @@ import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Checklists from "./pages/Checklists";
 import Equipment from "./pages/Equipment";
-import Calls from "./pages/Calls";
 import JobMap from "./pages/JobMap";
 import UserManagement from "./pages/admin/UserManagement";
 import InventoryManagement from "./pages/admin/InventoryManagement";
@@ -22,6 +21,7 @@ import ChecklistSubmissionDetail from "./pages/admin/ChecklistSubmissionDetail";
 import WeeklyChecklist from "./pages/technician/WeeklyChecklist";
 import LocationManagement from "./pages/admin/LocationManagement";
 import IntegrationSettings from "./pages/admin/IntegrationSettings";
+import CallLog from "./pages/admin/CallLog";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -174,15 +174,17 @@ const App = () => (
             
             {/* Admin and Call Staff routes */}
             <Route
-              path="/calls"
+              path="/admin/calls"
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin', 'call_staff']}>
-                    <Calls />
+                    <CallLog />
                   </RoleGuard>
                 </ProtectedRoute>
               }
             />
+            {/* Legacy calls route redirect */}
+            <Route path="/calls" element={<Navigate to="/admin/calls" replace />} />
             <Route
               path="/job-map"
               element={
