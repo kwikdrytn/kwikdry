@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { format, addDays } from "date-fns";
 import { 
   CalendarIcon, 
@@ -31,6 +31,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { AddressSearch } from "./AddressSearch";
 import { 
   MapFilters as MapFiltersType, 
   DEFAULT_FILTERS, 
@@ -43,9 +44,11 @@ import {
 interface MapFiltersProps {
   filters: MapFiltersType;
   onFiltersChange: (filters: MapFiltersType) => void;
+  onLocationSelect?: (coords: [number, number], placeName: string) => void;
+  onClearSearch?: () => void;
 }
 
-export function MapFilters({ filters, onFiltersChange }: MapFiltersProps) {
+export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClearSearch }: MapFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [techOpen, setTechOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
@@ -139,6 +142,16 @@ export function MapFilters({ filters, onFiltersChange }: MapFiltersProps) {
   return (
     <Card className="absolute top-4 left-4 z-10 w-80 shadow-lg max-h-[80vh] overflow-hidden flex flex-col">
       <CardContent className="p-3 flex flex-col overflow-hidden">
+        {/* Address Search */}
+        {onLocationSelect && (
+          <div className="mb-3">
+            <AddressSearch 
+              onLocationSelect={onLocationSelect}
+              onClear={onClearSearch}
+            />
+          </div>
+        )}
+        
         <div className="flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 text-sm font-medium">
             <Filter className="h-4 w-4" />
