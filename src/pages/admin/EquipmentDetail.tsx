@@ -42,6 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EquipmentStatusBadge, MaintenanceBadge } from "@/components/equipment/EquipmentStatusBadge";
+import { MaintenanceTypeBadge } from "@/components/equipment/MaintenanceTypeBadge";
 import { EquipmentFormDialog } from "@/components/equipment/EquipmentFormDialog";
 import { ReassignEquipmentDialog } from "@/components/equipment/ReassignEquipmentDialog";
 import { MaintenanceFormDialog } from "@/components/equipment/MaintenanceFormDialog";
@@ -51,6 +52,7 @@ import {
   useUpdateEquipment,
   useDeleteEquipment,
   useEquipmentMaintenance,
+  useEquipmentMaintenanceCost,
   EquipmentFormData,
 } from "@/hooks/useEquipment";
 
@@ -75,6 +77,7 @@ export default function EquipmentDetail() {
 
   const { data: equipment, isLoading } = useEquipmentItem(id);
   const { data: maintenanceRecords = [] } = useEquipmentMaintenance(id);
+  const { data: totalMaintenanceCost = 0 } = useEquipmentMaintenanceCost(id);
   const updateEquipment = useUpdateEquipment();
   const deleteEquipment = useDeleteEquipment();
 
@@ -349,43 +352,53 @@ export default function EquipmentDetail() {
 
             {/* Maintenance History */}
             {maintenanceRecords.length > 0 ? (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Performed By</TableHead>
-                      <TableHead className="text-right">Cost</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {maintenanceRecords.map((record: any) => (
-                      <TableRow key={record.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell>
-                          {format(parseISO(record.performed_at), "MMM d, yyyy")}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {record.type.replace('_', ' ')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {record.description}
-                        </TableCell>
-                        <TableCell>
-                          {record.profiles?.first_name && record.profiles?.last_name
-                            ? `${record.profiles.first_name} ${record.profiles.last_name}`
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {record.cost ? `$${record.cost.toLocaleString()}` : "—"}
-                        </TableCell>
+              <div className="space-y-3">
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Performed By</TableHead>
+                        <TableHead className="text-right">Cost</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {maintenanceRecords.map((record: any) => (
+                        <TableRow key={record.id} className="cursor-pointer hover:bg-muted/50">
+                          <TableCell>
+                            {format(parseISO(record.performed_at), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell>
+                            <MaintenanceTypeBadge type={record.type} />
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate">
+                            {record.description}
+                          </TableCell>
+                          <TableCell>
+                            {record.profiles?.first_name && record.profiles?.last_name
+                              ? `${record.profiles.first_name} ${record.profiles.last_name}`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {record.cost ? `$${Number(record.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {/* Total Maintenance Cost */}
+                <div className="flex justify-end">
+                  <div className="bg-muted/50 rounded-lg px-4 py-2 text-right">
+                    <p className="text-sm text-muted-foreground">Total Maintenance Cost</p>
+                    <p className="text-xl font-bold font-mono">
+                      ${totalMaintenanceCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
