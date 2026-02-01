@@ -175,8 +175,8 @@ export default function CallLog() {
     enabled: !!profile?.organization_id,
   });
 
-  // Sync range state
-  const [syncDays, setSyncDays] = useState<number>(30);
+  // Sync range state - default to full history (1 year)
+  const [syncDays, setSyncDays] = useState<number>(365);
 
   // Sync calls mutation
   const syncMutation = useMutation({
@@ -322,7 +322,7 @@ export default function CallLog() {
           {isAdmin && (
             <div className="flex items-center gap-2">
               <Select value={syncDays.toString()} onValueChange={(v) => setSyncDays(parseInt(v))}>
-                <SelectTrigger className="w-[130px]">
+                <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Sync range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -331,6 +331,7 @@ export default function CallLog() {
                   <SelectItem value="90">Last 90 days</SelectItem>
                   <SelectItem value="180">Last 6 months</SelectItem>
                   <SelectItem value="365">Last year</SelectItem>
+                  <SelectItem value="730">Last 2 years</SelectItem>
                 </SelectContent>
               </Select>
               <Button
