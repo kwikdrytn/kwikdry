@@ -48,6 +48,13 @@ interface HCPJob {
   scheduled_date: string | null;
 }
 
+interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  refresh_token_expires_in: number;
+}
+
 // Normalize phone numbers: remove all non-digit characters
 function normalizePhone(phone: string | undefined | null): string | null {
   if (!phone) return null;
@@ -159,12 +166,12 @@ function mapCallStatus(result: string): 'completed' | 'missed' | 'voicemail' | '
   }
 }
 
-// Get access token from refresh token
+// Get access token from refresh token and return new refresh token
 async function getAccessToken(
   clientId: string,
   clientSecret: string,
   refreshToken: string
-): Promise<string | null> {
+): Promise<{ accessToken: string; newRefreshToken: string } | null> {
   const tokenUrl = `${RC_API_BASE}/restapi/oauth/token`;
   
   const tokenBody = new URLSearchParams();
@@ -183,12 +190,16 @@ async function getAccessToken(
   });
   
   if (!response.ok) {
-    console.error('Failed to refresh token:', response.status);
+    const errorText = await response.text();
+    console.error('Failed to refresh token:', response.status, errorText);
     return null;
   }
   
-  const data = await response.json();
-  return data.access_token;
+  const data: TokenResponse = await response.json();
+  return {
+    accessToken: data.access_token,
+    newRefreshToken: data.refresh_token,
+  };
 }
 
 // Fetch call log from RingCentral
@@ -230,8 +241,8 @@ async function fetchCallLog(
     if (calls.length < perPage) break;
     page++;
     
-    // Safety limit
-    if (page > 20) break;
+    // Safety limit - allow up to 100 pages (10,000 calls)
+    if (page > 100) break;
   }
   
   return allCalls;
@@ -247,7 +258,7 @@ Deno.serve(async (req) => {
       organization_id, 
       location_id,
       refresh_token,
-      hours_back = 24
+      days_back = 1, // Default to 1 day, can go much higher
     } = await req.json();
 
     // Use environment variables for client credentials (same as OAuth callback)
@@ -285,23 +296,47 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Starting RC call sync for organization: ${organization_id}`);
+    console.log(`Starting RC call sync for organization: ${organization_id}, days_back: ${days_back}`);
 
-    // Get access token
-    const accessToken = await getAccessToken(clientId, clientSecret, refresh_token);
-    if (!accessToken) {
+    // Create Supabase client early so we can save new refresh token
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get access token (this also gives us a new refresh token)
+    const tokenResult = await getAccessToken(clientId, clientSecret, refresh_token);
+    if (!tokenResult) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Failed to authenticate with RingCentral. Please re-test connection.' 
+          error: 'Failed to authenticate with RingCentral. Please reconnect your account in Integration Settings.' 
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Calculate date range
+    const { accessToken, newRefreshToken } = tokenResult;
+
+    // IMPORTANT: Save the new refresh token immediately
+    // RingCentral refresh tokens are single-use - once used, they're invalidated
+    if (newRefreshToken && newRefreshToken !== refresh_token) {
+      console.log('Saving new refresh token...');
+      const { error: updateError } = await supabase
+        .from('organizations')
+        .update({ rc_refresh_token: newRefreshToken })
+        .eq('id', organization_id);
+      
+      if (updateError) {
+        console.error('Failed to save new refresh token:', updateError);
+        // Continue anyway - the current access token is still valid
+      } else {
+        console.log('New refresh token saved successfully');
+      }
+    }
+
+    // Calculate date range (days instead of hours for longer history)
     const dateTo = new Date();
-    const dateFrom = new Date(dateTo.getTime() - hours_back * 60 * 60 * 1000);
+    const dateFrom = new Date(dateTo.getTime() - days_back * 24 * 60 * 60 * 1000);
 
     console.log(`Fetching calls from ${dateFrom.toISOString()} to ${dateTo.toISOString()}`);
 
@@ -313,11 +348,6 @@ Deno.serve(async (req) => {
     );
 
     console.log(`Fetched ${calls.length} calls from RingCentral`);
-
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch customers for matching
     const { data: customers } = await supabase
@@ -406,6 +436,10 @@ Deno.serve(async (req) => {
           linked: linkedCount,
         },
         fetched: calls.length,
+        date_range: {
+          from: dateFrom.toISOString(),
+          to: dateTo.toISOString(),
+        }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
