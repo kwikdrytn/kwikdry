@@ -95,42 +95,42 @@ export default function EquipmentPage() {
     <DashboardLayout title="Equipment">
       <div className="space-y-6">
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total Equipment</CardDescription>
-              <CardTitle className="text-3xl">{equipment.length}</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl">{equipment.length}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Active</CardDescription>
-              <CardTitle className="text-3xl text-green-600">{activeCount}</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl text-green-600">{activeCount}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>In Maintenance</CardDescription>
-              <CardTitle className="text-3xl text-yellow-600">{maintenanceCount}</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl text-yellow-600">{maintenanceCount}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Retired</CardDescription>
-              <CardTitle className="text-3xl text-muted-foreground">{retiredCount}</CardTitle>
+              <CardTitle className="text-2xl md:text-3xl text-muted-foreground">{retiredCount}</CardTitle>
             </CardHeader>
           </Card>
         </div>
 
         {/* Main Content */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
                 Equipment
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="hidden sm:block">
                 Manage your equipment inventory, assignments, and maintenance schedules
               </CardDescription>
             </div>
@@ -147,9 +147,10 @@ export default function EquipmentPage() {
                   <TableIcon className="h-4 w-4" />
                 </ToggleGroupItem>
               </ToggleGroup>
-              <Button onClick={handleCreate} className="gap-2">
+              <Button onClick={handleCreate} className="gap-2" size="sm">
                 <Plus className="h-4 w-4" />
-                Add Equipment
+                <span className="hidden sm:inline">Add Equipment</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </div>
           </CardHeader>

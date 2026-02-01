@@ -130,7 +130,7 @@ export default function Settings() {
 
   return (
     <DashboardLayout title="Settings">
-      <div className="max-w-2xl space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>
