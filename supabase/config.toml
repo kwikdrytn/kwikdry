@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.rc-oauth-callback]
 verify_jwt = false
+
+[functions.suggest-job-time]
+verify_jwt = false
