@@ -93,6 +93,28 @@ export const TIMEZONES = [
   { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
 ];
 
+export function useLocations() {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ["locations", profile?.organization_id],
+    queryFn: async () => {
+      if (!profile?.organization_id) return [];
+
+      const { data, error } = await supabase
+        .from("locations")
+        .select("*")
+        .eq("organization_id", profile.organization_id)
+        .is("deleted_at", null)
+        .order("name");
+
+      if (error) throw error;
+      return data as Location[];
+    },
+    enabled: !!profile?.organization_id,
+  });
+}
+
 export function useLocationsWithTeamCount() {
   const { profile } = useAuth();
 
