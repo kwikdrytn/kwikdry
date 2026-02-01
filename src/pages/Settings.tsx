@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "react-router-dom";
-import { Users, MapPin, Plug, ChevronRight } from "lucide-react";
+import { Users, MapPin, Plug, ChevronRight, Camera, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export default function Settings() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, refreshProfile } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.[0] ?? '';
@@ -20,6 +25,71 @@ export default function Settings() {
 
   const getFullName = (firstName?: string | null, lastName?: string | null) => {
     return [firstName, lastName].filter(Boolean).join(' ') || 'User';
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile with new avatar URL (add cache buster)
+      const avatarUrl = `${publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      // Refresh profile to show new avatar
+      await refreshProfile?.();
+      toast.success('Profile picture updated');
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Failed to upload profile picture');
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const adminLinks = [
@@ -40,12 +110,35 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={profile?.avatar_url ?? undefined} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                  {getInitials(profile?.first_name, profile?.last_name)}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative group">
+                <Avatar 
+                  className="h-20 w-20 cursor-pointer transition-opacity group-hover:opacity-80"
+                  onClick={handleAvatarClick}
+                >
+                  <AvatarImage src={profile?.avatar_url ?? undefined} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+                    {getInitials(profile?.first_name, profile?.last_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div 
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  onClick={handleAvatarClick}
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-6 w-6 text-white" />
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={isUploading}
+                />
+              </div>
               <div>
                 <h3 className="font-medium">{getFullName(profile?.first_name, profile?.last_name)}</h3>
                 <p className="text-sm text-muted-foreground">{profile?.email}</p>
