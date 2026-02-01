@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
@@ -46,6 +47,7 @@ import {
   FileText,
   Save,
   Loader2,
+  Hash,
 } from "lucide-react";
 
 type CallDirection = "inbound" | "outbound";
@@ -71,6 +73,7 @@ interface CallLogEntry {
   linked_job_id: string | null;
   resulted_in_booking: boolean | null;
   booking_service_type: string | null;
+  booking_job_id: string | null;
   recording_url: string | null;
   notes: string | null;
   synced_at: string | null;
@@ -153,6 +156,7 @@ export function CallDetailPanel({ call, open, onOpenChange }: CallDetailPanelPro
   const [audioDuration, setAudioDuration] = useState(0);
   const [resultedInBooking, setResultedInBooking] = useState(false);
   const [serviceType, setServiceType] = useState<string>("");
+  const [bookingJobId, setBookingJobId] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -161,6 +165,7 @@ export function CallDetailPanel({ call, open, onOpenChange }: CallDetailPanelPro
     if (call) {
       setResultedInBooking(call.resulted_in_booking || false);
       setServiceType(call.booking_service_type || "");
+      setBookingJobId(call.booking_job_id || "");
       setNotes(call.notes || "");
       setHasChanges(false);
       setIsPlaying(false);
@@ -214,6 +219,7 @@ export function CallDetailPanel({ call, open, onOpenChange }: CallDetailPanelPro
         .update({
           resulted_in_booking: resultedInBooking,
           booking_service_type: resultedInBooking ? serviceType : null,
+          booking_job_id: resultedInBooking && bookingJobId ? bookingJobId : null,
           notes: notes || null,
         })
         .eq("id", call.id);
@@ -284,6 +290,11 @@ export function CallDetailPanel({ call, open, onOpenChange }: CallDetailPanelPro
 
   const handleNotesChange = (value: string) => {
     setNotes(value);
+    setHasChanges(true);
+  };
+
+  const handleBookingJobIdChange = (value: string) => {
+    setBookingJobId(value);
     setHasChanges(true);
   };
 
@@ -543,7 +554,7 @@ export function CallDetailPanel({ call, open, onOpenChange }: CallDetailPanelPro
               </div>
 
               {resultedInBooking && (
-                <div className="space-y-3 pt-2">
+                <div className="space-y-4 pt-2 border-t mt-3">
                   <div className="space-y-2">
                     <Label htmlFor="service-type" className="text-sm">
                       Service Type
@@ -561,27 +572,60 @@ export function CallDetailPanel({ call, open, onOpenChange }: CallDetailPanelPro
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="booking-job-id" className="text-sm flex items-center gap-1">
+                      <Hash className="h-3 w-3" />
+                      Job ID <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="booking-job-id"
+                      placeholder="Link to HouseCall Pro job..."
+                      value={bookingJobId}
+                      onChange={(e) => handleBookingJobIdChange(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the HCP job ID to link this booking
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="booking-notes" className="text-sm">
+                      Booking Notes
+                    </Label>
+                    <Textarea
+                      id="booking-notes"
+                      placeholder="Add booking details..."
+                      value={notes}
+                      onChange={(e) => handleNotesChange(e.target.value)}
+                      rows={3}
+                      className="resize-none"
+                    />
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          <Separator />
-
-          {/* Notes */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Notes
-            </h4>
-            <Textarea
-              placeholder="Add notes about this call..."
-              value={notes}
-              onChange={(e) => handleNotesChange(e.target.value)}
-              rows={4}
-              className="resize-none"
-            />
-          </div>
+          {/* Notes section only shown when NOT in booking mode (booking has its own notes) */}
+          {!resultedInBooking && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Notes
+                </h4>
+                <Textarea
+                  placeholder="Add notes about this call..."
+                  value={notes}
+                  onChange={(e) => handleNotesChange(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+            </>
+          )}
 
           {/* Save Button */}
           {hasChanges && (
