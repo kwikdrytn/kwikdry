@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { InventoryItem } from "@/hooks/useInventory";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -16,6 +17,9 @@ import { differenceInDays, parseISO, format } from "date-fns";
 interface InventoryTableProps {
   items: InventoryItem[];
   isLoading: boolean;
+  selectedIds?: Set<string>;
+  onSelectionChange?: (ids: Set<string>) => void;
+  selectionMode?: boolean;
 }
 
 const unitLabels: Record<string, string> = {
@@ -76,8 +80,37 @@ function getDaysLeftBadge(daysLeft: number | null) {
   );
 }
 
-export function InventoryTable({ items, isLoading }: InventoryTableProps) {
+export function InventoryTable({ 
+  items, 
+  isLoading, 
+  selectedIds = new Set(), 
+  onSelectionChange,
+  selectionMode = false,
+}: InventoryTableProps) {
   const navigate = useNavigate();
+
+  const handleSelectAll = (checked: boolean) => {
+    if (!onSelectionChange) return;
+    if (checked) {
+      onSelectionChange(new Set(items.map(item => item.id)));
+    } else {
+      onSelectionChange(new Set());
+    }
+  };
+
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    if (!onSelectionChange) return;
+    const newSelection = new Set(selectedIds);
+    if (checked) {
+      newSelection.add(itemId);
+    } else {
+      newSelection.delete(itemId);
+    }
+    onSelectionChange(newSelection);
+  };
+
+  const allSelected = items.length > 0 && selectedIds.size === items.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < items.length;
 
   if (isLoading) {
     return (
@@ -112,6 +145,20 @@ export function InventoryTable({ items, isLoading }: InventoryTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
+            {selectionMode && (
+              <TableHead className="w-[50px]">
+                <Checkbox
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) {
+                      (el as HTMLButtonElement & { indeterminate?: boolean }).indeterminate = someSelected;
+                    }
+                  }}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
+            )}
             <TableHead className="min-w-[200px]">Product Name</TableHead>
             <TableHead>Expiration Date</TableHead>
             <TableHead>Days Left</TableHead>
@@ -123,13 +170,33 @@ export function InventoryTable({ items, isLoading }: InventoryTableProps) {
         <TableBody>
           {items.map((item) => {
             const daysLeft = getDaysLeft(item.expiration_date);
+            const isSelected = selectedIds.has(item.id);
             
             return (
               <TableRow
                 key={item.id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => navigate(`/inventory/${item.id}`)}
+                className={cn(
+                  "cursor-pointer hover:bg-muted/50",
+                  isSelected && "bg-primary/5"
+                )}
+                onClick={(e) => {
+                  if (selectionMode) {
+                    e.preventDefault();
+                    handleSelectItem(item.id, !isSelected);
+                  } else {
+                    navigate(`/inventory/${item.id}`);
+                  }
+                }}
               >
+                {selectionMode && (
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={(checked) => handleSelectItem(item.id, !!checked)}
+                      aria-label={`Select ${item.name}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <p className="font-medium">{item.name}</p>
                 </TableCell>
