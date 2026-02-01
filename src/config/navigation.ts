@@ -8,6 +8,7 @@ import {
   Users, 
   MapPin, 
   Settings,
+  Plug,
   LucideIcon
 } from "lucide-react";
 import { UserRole } from "@/stores/useAuthStore";
@@ -78,6 +79,12 @@ export const navItems: NavItem[] = [
     title: "Settings", 
     url: "/settings", 
     icon: Settings,
+    allowedRoles: ['admin']
+  },
+  { 
+    title: "Integrations", 
+    url: "/admin/settings/integrations", 
+    icon: Plug,
     allowedRoles: ['admin']
   },
 ];

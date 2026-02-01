@@ -1,1 +1,4 @@
 project_id = "zhwwvmhsmofucgejqpcm"
+
+[functions.test-hcp-connection]
+verify_jwt = false
