@@ -10,6 +10,8 @@ export interface InventoryItem {
   id: string;
   name: string;
   description: string | null;
+  notes: string | null;
+  expiration_date: string | null;
   category: InventoryCategory;
   unit: InventoryUnit;
   reorder_threshold: number;
@@ -18,11 +20,14 @@ export interface InventoryItem {
   organization_id: string;
   created_at: string | null;
   total_stock?: number;
+  location_name?: string;
 }
 
 export interface InventoryItemFormData {
   name: string;
   description?: string;
+  notes?: string;
+  expiration_date?: string | null;
   category: InventoryCategory;
   unit: InventoryUnit;
   reorder_threshold: number;
