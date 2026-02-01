@@ -28,6 +28,41 @@
 
   <body>
     <div id="root"></div>
+    
+    <!-- OAuth callback handler - runs before React loads -->
+    <script>
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        var code = params.get('code');
+        var state = params.get('state');
+        
+        if (state === 'rc_oauth' && code && window.opener) {
+          // This is an OAuth popup callback
+          document.getElementById('root').innerHTML = 
+            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;">' +
+            '<div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px;"></div>' +
+            '<p style="color:#64748b;">Completing connection...</p>' +
+            '<style>@keyframes spin{to{transform:rotate(360deg);}}</style>' +
+            '</div>';
+          
+          window.opener.postMessage({
+            type: 'rc_oauth_callback',
+            code: code,
+            state: state
+          }, '*');
+          
+          document.getElementById('root').innerHTML = 
+            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;">' +
+            '<svg style="width:40px;height:40px;color:#10b981;margin-bottom:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+            '<p style="color:#10b981;font-weight:500;">Connected! Closing...</p>' +
+            '</div>';
+          
+          setTimeout(function() { window.close(); }, 1500);
+          return; // Don't load React
+        }
+      })();
+    </script>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
