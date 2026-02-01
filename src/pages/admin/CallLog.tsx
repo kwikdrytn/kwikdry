@@ -25,18 +25,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPhoneNumber } from "@/lib/ringcentral";
+import { CallDetailPanel } from "@/components/calls/CallDetailPanel";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -46,14 +40,8 @@ import {
   Eye,
   Check,
   Phone,
-  Clock,
   User,
   Loader2,
-  PhoneIncoming,
-  PhoneOutgoing,
-  PhoneMissed,
-  Voicemail,
-  Link2,
 } from "lucide-react";
 
 type CallDirection = "inbound" | "outbound";
@@ -78,6 +66,7 @@ interface CallLogEntry {
   match_confidence: MatchConfidence | null;
   linked_job_id: string | null;
   resulted_in_booking: boolean | null;
+  booking_service_type: string | null;
   recording_url: string | null;
   notes: string | null;
   synced_at: string | null;
@@ -536,143 +525,12 @@ export default function CallLog() {
         )}
       </div>
 
-      {/* Call Detail Sheet */}
-      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-        <SheetContent className="sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              {selectedCall?.direction === "inbound" ? (
-                <PhoneIncoming className="h-5 w-5 text-emerald-600 dark:text-emerald-500" />
-              ) : (
-                <PhoneOutgoing className="h-5 w-5 text-sky-600 dark:text-sky-500" />
-              )}
-              Call Details
-            </SheetTitle>
-            <SheetDescription>
-              {selectedCall && format(parseISO(selectedCall.started_at), "EEEE, MMMM d, yyyy 'at' h:mm a")}
-            </SheetDescription>
-          </SheetHeader>
-
-          {selectedCall && (
-            <div className="mt-6 space-y-6">
-              {/* Call Info */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Direction</p>
-                    <p className="font-medium capitalize">{selectedCall.direction}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <Badge variant={getStatusBadgeVariant(selectedCall.status)}>
-                      {getStatusLabel(selectedCall.status)}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">From</p>
-                    <p className="font-mono">{formatPhoneNumber(selectedCall.from_number)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">To</p>
-                    <p className="font-mono">{formatPhoneNumber(selectedCall.to_number)}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Duration</p>
-                    <p className="font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      {formatDuration(selectedCall.duration_seconds, selectedCall.status)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Resulted in Booking</p>
-                    <button
-                      onClick={() => toggleBookingMutation.mutate({
-                        callId: selectedCall.id,
-                        booked: !selectedCall.resulted_in_booking,
-                      })}
-                      className={cn(
-                        "h-6 w-6 rounded border inline-flex items-center justify-center transition-colors mt-1",
-                        selectedCall.resulted_in_booking
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-muted-foreground/30 hover:border-primary"
-                      )}
-                    >
-                      {selectedCall.resulted_in_booking && <Check className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Customer Match */}
-              <div className="rounded-lg border p-4 space-y-2">
-                <h4 className="font-medium flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Customer Match
-                </h4>
-                {selectedCall.matched_customer_name ? (
-                  <div className="space-y-1">
-                    <p className="font-medium">{selectedCall.matched_customer_name}</p>
-                    <p className="text-sm text-muted-foreground font-mono">
-                      {formatPhoneNumber(selectedCall.matched_customer_phone)}
-                    </p>
-                    <Badge variant={selectedCall.match_confidence === "exact" ? "default" : "secondary"}>
-                      {selectedCall.match_confidence === "exact" ? "Exact Match" : "Partial Match"}
-                    </Badge>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No customer match found</p>
-                )}
-              </div>
-
-              {/* Linked Job */}
-              {selectedCall.linked_job_id && (
-                <div className="rounded-lg border p-4 space-y-2">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Link2 className="h-4 w-4" />
-                    Linked Job
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    Job ID: {selectedCall.linked_job_id}
-                  </p>
-                </div>
-              )}
-
-              {/* Recording */}
-              {selectedCall.recording_url && (
-                <div className="rounded-lg border p-4 space-y-2">
-                  <h4 className="font-medium">Recording</h4>
-                  <audio controls className="w-full">
-                    <source src={selectedCall.recording_url} type="audio/mpeg" />
-                    Your browser does not support the audio element.
-                  </audio>
-                </div>
-              )}
-
-              {/* Notes */}
-              {selectedCall.notes && (
-                <div className="rounded-lg border p-4 space-y-2">
-                  <h4 className="font-medium">Notes</h4>
-                  <p className="text-sm">{selectedCall.notes}</p>
-                </div>
-              )}
-
-              {/* Metadata */}
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>RC Call ID: {selectedCall.rc_call_id}</p>
-                {selectedCall.synced_at && (
-                  <p>Last synced: {format(parseISO(selectedCall.synced_at), "MMM d, yyyy h:mm a")}</p>
-                )}
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      {/* Call Detail Panel */}
+      <CallDetailPanel
+        call={selectedCall}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+      />
     </DashboardLayout>
   );
 }
