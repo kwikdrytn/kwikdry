@@ -414,9 +414,10 @@ Deno.serve(async (req) => {
         synced_at: now,
       };
 
+      // Use composite unique key (organization_id + rc_call_id) for upsert
       const { error } = await supabase
         .from('call_log')
-        .upsert(record, { onConflict: 'rc_call_id' });
+        .upsert(record, { onConflict: 'organization_id,rc_call_id' });
 
       if (!error) {
         syncedCount++;
