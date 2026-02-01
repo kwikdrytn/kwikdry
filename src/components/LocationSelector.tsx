@@ -84,7 +84,7 @@ export function LocationSelector() {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[220px] justify-between"
+          className="w-auto md:w-[220px] justify-between"
           disabled={isLoading}
         >
           <div className="flex items-center gap-2 truncate">
@@ -93,7 +93,7 @@ export function LocationSelector() {
             ) : (
               <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
-            <span className="truncate">
+            <span className="truncate hidden sm:inline">
               {isLoading 
                 ? "Loading..." 
                 : isAllLocations
@@ -103,10 +103,10 @@ export function LocationSelector() {
                     : "Select location"}
             </span>
           </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="ml-0 sm:ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0 bg-popover border shadow-md z-50">
+      <PopoverContent className="w-[220px] p-0 bg-popover border shadow-md z-50" align="end">
         <Command>
           <CommandInput placeholder="Search locations..." />
           <CommandList>

@@ -108,23 +108,23 @@ export default function InventoryManagement() {
     <DashboardLayout title="Inventory">
       <div className="space-y-6">
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Items</CardDescription>
-              <CardTitle className="text-3xl">{items.length}</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Total Items</CardDescription>
+              <CardTitle className="text-xl sm:text-3xl">{items.length}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Low Stock Items</CardDescription>
-              <CardTitle className="text-3xl text-destructive">{lowStockCount}</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Low Stock</CardDescription>
+              <CardTitle className="text-xl sm:text-3xl text-destructive">{lowStockCount}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>In Stock Items</CardDescription>
-              <CardTitle className="text-3xl text-primary">{items.length - lowStockCount}</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">In Stock</CardDescription>
+              <CardTitle className="text-xl sm:text-3xl text-primary">{items.length - lowStockCount}</CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -132,20 +132,20 @@ export default function InventoryManagement() {
         {/* Bulk Actions Bar */}
         {selectionMode && (
           <Card className="border-primary">
-            <CardContent className="flex items-center justify-between py-3">
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-3">
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium">
-                  {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} selected
+                  {selectedIds.size} selected
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectedIds(new Set(items.map(i => i.id)))}
                 >
-                  Select All ({items.length})
+                  Select All
                 </Button>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="default"
                   size="sm"
@@ -154,7 +154,7 @@ export default function InventoryManagement() {
                   className="gap-2"
                 >
                   <Pencil className="h-4 w-4" />
-                  Edit Selected
+                  <span className="hidden sm:inline">Edit</span>
                 </Button>
                 <Button
                   variant="destructive"
@@ -164,7 +164,7 @@ export default function InventoryManagement() {
                   className="gap-2"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete Selected
+                  <span className="hidden sm:inline">Delete</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -182,19 +182,19 @@ export default function InventoryManagement() {
 
         {/* Main Table */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
                 Inventory Items
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="hidden sm:block">
                 {selectionMode 
                   ? "Click items to select them for bulk editing" 
                   : "Click an item to view details and manage stock"}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {!selectionMode && (
                 <>
                   <Button 
@@ -202,17 +202,20 @@ export default function InventoryManagement() {
                     onClick={() => setSelectionMode(true)} 
                     className="gap-2"
                     disabled={items.length === 0}
+                    size="sm"
                   >
                     <CheckSquare className="h-4 w-4" />
-                    Bulk Edit
+                    <span className="hidden sm:inline">Bulk Edit</span>
+                    <span className="sm:hidden">Bulk</span>
                   </Button>
-                  <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+                  <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2" size="sm">
                     <Upload className="h-4 w-4" />
-                    Import CSV
+                    <span className="hidden sm:inline">Import CSV</span>
+                    <span className="sm:hidden">Import</span>
                   </Button>
-                  <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+                  <Button onClick={() => setIsFormOpen(true)} className="gap-2" size="sm">
                     <Plus className="h-4 w-4" />
-                    Add Item
+                    Add
                   </Button>
                 </>
               )}

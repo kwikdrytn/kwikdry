@@ -84,7 +84,7 @@ export default function UserManagement() {
 
           <TabsContent value="users" className="space-y-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <UsersIcon className="h-5 w-5" />
@@ -94,7 +94,7 @@ export default function UserManagement() {
                     {users.length} user{users.length !== 1 ? 's' : ''} in your organization
                   </CardDescription>
                 </div>
-                <Button onClick={handleAddUser} className="gap-2">
+                <Button onClick={handleAddUser} className="gap-2 w-full sm:w-auto" size="sm">
                   <Plus className="h-4 w-4" />
                   Add User
                 </Button>

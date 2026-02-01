@@ -33,6 +33,8 @@ import { formatPhoneNumber } from "@/lib/ringcentral";
 import { CallDetailPanel } from "@/components/calls/CallDetailPanel";
 import { QuickBookingPopover } from "@/components/calls/QuickBookingPopover";
 import { CallRecordingPlayer } from "@/components/calls/CallRecordingPlayer";
+import { CallCardList } from "@/components/calls/CallCardList";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -127,6 +129,7 @@ export default function CallLog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin";
+  const isMobile = useIsMobile();
 
   // Date range state
   const [dateFrom, setDateFrom] = useState<Date>(startOfDay(new Date()));
@@ -413,49 +416,45 @@ export default function CallLog() {
           )}
         </div>
 
-        {/* Call Log Table */}
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">Time</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="w-[80px]">Duration</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
-                <TableHead className="w-[180px]">Recording</TableHead>
-                <TableHead className="w-[60px] text-center">Booked</TableHead>
-                <TableHead className="w-[60px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-8" /></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredCalls?.length === 0 ? (
+        {/* Call Log - Mobile Cards or Desktop Table */}
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : filteredCalls?.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Phone className="h-8 w-8 mb-2" />
+            <p>No calls found</p>
+            <p className="text-sm">Try adjusting the date range or filters</p>
+          </div>
+        ) : isMobile ? (
+          <CallCardList
+            calls={filteredCalls || []}
+            onViewCall={handleRowClick}
+            onToggleBooking={(callId, booked, serviceType) => {
+              toggleBookingMutation.mutate({ callId, booked, serviceType });
+            }}
+          />
+        ) : (
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Phone className="h-8 w-8 mb-2" />
-                      <p>No calls found</p>
-                      <p className="text-sm">Try adjusting the date range or filters</p>
-                    </div>
-                  </TableCell>
+                  <TableHead className="w-[100px]">Time</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="w-[80px]">Duration</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[180px]">Recording</TableHead>
+                  <TableHead className="w-[60px] text-center">Booked</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
-              ) : (
-                filteredCalls?.map((call) => {
+              </TableHeader>
+              <TableBody>
+                {filteredCalls?.map((call) => {
                   const externalPhone = call.direction === "inbound" ? call.from_number : call.to_number;
                   const displayName = call.matched_customer_name || formatPhoneNumber(externalPhone);
 
@@ -532,11 +531,11 @@ export default function CallLog() {
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         {/* Results count */}
         {!isLoading && filteredCalls && (
