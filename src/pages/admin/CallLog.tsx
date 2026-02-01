@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatPhoneNumber } from "@/lib/ringcentral";
 import { CallDetailPanel } from "@/components/calls/CallDetailPanel";
 import { QuickBookingPopover } from "@/components/calls/QuickBookingPopover";
+import { CallRecordingPlayer } from "@/components/calls/CallRecordingPlayer";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -423,6 +424,7 @@ export default function CallLog() {
                 <TableHead>Customer</TableHead>
                 <TableHead className="w-[80px]">Duration</TableHead>
                 <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[180px]">Recording</TableHead>
                 <TableHead className="w-[60px] text-center">Booked</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
@@ -437,13 +439,14 @@ export default function CallLog() {
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                   </TableRow>
                 ))
               ) : filteredCalls?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center">
+                  <TableCell colSpan={9} className="h-32 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Phone className="h-8 w-8 mb-2" />
                       <p>No calls found</p>
@@ -497,6 +500,13 @@ export default function CallLog() {
                         <Badge variant={getStatusBadgeVariant(call.status)}>
                           {getStatusLabel(call.status)}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {call.recording_url ? (
+                          <CallRecordingPlayer recordingUrl={call.recording_url} />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No recording</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <QuickBookingPopover
