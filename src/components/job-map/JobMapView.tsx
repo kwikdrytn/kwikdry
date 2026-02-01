@@ -353,26 +353,14 @@ export function JobMapView() {
         },
       });
 
-      // Add hover events for fill layer
-      currentMap.on("mouseenter", `${sourceId}-fill`, (e) => {
+      // Add hover events for fill layer (highlight only, no popup)
+      currentMap.on("mouseenter", `${sourceId}-fill`, () => {
         if (!filters.showZones) return;
         
         currentMap.getCanvas().style.cursor = "pointer";
         hoveredZoneRef.current = zone.id;
         
         currentMap.setLayoutProperty(`${sourceId}-highlight`, "visibility", "visible");
-        
-        if (e.lngLat) {
-          zonePopupRef.current?.remove();
-          zonePopupRef.current = new mapboxgl.Popup({
-            closeButton: false,
-            closeOnClick: false,
-            className: "zone-tooltip",
-          })
-            .setLngLat(e.lngLat)
-            .setHTML(`<div style="font-weight: 600; font-size: 13px;">${zone.name}</div>`)
-            .addTo(currentMap);
-        }
       });
 
       currentMap.on("mouseleave", `${sourceId}-fill`, () => {
@@ -382,9 +370,6 @@ export function JobMapView() {
         if (currentMap.getLayer(`${sourceId}-highlight`)) {
           currentMap.setLayoutProperty(`${sourceId}-highlight`, "visibility", "none");
         }
-        
-        zonePopupRef.current?.remove();
-        zonePopupRef.current = null;
       });
     });
   }, [zones, mapLoaded, filters.showZones]);
