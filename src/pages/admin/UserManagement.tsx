@@ -2,11 +2,13 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Users as UsersIcon } from "lucide-react";
 import { UserTable } from "@/components/users/UserTable";
 import { UserFormDialog } from "@/components/users/UserFormDialog";
 import { DeactivateUserDialog } from "@/components/users/DeactivateUserDialog";
 import { UserFilters } from "@/components/users/UserFilters";
+import { RolesManagement } from "@/components/users/RolesManagement";
 import { 
   useUsers, 
   useCreateUser, 
@@ -17,6 +19,7 @@ import {
 } from "@/hooks/useUsers";
 
 export default function UserManagement() {
+  const [activeTab, setActiveTab] = useState("users");
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
   
@@ -71,40 +74,53 @@ export default function UserManagement() {
   };
 
   return (
-    <DashboardLayout title="User Management" description="Manage team members and access">
+    <DashboardLayout title="User Management" description="Manage team members, roles, and access">
       <div className="space-y-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <UsersIcon className="h-5 w-5" />
-                Users
-              </CardTitle>
-              <CardDescription>
-                {users.length} user{users.length !== 1 ? 's' : ''} in your organization
-              </CardDescription>
-            </div>
-            <Button onClick={handleAddUser} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add User
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <UserFilters
-              locationId={locationFilter}
-              role={roleFilter}
-              onLocationChange={setLocationFilter}
-              onRoleChange={setRoleFilter}
-            />
-            
-            <UserTable
-              users={users}
-              isLoading={isLoading}
-              onEdit={handleEditUser}
-              onDeactivate={handleDeactivateUser}
-            />
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="roles">Roles</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="users" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <UsersIcon className="h-5 w-5" />
+                    Users
+                  </CardTitle>
+                  <CardDescription>
+                    {users.length} user{users.length !== 1 ? 's' : ''} in your organization
+                  </CardDescription>
+                </div>
+                <Button onClick={handleAddUser} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add User
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <UserFilters
+                  locationId={locationFilter}
+                  role={roleFilter}
+                  onLocationChange={setLocationFilter}
+                  onRoleChange={setRoleFilter}
+                />
+                
+                <UserTable
+                  users={users}
+                  isLoading={isLoading}
+                  onEdit={handleEditUser}
+                  onDeactivate={handleDeactivateUser}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="roles" className="space-y-6">
+            <RolesManagement />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <UserFormDialog

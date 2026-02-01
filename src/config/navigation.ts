@@ -29,7 +29,7 @@ export const navItems: NavItem[] = [
   },
   { 
     title: "Inventory", 
-    url: "/admin/inventory", 
+    url: "/inventory", 
     icon: Package,
     allowedRoles: ['admin', 'technician']
   },
@@ -37,13 +37,7 @@ export const navItems: NavItem[] = [
     title: "Checklists", 
     url: "/checklists", 
     icon: ClipboardCheck,
-    allowedRoles: ['technician']
-  },
-  { 
-    title: "Checklist Review", 
-    url: "/admin/checklists", 
-    icon: ClipboardCheck,
-    allowedRoles: ['admin']
+    allowedRoles: ['admin', 'technician']
   },
   { 
     title: "Equipment", 
@@ -53,7 +47,7 @@ export const navItems: NavItem[] = [
   },
   { 
     title: "Calls", 
-    url: "/admin/calls", 
+    url: "/calls", 
     icon: Phone,
     allowedRoles: ['admin', 'call_staff']
   },
@@ -65,7 +59,7 @@ export const navItems: NavItem[] = [
   },
   { 
     title: "Users", 
-    url: "/admin/users", 
+    url: "/users", 
     icon: Users,
     allowedRoles: ['admin']
   },
@@ -83,7 +77,7 @@ export const navItems: NavItem[] = [
   },
   { 
     title: "Integrations", 
-    url: "/admin/settings/integrations", 
+    url: "/settings/integrations", 
     icon: Plug,
     allowedRoles: ['admin']
   },
