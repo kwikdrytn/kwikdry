@@ -324,6 +324,12 @@ export function JobMapView() {
       setMapLoaded(true);
     });
 
+    // Close click popup when clicking on the map (outside markers)
+    map.current.on("click", () => {
+      clickPopupRef.current?.remove();
+      clickPopupRef.current = null;
+    });
+
     return () => {
       map.current?.remove();
       map.current = null;
