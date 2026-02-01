@@ -552,17 +552,11 @@ export function JobMapView() {
     <div className="relative h-full w-full">
       <div ref={mapContainer} className="h-full w-full" />
       
-      {/* Address Search */}
-      <div className="absolute top-4 left-4 w-80 z-10">
-        <AddressSearch 
-          onLocationSelect={handleLocationSelect}
-          onClear={handleClearSearch}
-        />
-      </div>
-      
       <MapFilters
         filters={filters}
         onFiltersChange={setFilters}
+        onLocationSelect={handleLocationSelect}
+        onClearSearch={handleClearSearch}
       />
 
       <MapLegend 
