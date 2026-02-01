@@ -238,8 +238,18 @@ export function JobMapView() {
   // Add service zone polygons with labels and hover
   useEffect(() => {
     if (!map.current || !mapLoaded || !zones) return;
-
+    
     const currentMap = map.current;
+    
+    // Ensure style is fully loaded before adding sources/layers
+    if (!currentMap.isStyleLoaded()) {
+      const handleStyleLoad = () => {
+        // Trigger re-render to run this effect again
+        setMapLoaded(prev => prev);
+      };
+      currentMap.once('idle', handleStyleLoad);
+      return;
+    }
 
     // Remove existing zone layers and sources
     zones.forEach((zone) => {
@@ -377,6 +387,7 @@ export function JobMapView() {
   // Toggle zone visibility
   useEffect(() => {
     if (!map.current || !mapLoaded || !zones) return;
+    if (!map.current.isStyleLoaded()) return;
 
     zones.forEach((zone) => {
       const sourceId = `zone-${zone.id}`;
@@ -401,6 +412,7 @@ export function JobMapView() {
   // Add job markers with hover popups
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
+    if (!map.current.isStyleLoaded()) return;
 
     // Clear existing markers
     markersRef.current.forEach(marker => marker.remove());
