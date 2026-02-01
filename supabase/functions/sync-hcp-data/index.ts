@@ -80,6 +80,10 @@ interface HCPServiceZone {
   };
   boundary?: Array<{ lat: number; lng: number }>;
   vertices?: Array<{ lat: number; lng: number }>;
+  // HCP zones can be defined by zip codes or cities
+  zip_codes?: string[];
+  postal_codes?: string[];
+  cities?: string[];
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -158,6 +162,133 @@ function convertToGeoJSON(zone: HCPServiceZone): object | null {
   return {
     type: 'Polygon',
     coordinates: [coordinates]
+  };
+}
+
+// Fetch ZCTA (ZIP Code Tabulation Area) polygon from Census Reporter API
+async function fetchZipCodePolygon(zipCode: string): Promise<number[][] | null> {
+  try {
+    // ZCTA geoid format: 86000US{zipcode}
+    const geoid = `86000US${zipCode}`;
+    const url = `https://api.censusreporter.org/1.0/geo/tiger2022/${geoid}?geom=true`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.log(`Census API failed for zip ${zipCode}: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const geometry = data?.geometry;
+    
+    if (!geometry) return null;
+    
+    // Handle both Polygon and MultiPolygon
+    if (geometry.type === 'Polygon') {
+      return geometry.coordinates[0]; // Return outer ring
+    } else if (geometry.type === 'MultiPolygon') {
+      // Return the largest polygon (by point count)
+      let largest = geometry.coordinates[0][0];
+      for (const poly of geometry.coordinates) {
+        if (poly[0].length > largest.length) {
+          largest = poly[0];
+        }
+      }
+      return largest;
+    }
+    
+    return null;
+  } catch (error) {
+    console.log(`Error fetching zip polygon for ${zipCode}:`, error);
+    return null;
+  }
+}
+
+// Calculate convex hull using Graham scan algorithm
+function convexHull(points: number[][]): number[][] {
+  if (points.length < 3) return points;
+  
+  // Find the point with lowest y (and leftmost if tie)
+  let start = 0;
+  for (let i = 1; i < points.length; i++) {
+    if (points[i][1] < points[start][1] || 
+        (points[i][1] === points[start][1] && points[i][0] < points[start][0])) {
+      start = i;
+    }
+  }
+  
+  // Swap start point to beginning
+  [points[0], points[start]] = [points[start], points[0]];
+  const pivot = points[0];
+  
+  // Sort by polar angle with pivot
+  const sorted = points.slice(1).sort((a, b) => {
+    const angleA = Math.atan2(a[1] - pivot[1], a[0] - pivot[0]);
+    const angleB = Math.atan2(b[1] - pivot[1], b[0] - pivot[0]);
+    if (angleA !== angleB) return angleA - angleB;
+    // If same angle, closer point first
+    const distA = (a[0] - pivot[0]) ** 2 + (a[1] - pivot[1]) ** 2;
+    const distB = (b[0] - pivot[0]) ** 2 + (b[1] - pivot[1]) ** 2;
+    return distA - distB;
+  });
+  
+  // Cross product to determine turn direction
+  const cross = (o: number[], a: number[], b: number[]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  
+  const hull: number[][] = [pivot];
+  for (const point of sorted) {
+    while (hull.length >= 2 && cross(hull[hull.length - 2], hull[hull.length - 1], point) <= 0) {
+      hull.pop();
+    }
+    hull.push(point);
+  }
+  
+  // Close the polygon
+  hull.push(hull[0]);
+  return hull;
+}
+
+// Merge multiple zip code polygons into a single zone polygon
+async function buildZonePolygonFromZipCodes(zipCodes: string[]): Promise<object | null> {
+  if (!zipCodes || zipCodes.length === 0) return null;
+  
+  console.log(`Building polygon for ${zipCodes.length} zip codes: ${zipCodes.join(', ')}`);
+  
+  // Fetch polygons for each zip code (limit to 20 to avoid rate limits)
+  const zipCodesToFetch = zipCodes.slice(0, 20);
+  const polygonPromises = zipCodesToFetch.map(zip => fetchZipCodePolygon(zip.trim()));
+  const polygons = await Promise.all(polygonPromises);
+  
+  // Collect all valid polygon points
+  const allPoints: number[][] = [];
+  for (const polygon of polygons) {
+    if (polygon) {
+      allPoints.push(...polygon);
+    }
+  }
+  
+  if (allPoints.length < 3) {
+    console.log('Not enough points to build polygon');
+    return null;
+  }
+  
+  // Simplify: take every Nth point to reduce complexity
+  const simplified = allPoints.filter((_, i) => i % 3 === 0);
+  
+  // Create convex hull of all points
+  const hull = convexHull(simplified);
+  
+  if (hull.length < 4) {
+    console.log('Convex hull too small');
+    return null;
+  }
+  
+  console.log(`Built zone polygon with ${hull.length} points from ${polygons.filter(Boolean).length} zip codes`);
+  
+  return {
+    type: 'Polygon',
+    coordinates: [hull]
   };
 }
 
@@ -433,9 +564,24 @@ Deno.serve(async (req) => {
 
     // Upsert service zones
     if (serviceZones.length > 0) {
-      const zoneRecords = serviceZones.map(zone => {
-        const polygonGeoJson = convertToGeoJSON(zone);
-        return {
+      console.log('Processing service zones for polygon generation...');
+      
+      for (const zone of serviceZones) {
+        // First try to get polygon from HCP directly
+        let polygonGeoJson = convertToGeoJSON(zone);
+        
+        // If no polygon from HCP, try to build from zip codes
+        if (!polygonGeoJson) {
+          const zipCodes = zone.zip_codes || zone.postal_codes || [];
+          if (zipCodes.length > 0) {
+            console.log(`Zone "${zone.name}" has ${zipCodes.length} zip codes, building polygon...`);
+            polygonGeoJson = await buildZonePolygonFromZipCodes(zipCodes);
+          } else {
+            console.log(`Zone "${zone.name}" has no zip codes or polygon data`);
+          }
+        }
+        
+        const record = {
           organization_id,
           hcp_zone_id: zone.id,
           name: zone.name,
@@ -443,9 +589,7 @@ Deno.serve(async (req) => {
           polygon_geojson: polygonGeoJson,
           synced_at: now,
         };
-      });
-
-      for (const record of zoneRecords) {
+        
         const { error } = await supabase
           .from('hcp_service_zones')
           .upsert(record, { onConflict: 'organization_id,hcp_zone_id' });
