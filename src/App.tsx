@@ -72,9 +72,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Legacy route redirect */}
-            <Route path="/admin/inventory" element={<Navigate to="/inventory" replace />} />
-            <Route path="/admin/inventory/:id" element={<Navigate to="/inventory/:id" replace />} />
+            {/* Legacy route redirects are handled by the main routes above */}
             
             {/* Checklists - Role-based tabs within page */}
             <Route
