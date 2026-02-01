@@ -8,6 +8,7 @@ const corsHeaders = {
 const HCP_BASE_URL = 'https://api.housecallpro.com';
 
 const MAPBOX_GEOCODE_BASE_URL = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
+const CENSUS_API_BASE = 'https://api.censusreporter.org/1.0/geo/tiger2023';
 
 interface HCPJob {
   id: string;
@@ -165,164 +166,83 @@ function convertToGeoJSON(zone: HCPServiceZone): object | null {
   };
 }
 
-// Fetch zip code bounding box from Mapbox geocoding API
-async function fetchZipCodeBounds(
-  zipCode: string,
-  mapboxToken: string
-): Promise<{ center: [number, number]; bbox: [number, number, number, number] } | null> {
+// Fetch precise ZCTA polygon from Census Reporter API
+async function fetchZipCodePolygon(zipCode: string): Promise<object | null> {
   try {
-    // Search for the zip code with postcode type filter
-    const url = `${MAPBOX_GEOCODE_BASE_URL}/${encodeURIComponent(zipCode)}.json?access_token=${encodeURIComponent(mapboxToken)}&types=postcode&country=us&limit=1`;
+    const url = `${CENSUS_API_BASE}/86000US${zipCode}?geom=true`;
+    console.log(`Fetching ZCTA polygon for ${zipCode}...`);
     
     const response = await fetch(url);
     if (!response.ok) {
-      console.log(`Mapbox geocode failed for zip ${zipCode}: ${response.status}`);
+      console.log(`Census API failed for zip ${zipCode}: ${response.status}`);
       return null;
     }
     
     const data = await response.json();
-    const feature = data?.features?.[0];
+    const geometry = data?.geometry;
     
-    if (!feature) {
-      console.log(`No results for zip ${zipCode}`);
+    if (!geometry || !geometry.coordinates) {
+      console.log(`No geometry returned for zip ${zipCode}`);
       return null;
     }
     
-    const center = feature.center as [number, number];
-    // Mapbox returns bbox as [minLng, minLat, maxLng, maxLat]
-    const bbox = feature.bbox as [number, number, number, number] | undefined;
-    
-    if (!center || center.length < 2) return null;
-    
-    // If bbox is available, use it; otherwise create approximate bounds from center
-    if (bbox && bbox.length === 4) {
-      return { center, bbox };
-    }
-    
-    // Create approximate bounds (roughly 5km radius for a zip code)
-    const radius = 0.05; // ~5km in degrees at mid-latitudes
-    return {
-      center,
-      bbox: [center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius]
-    };
+    console.log(`Got ${geometry.type} for zip ${zipCode}`);
+    return geometry;
   } catch (error) {
-    console.log(`Error fetching bounds for zip ${zipCode}:`, error);
+    console.log(`Error fetching ZCTA for ${zipCode}:`, error);
     return null;
   }
 }
 
-// Create polygon corners from bounding box
-function bboxToPolygonPoints(bbox: [number, number, number, number]): number[][] {
-  const [minLng, minLat, maxLng, maxLat] = bbox;
-  return [
-    [minLng, minLat], // SW
-    [maxLng, minLat], // SE
-    [maxLng, maxLat], // NE
-    [minLng, maxLat], // NW
-  ];
-}
-
-// Calculate convex hull using Graham scan algorithm
-function convexHull(points: number[][]): number[][] {
-  if (points.length < 3) return points;
+// Merge multiple zip code polygons into a single MultiPolygon
+async function buildZonePolygonFromZipCodes(zipCodes: string[]): Promise<object | null> {
+  if (!zipCodes || zipCodes.length === 0) return null;
   
-  // Remove duplicates
-  const unique = points.filter((p, i, arr) => 
-    arr.findIndex(q => Math.abs(q[0] - p[0]) < 0.0001 && Math.abs(q[1] - p[1]) < 0.0001) === i
-  );
+  console.log(`Building precise polygon for ${zipCodes.length} zip codes using Census ZCTA data...`);
   
-  if (unique.length < 3) return unique;
+  const geometries: object[] = [];
   
-  // Find the point with lowest y (and leftmost if tie)
-  let start = 0;
-  for (let i = 1; i < unique.length; i++) {
-    if (unique[i][1] < unique[start][1] || 
-        (unique[i][1] === unique[start][1] && unique[i][0] < unique[start][0])) {
-      start = i;
-    }
-  }
-  
-  // Swap start point to beginning
-  [unique[0], unique[start]] = [unique[start], unique[0]];
-  const pivot = unique[0];
-  
-  // Sort by polar angle with pivot
-  const sorted = unique.slice(1).sort((a, b) => {
-    const angleA = Math.atan2(a[1] - pivot[1], a[0] - pivot[0]);
-    const angleB = Math.atan2(b[1] - pivot[1], b[0] - pivot[0]);
-    if (Math.abs(angleA - angleB) > 0.0001) return angleA - angleB;
-    // If same angle, closer point first
-    const distA = (a[0] - pivot[0]) ** 2 + (a[1] - pivot[1]) ** 2;
-    const distB = (b[0] - pivot[0]) ** 2 + (b[1] - pivot[1]) ** 2;
-    return distA - distB;
-  });
-  
-  // Cross product to determine turn direction
-  const cross = (o: number[], a: number[], b: number[]) =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  
-  const hull: number[][] = [pivot];
-  for (const point of sorted) {
-    while (hull.length >= 2 && cross(hull[hull.length - 2], hull[hull.length - 1], point) <= 0) {
-      hull.pop();
-    }
-    hull.push(point);
-  }
-  
-  // Close the polygon
-  if (hull.length >= 3) {
-    hull.push([...hull[0]]);
-  }
-  
-  return hull;
-}
-
-// Merge multiple zip code bounds into a single zone polygon using Mapbox geocoding
-async function buildZonePolygonFromZipCodes(
-  zipCodes: string[],
-  mapboxToken: string
-): Promise<object | null> {
-  if (!zipCodes || zipCodes.length === 0 || !mapboxToken) return null;
-  
-  console.log(`Building polygon for ${zipCodes.length} zip codes using Mapbox...`);
-  
-  // Fetch bounds for each zip code (limit to 25 to avoid rate limits)
+  // Limit to 25 zip codes and add delay to respect rate limits
   const zipCodesToFetch = zipCodes.slice(0, 25);
-  const boundsPromises = zipCodesToFetch.map(zip => fetchZipCodeBounds(zip.trim(), mapboxToken));
-  const boundsResults = await Promise.all(boundsPromises);
   
-  // Collect all corner points from bounding boxes
-  const allPoints: number[][] = [];
-  let successCount = 0;
+  for (const zip of zipCodesToFetch) {
+    const geometry = await fetchZipCodePolygon(zip.trim());
+    if (geometry) {
+      geometries.push(geometry);
+    }
+    // Small delay to be respectful of the API
+    await new Promise(r => setTimeout(r, 100));
+  }
   
-  for (const result of boundsResults) {
-    if (result) {
-      const corners = bboxToPolygonPoints(result.bbox);
-      allPoints.push(...corners);
-      successCount++;
+  console.log(`Successfully fetched ${geometries.length}/${zipCodesToFetch.length} zip code boundaries`);
+  
+  if (geometries.length === 0) {
+    console.log('No geometries retrieved, cannot build zone polygon');
+    return null;
+  }
+  
+  // Merge all polygons into a single MultiPolygon
+  const allCoordinates: number[][][][] = [];
+  
+  for (const geom of geometries) {
+    const g = geom as { type: string; coordinates: number[][][] | number[][][][] };
+    if (g.type === 'Polygon') {
+      allCoordinates.push(g.coordinates as number[][][]);
+    } else if (g.type === 'MultiPolygon') {
+      allCoordinates.push(...(g.coordinates as number[][][][]));
     }
   }
   
-  console.log(`Got bounds for ${successCount}/${zipCodesToFetch.length} zip codes`);
-  
-  if (allPoints.length < 3) {
-    console.log('Not enough points to build polygon');
+  if (allCoordinates.length === 0) {
+    console.log('No valid coordinates to merge');
     return null;
   }
   
-  // Create convex hull of all bounding box corners
-  const hull = convexHull(allPoints);
-  
-  if (hull.length < 4) {
-    console.log('Convex hull too small');
-    return null;
-  }
-  
-  console.log(`Built zone polygon with ${hull.length} vertices`);
+  console.log(`Built MultiPolygon with ${allCoordinates.length} polygon parts`);
   
   return {
-    type: 'Polygon',
-    coordinates: [hull]
+    type: 'MultiPolygon',
+    coordinates: allCoordinates
   };
 }
 
@@ -608,9 +528,8 @@ Deno.serve(async (req) => {
         if (!polygonGeoJson) {
           const zipCodes = zone.zip_codes || zone.postal_codes || [];
           if (zipCodes.length > 0) {
-            const mapboxToken = Deno.env.get('VITE_MAPBOX_TOKEN') || '';
             console.log(`Zone "${zone.name}" has ${zipCodes.length} zip codes, building polygon...`);
-            polygonGeoJson = await buildZonePolygonFromZipCodes(zipCodes, mapboxToken);
+            polygonGeoJson = await buildZonePolygonFromZipCodes(zipCodes);
           } else {
             console.log(`Zone "${zone.name}" has no zip codes or polygon data`);
           }
