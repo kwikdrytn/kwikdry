@@ -288,30 +288,76 @@ export function useCreateInventoryItem() {
   });
 }
 
+export interface BulkImportItem extends InventoryItemFormData {
+  quantity?: number;
+  location_id?: string;
+}
+
 export function useBulkCreateInventoryItems() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
 
   return useMutation({
-    mutationFn: async (items: InventoryItemFormData[]) => {
+    mutationFn: async (items: BulkImportItem[]) => {
       if (!profile?.organization_id) throw new Error('No organization');
 
       const itemsWithOrg = items.map(item => ({
-        ...item,
+        name: item.name,
+        description: item.description,
+        notes: item.notes,
+        expiration_date: item.expiration_date,
+        category: item.category,
+        unit: item.unit,
+        reorder_threshold: item.reorder_threshold,
+        par_level: item.par_level,
         organization_id: profile.organization_id,
         is_active: true,
       }));
 
-      const { data, error } = await supabase
+      // Insert inventory items
+      const { data: createdItems, error } = await supabase
         .from('inventory_items')
         .insert(itemsWithOrg)
         .select();
 
       if (error) throw error;
-      return data;
+
+      // Create stock records for items that have quantity and location
+      const stockRecords: Array<{
+        item_id: string;
+        location_id: string;
+        quantity: number;
+        technician_id: null;
+      }> = [];
+
+      createdItems.forEach((createdItem, index) => {
+        const originalItem = items[index];
+        if (originalItem.quantity && originalItem.quantity > 0 && originalItem.location_id) {
+          stockRecords.push({
+            item_id: createdItem.id,
+            location_id: originalItem.location_id,
+            quantity: originalItem.quantity,
+            technician_id: null,
+          });
+        }
+      });
+
+      if (stockRecords.length > 0) {
+        const { error: stockError } = await supabase
+          .from('inventory_stock')
+          .insert(stockRecords);
+
+        if (stockError) {
+          console.error('Failed to create stock records:', stockError);
+          // Don't throw - items were created successfully
+        }
+      }
+
+      return createdItems;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['item-stock'] });
       toast.success(`Successfully imported ${data.length} item(s)`);
     },
     onError: (error) => {

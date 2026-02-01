@@ -6,12 +6,13 @@ import { Plus, Package, Upload } from "lucide-react";
 import { InventoryTable } from "@/components/inventory/InventoryTable";
 import { InventoryFilters } from "@/components/inventory/InventoryFilters";
 import { InventoryFormDialog } from "@/components/inventory/InventoryFormDialog";
-import { CsvImportDialog, ParsedItem } from "@/components/inventory/CsvImportDialog";
+import { CsvImportDialog } from "@/components/inventory/CsvImportDialog";
 import { 
   useInventoryItems, 
   useCreateInventoryItem,
   useBulkCreateInventoryItems,
-  InventoryItemFormData 
+  InventoryItemFormData,
+  BulkImportItem,
 } from "@/hooks/useInventory";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -37,8 +38,12 @@ export default function InventoryManagement() {
     });
   };
 
-  const handleImportItems = (items: ParsedItem[]) => {
-    bulkCreateItems.mutate(items as InventoryItemFormData[], {
+  const handleImportItems = (items: BulkImportItem[], locationId: string | null) => {
+    const itemsWithLocation = items.map(item => ({
+      ...item,
+      location_id: locationId || undefined,
+    }));
+    bulkCreateItems.mutate(itemsWithLocation, {
       onSuccess: () => setIsImportOpen(false),
     });
   };

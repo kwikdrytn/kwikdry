@@ -27,18 +27,20 @@ import {
   Loader2,
   X 
 } from "lucide-react";
-import { InventoryUnit } from "@/hooks/useInventory";
+import { InventoryUnit, BulkImportItem } from "@/hooks/useInventory";
+import { useLocations } from "@/hooks/useUsers";
 
 interface CsvImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (items: ParsedItem[]) => void;
+  onImport: (items: BulkImportItem[], locationId: string | null) => void;
   isLoading?: boolean;
 }
 
 export interface ParsedItem {
   name: string;
   expiration_date?: string | null;
+  quantity?: number;
   unit: InventoryUnit;
   notes?: string;
   // Keep for backwards compatibility
@@ -196,8 +198,10 @@ export function CsvImportDialog({
   onImport,
   isLoading,
 }: CsvImportDialogProps) {
+  const { data: locations = [] } = useLocations();
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [mapping, setMapping] = useState<Record<FieldKey, string | null>>({
     name: null,
     expiration_date: null,
@@ -276,9 +280,13 @@ export function CsvImportDialog({
         warnings.push(`Row ${rowIndex + 2}: Could not parse expiration date "${expirationDateRaw}"`);
       }
 
+      const quantityRaw = getValue('quantity');
+      const quantity = quantityRaw ? parseFloat(quantityRaw) : 0;
+
       items.push({
         name,
         expiration_date: expirationDate,
+        quantity: isNaN(quantity) ? 0 : quantity,
         unit: unit || 'each',
         notes: getValue('notes') || undefined,
         // Default values for backwards compatibility
@@ -293,13 +301,14 @@ export function CsvImportDialog({
 
   const handleImport = () => {
     if (parsedItems.items.length > 0) {
-      onImport(parsedItems.items);
+      onImport(parsedItems.items as BulkImportItem[], selectedLocationId);
     }
   };
 
   const handleClose = () => {
     setFile(null);
     setCsvData(null);
+    setSelectedLocationId(null);
     setMapping({
       name: null,
       expiration_date: null,
@@ -403,6 +412,36 @@ export function CsvImportDialog({
                     </div>
                   ))}
                 </div>
+
+                {/* Location Selector for Stock */}
+                {mapping.quantity && (
+                  <div className="border-t pt-4 mt-4">
+                    <div className="grid grid-cols-2 gap-3 items-center">
+                      <Label className="text-sm">
+                        Stock Location <span className="text-destructive">*</span>
+                      </Label>
+                      <Select
+                        value={selectedLocationId ?? '__none__'}
+                        onValueChange={(value) => setSelectedLocationId(value === '__none__' ? null : value)}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">-- Select location --</SelectItem>
+                          {locations.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Imported quantities will be added to this location's stock.
+                    </p>
+                  </div>
+                )}
 
                 {validationErrors.length > 0 && (
                   <Alert variant="destructive">
