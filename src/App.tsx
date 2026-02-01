@@ -22,6 +22,7 @@ import WeeklyChecklist from "./pages/technician/WeeklyChecklist";
 import LocationManagement from "./pages/admin/LocationManagement";
 import IntegrationSettings from "./pages/admin/IntegrationSettings";
 import CallLog from "./pages/admin/CallLog";
+import CallMetrics from "./pages/admin/CallMetrics";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -179,6 +180,16 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin', 'call_staff']}>
                     <CallLog />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/calls/metrics"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <CallMetrics />
                   </RoleGuard>
                 </ProtectedRoute>
               }
