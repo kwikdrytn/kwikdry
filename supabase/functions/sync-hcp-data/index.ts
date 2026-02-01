@@ -165,67 +165,92 @@ function convertToGeoJSON(zone: HCPServiceZone): object | null {
   };
 }
 
-// Fetch ZCTA (ZIP Code Tabulation Area) polygon from Census Reporter API
-async function fetchZipCodePolygon(zipCode: string): Promise<number[][] | null> {
+// Fetch zip code bounding box from Mapbox geocoding API
+async function fetchZipCodeBounds(
+  zipCode: string,
+  mapboxToken: string
+): Promise<{ center: [number, number]; bbox: [number, number, number, number] } | null> {
   try {
-    // ZCTA geoid format: 86000US{zipcode}
-    const geoid = `86000US${zipCode}`;
-    const url = `https://api.censusreporter.org/1.0/geo/tiger2022/${geoid}?geom=true`;
+    // Search for the zip code with postcode type filter
+    const url = `${MAPBOX_GEOCODE_BASE_URL}/${encodeURIComponent(zipCode)}.json?access_token=${encodeURIComponent(mapboxToken)}&types=postcode&country=us&limit=1`;
     
     const response = await fetch(url);
     if (!response.ok) {
-      console.log(`Census API failed for zip ${zipCode}: ${response.status}`);
+      console.log(`Mapbox geocode failed for zip ${zipCode}: ${response.status}`);
       return null;
     }
     
     const data = await response.json();
-    const geometry = data?.geometry;
+    const feature = data?.features?.[0];
     
-    if (!geometry) return null;
-    
-    // Handle both Polygon and MultiPolygon
-    if (geometry.type === 'Polygon') {
-      return geometry.coordinates[0]; // Return outer ring
-    } else if (geometry.type === 'MultiPolygon') {
-      // Return the largest polygon (by point count)
-      let largest = geometry.coordinates[0][0];
-      for (const poly of geometry.coordinates) {
-        if (poly[0].length > largest.length) {
-          largest = poly[0];
-        }
-      }
-      return largest;
+    if (!feature) {
+      console.log(`No results for zip ${zipCode}`);
+      return null;
     }
     
-    return null;
+    const center = feature.center as [number, number];
+    // Mapbox returns bbox as [minLng, minLat, maxLng, maxLat]
+    const bbox = feature.bbox as [number, number, number, number] | undefined;
+    
+    if (!center || center.length < 2) return null;
+    
+    // If bbox is available, use it; otherwise create approximate bounds from center
+    if (bbox && bbox.length === 4) {
+      return { center, bbox };
+    }
+    
+    // Create approximate bounds (roughly 5km radius for a zip code)
+    const radius = 0.05; // ~5km in degrees at mid-latitudes
+    return {
+      center,
+      bbox: [center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius]
+    };
   } catch (error) {
-    console.log(`Error fetching zip polygon for ${zipCode}:`, error);
+    console.log(`Error fetching bounds for zip ${zipCode}:`, error);
     return null;
   }
+}
+
+// Create polygon corners from bounding box
+function bboxToPolygonPoints(bbox: [number, number, number, number]): number[][] {
+  const [minLng, minLat, maxLng, maxLat] = bbox;
+  return [
+    [minLng, minLat], // SW
+    [maxLng, minLat], // SE
+    [maxLng, maxLat], // NE
+    [minLng, maxLat], // NW
+  ];
 }
 
 // Calculate convex hull using Graham scan algorithm
 function convexHull(points: number[][]): number[][] {
   if (points.length < 3) return points;
   
+  // Remove duplicates
+  const unique = points.filter((p, i, arr) => 
+    arr.findIndex(q => Math.abs(q[0] - p[0]) < 0.0001 && Math.abs(q[1] - p[1]) < 0.0001) === i
+  );
+  
+  if (unique.length < 3) return unique;
+  
   // Find the point with lowest y (and leftmost if tie)
   let start = 0;
-  for (let i = 1; i < points.length; i++) {
-    if (points[i][1] < points[start][1] || 
-        (points[i][1] === points[start][1] && points[i][0] < points[start][0])) {
+  for (let i = 1; i < unique.length; i++) {
+    if (unique[i][1] < unique[start][1] || 
+        (unique[i][1] === unique[start][1] && unique[i][0] < unique[start][0])) {
       start = i;
     }
   }
   
   // Swap start point to beginning
-  [points[0], points[start]] = [points[start], points[0]];
-  const pivot = points[0];
+  [unique[0], unique[start]] = [unique[start], unique[0]];
+  const pivot = unique[0];
   
   // Sort by polar angle with pivot
-  const sorted = points.slice(1).sort((a, b) => {
+  const sorted = unique.slice(1).sort((a, b) => {
     const angleA = Math.atan2(a[1] - pivot[1], a[0] - pivot[0]);
     const angleB = Math.atan2(b[1] - pivot[1], b[0] - pivot[0]);
-    if (angleA !== angleB) return angleA - angleB;
+    if (Math.abs(angleA - angleB) > 0.0001) return angleA - angleB;
     // If same angle, closer point first
     const distA = (a[0] - pivot[0]) ** 2 + (a[1] - pivot[1]) ** 2;
     const distB = (b[0] - pivot[0]) ** 2 + (b[1] - pivot[1]) ** 2;
@@ -245,46 +270,55 @@ function convexHull(points: number[][]): number[][] {
   }
   
   // Close the polygon
-  hull.push(hull[0]);
+  if (hull.length >= 3) {
+    hull.push([...hull[0]]);
+  }
+  
   return hull;
 }
 
-// Merge multiple zip code polygons into a single zone polygon
-async function buildZonePolygonFromZipCodes(zipCodes: string[]): Promise<object | null> {
-  if (!zipCodes || zipCodes.length === 0) return null;
+// Merge multiple zip code bounds into a single zone polygon using Mapbox geocoding
+async function buildZonePolygonFromZipCodes(
+  zipCodes: string[],
+  mapboxToken: string
+): Promise<object | null> {
+  if (!zipCodes || zipCodes.length === 0 || !mapboxToken) return null;
   
-  console.log(`Building polygon for ${zipCodes.length} zip codes: ${zipCodes.join(', ')}`);
+  console.log(`Building polygon for ${zipCodes.length} zip codes using Mapbox...`);
   
-  // Fetch polygons for each zip code (limit to 20 to avoid rate limits)
-  const zipCodesToFetch = zipCodes.slice(0, 20);
-  const polygonPromises = zipCodesToFetch.map(zip => fetchZipCodePolygon(zip.trim()));
-  const polygons = await Promise.all(polygonPromises);
+  // Fetch bounds for each zip code (limit to 25 to avoid rate limits)
+  const zipCodesToFetch = zipCodes.slice(0, 25);
+  const boundsPromises = zipCodesToFetch.map(zip => fetchZipCodeBounds(zip.trim(), mapboxToken));
+  const boundsResults = await Promise.all(boundsPromises);
   
-  // Collect all valid polygon points
+  // Collect all corner points from bounding boxes
   const allPoints: number[][] = [];
-  for (const polygon of polygons) {
-    if (polygon) {
-      allPoints.push(...polygon);
+  let successCount = 0;
+  
+  for (const result of boundsResults) {
+    if (result) {
+      const corners = bboxToPolygonPoints(result.bbox);
+      allPoints.push(...corners);
+      successCount++;
     }
   }
+  
+  console.log(`Got bounds for ${successCount}/${zipCodesToFetch.length} zip codes`);
   
   if (allPoints.length < 3) {
     console.log('Not enough points to build polygon');
     return null;
   }
   
-  // Simplify: take every Nth point to reduce complexity
-  const simplified = allPoints.filter((_, i) => i % 3 === 0);
-  
-  // Create convex hull of all points
-  const hull = convexHull(simplified);
+  // Create convex hull of all bounding box corners
+  const hull = convexHull(allPoints);
   
   if (hull.length < 4) {
     console.log('Convex hull too small');
     return null;
   }
   
-  console.log(`Built zone polygon with ${hull.length} points from ${polygons.filter(Boolean).length} zip codes`);
+  console.log(`Built zone polygon with ${hull.length} vertices`);
   
   return {
     type: 'Polygon',
@@ -574,8 +608,9 @@ Deno.serve(async (req) => {
         if (!polygonGeoJson) {
           const zipCodes = zone.zip_codes || zone.postal_codes || [];
           if (zipCodes.length > 0) {
+            const mapboxToken = Deno.env.get('VITE_MAPBOX_TOKEN') || '';
             console.log(`Zone "${zone.name}" has ${zipCodes.length} zip codes, building polygon...`);
-            polygonGeoJson = await buildZonePolygonFromZipCodes(zipCodes);
+            polygonGeoJson = await buildZonePolygonFromZipCodes(zipCodes, mapboxToken);
           } else {
             console.log(`Zone "${zone.name}" has no zip codes or polygon data`);
           }
