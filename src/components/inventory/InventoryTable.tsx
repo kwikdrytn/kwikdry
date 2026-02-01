@@ -128,7 +128,7 @@ export function InventoryTable({ items, isLoading }: InventoryTableProps) {
               <TableRow
                 key={item.id}
                 className="cursor-pointer hover:bg-muted/50"
-                onClick={() => navigate(`/admin/inventory/${item.id}`)}
+                onClick={() => navigate(`/inventory/${item.id}`)}
               >
                 <TableCell>
                   <p className="font-medium">{item.name}</p>
