@@ -348,7 +348,7 @@ export default function IntegrationSettings() {
   // RingCentral OAuth constants
   const RC_CLIENT_ID = 'd54LY9v6MLKawusT9IfF98';
   const RC_AUTH_URL = 'https://platform.ringcentral.com/restapi/oauth/authorize';
-  const RC_REDIRECT_URI = 'https://kwikdry.lovable.app/oauth-callback.html';
+  const RC_REDIRECT_URI = 'https://kwikdry.lovable.app';
 
   // Handle OAuth callback via postMessage from popup
   useEffect(() => {
