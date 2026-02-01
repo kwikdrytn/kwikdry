@@ -53,7 +53,7 @@ export const navItems: NavItem[] = [
   },
   { 
     title: "Calls", 
-    url: "/calls", 
+    url: "/admin/calls", 
     icon: Phone,
     allowedRoles: ['admin', 'call_staff']
   },
