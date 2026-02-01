@@ -2,13 +2,15 @@ import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Package } from "lucide-react";
+import { Plus, Package, Upload } from "lucide-react";
 import { InventoryTable } from "@/components/inventory/InventoryTable";
 import { InventoryFilters } from "@/components/inventory/InventoryFilters";
 import { InventoryFormDialog } from "@/components/inventory/InventoryFormDialog";
+import { CsvImportDialog, ParsedItem } from "@/components/inventory/CsvImportDialog";
 import { 
   useInventoryItems, 
   useCreateInventoryItem,
+  useBulkCreateInventoryItems,
   InventoryItemFormData 
 } from "@/hooks/useInventory";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -17,6 +19,7 @@ export default function InventoryManagement() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   
   const debouncedSearch = useDebounce(search, 300);
 
@@ -26,10 +29,17 @@ export default function InventoryManagement() {
   });
 
   const createItem = useCreateInventoryItem();
+  const bulkCreateItems = useBulkCreateInventoryItems();
 
   const handleCreateItem = (data: InventoryItemFormData) => {
     createItem.mutate(data, {
       onSuccess: () => setIsFormOpen(false),
+    });
+  };
+
+  const handleImportItems = (items: ParsedItem[]) => {
+    bulkCreateItems.mutate(items as InventoryItemFormData[], {
+      onSuccess: () => setIsImportOpen(false),
     });
   };
 
@@ -75,10 +85,16 @@ export default function InventoryManagement() {
                 Click an item to view details and manage stock
               </CardDescription>
             </div>
-            <Button onClick={() => setIsFormOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4" />
+                Import CSV
+              </Button>
+              <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Item
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <InventoryFilters
@@ -101,6 +117,13 @@ export default function InventoryManagement() {
         onOpenChange={setIsFormOpen}
         onSubmit={handleCreateItem}
         isLoading={createItem.isPending}
+      />
+
+      <CsvImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onImport={handleImportItems}
+        isLoading={bulkCreateItems.isPending}
       />
     </DashboardLayout>
   );
