@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { SyncResult, SyncProgress } from "@/lib/housecallpro";
+import { RCSyncResult, RCSyncProgress } from "@/lib/ringcentral";
 import { EmployeeLinking } from "@/components/integrations/EmployeeLinking";
 import { 
   CheckCircle2, 
@@ -92,6 +93,10 @@ export default function IntegrationSettings() {
   const [showRcSecret, setShowRcSecret] = useState(false);
   const [showRcJwt, setShowRcJwt] = useState(false);
   const [hasRcChanges, setHasRcChanges] = useState(false);
+  const [rcSyncProgress, setRcSyncProgress] = useState<RCSyncProgress>({
+    stage: 'idle',
+    message: '',
+  });
 
   // Fetch organization data (including RingCentral fields)
   const { data: organization, isLoading: orgLoading } = useQuery({
@@ -430,6 +435,78 @@ export default function IntegrationSettings() {
     }
   });
 
+  // Sync RingCentral calls mutation
+  const syncRcCallsMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile?.organization_id) throw new Error("No organization");
+      if (!organization?.rc_refresh_token) throw new Error("RingCentral not connected");
+      if (!profile?.location_id) throw new Error("No location selected");
+
+      setRcSyncProgress({
+        stage: 'syncing',
+        message: 'Starting call sync...',
+        details: 'Connecting to RingCentral',
+      });
+
+      const { data, error } = await supabase.functions.invoke('sync-rc-calls', {
+        body: {
+          organization_id: profile.organization_id,
+          location_id: profile.location_id,
+          client_id: organization.rc_client_id,
+          client_secret: organization.rc_client_secret,
+          refresh_token: organization.rc_refresh_token,
+          hours_back: 24,
+        }
+      });
+
+      if (error) throw error;
+      return data as RCSyncResult;
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setRcSyncProgress({
+          stage: 'complete',
+          message: 'Sync complete!',
+          details: `Synced ${data.synced?.calls || 0} calls (${data.synced?.matched || 0} matched, ${data.synced?.linked || 0} linked to jobs)`,
+        });
+        
+        // Refresh counts
+        queryClient.invalidateQueries({ queryKey: ['rc-call-count'] });
+        queryClient.invalidateQueries({ queryKey: ['rc-last-sync'] });
+        
+        toast({
+          title: "Call sync complete",
+          description: `Synced ${data.synced?.calls || 0} calls from RingCentral`,
+        });
+      } else {
+        setRcSyncProgress({
+          stage: 'error',
+          message: 'Sync failed',
+          details: data.error || 'Unknown error',
+        });
+        
+        toast({
+          title: "Sync failed",
+          description: data.error || "Unable to sync calls from RingCentral",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      setRcSyncProgress({
+        stage: 'error',
+        message: 'Sync failed',
+        details: error.message,
+      });
+      
+      toast({
+        title: "Sync failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Fetch call log counts for RingCentral
   const { data: callLogCount } = useQuery({
     queryKey: ['rc-call-count', profile?.organization_id],
@@ -447,7 +524,7 @@ export default function IntegrationSettings() {
   });
 
   // Fetch last call sync timestamp
-  const { data: lastCallSync } = useQuery({
+  const { data: lastCallSync, refetch: refetchLastCallSync } = useQuery({
     queryKey: ['rc-last-sync', profile?.organization_id],
     queryFn: async () => {
       if (!profile?.organization_id) return null;
@@ -929,14 +1006,52 @@ export default function IntegrationSettings() {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      disabled={!isRcConnected}
+                      disabled={!isRcConnected || syncRcCallsMutation.isPending}
+                      onClick={() => syncRcCallsMutation.mutate()}
                     >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Sync Calls
+                      {syncRcCallsMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      {syncRcCallsMutation.isPending ? 'Syncing...' : 'Sync Calls'}
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Sync Progress */}
+                  {rcSyncProgress.stage !== 'idle' && (
+                    <div className="rounded-lg border p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        {rcSyncProgress.stage === 'syncing' && (
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        )}
+                        {rcSyncProgress.stage === 'complete' && (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        )}
+                        {rcSyncProgress.stage === 'error' && (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        <span className={`font-medium ${
+                          rcSyncProgress.stage === 'syncing' ? 'text-primary' :
+                          rcSyncProgress.stage === 'complete' ? 'text-green-600' :
+                          rcSyncProgress.stage === 'error' ? 'text-destructive' :
+                          'text-muted-foreground'
+                        }`}>
+                          {rcSyncProgress.message}
+                        </span>
+                      </div>
+                      {rcSyncProgress.details && (
+                        <p className="text-sm text-muted-foreground">
+                          {rcSyncProgress.details}
+                        </p>
+                      )}
+                      {rcSyncProgress.stage === 'syncing' && (
+                        <Progress value={undefined} className="h-2" />
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="rounded-lg border p-3">
                       <p className="text-xs text-muted-foreground">Last Sync</p>
                       <p className="text-sm font-medium truncate">
@@ -947,30 +1062,29 @@ export default function IntegrationSettings() {
                       <p className="text-xs text-muted-foreground">Calls Synced</p>
                       <p className="text-2xl font-semibold">{callLogCount ?? 0}</p>
                     </div>
+                    {isRcConnected && organization?.rc_account_id && (
+                      <div className="rounded-lg border p-3">
+                        <p className="text-xs text-muted-foreground">Account ID</p>
+                        <p className="text-sm font-medium font-mono truncate">{organization.rc_account_id}</p>
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Call sync functionality will be enabled after successful connection. Manual sync available for now.
+                    Syncs calls from the last 24 hours. Customer matching uses phone number lookups against HouseCall Pro customers.
                   </p>
 
                   {!isRcConnected && (
-                    <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4">
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
                       <div className="flex items-start gap-3">
-                        <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-yellow-600">Setup Required</p>
+                          <p className="text-sm font-medium text-amber-600">Setup Required</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Enter your RingCentral credentials and test the connection to enable call synchronization.
                           </p>
                         </div>
                       </div>
-                    </div>
-                  )}
-
-                  {isRcConnected && organization?.rc_account_id && (
-                    <div className="rounded-lg border p-3">
-                      <p className="text-xs text-muted-foreground">Account ID</p>
-                      <p className="text-sm font-medium font-mono">{organization.rc_account_id}</p>
                     </div>
                   )}
                 </div>
