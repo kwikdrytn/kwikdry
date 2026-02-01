@@ -175,9 +175,12 @@ export default function CallLog() {
     enabled: !!profile?.organization_id,
   });
 
+  // Sync range state
+  const [syncDays, setSyncDays] = useState<number>(30);
+
   // Sync calls mutation
   const syncMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (daysBack: number = 30) => {
       if (!profile?.organization_id || !profile?.location_id) {
         throw new Error("Missing organization or location");
       }
@@ -190,14 +193,14 @@ export default function CallLog() {
         .single();
 
       if (orgError || !org) throw new Error("Failed to fetch organization");
-      if (!org.rc_refresh_token) throw new Error("RingCentral not connected");
+      if (!org.rc_refresh_token) throw new Error("RingCentral not connected. Please connect in Integration Settings.");
 
       const { data, error } = await supabase.functions.invoke("sync-rc-calls", {
         body: {
           organization_id: profile.organization_id,
           location_id: profile.location_id,
           refresh_token: org.rc_refresh_token,
-          hours_back: 24,
+          days_back: daysBack,
         },
       });
 
@@ -208,7 +211,7 @@ export default function CallLog() {
       if (data?.success) {
         toast({
           title: "Sync complete",
-          description: `Synced ${data.synced?.calls || 0} calls from RingCentral`,
+          description: `Synced ${data.synced?.calls || 0} calls (${data.synced?.matched || 0} matched to customers)`,
         });
         refetch();
       } else {
@@ -315,19 +318,33 @@ export default function CallLog() {
             </Popover>
           </div>
 
-          {/* Sync Button (admin only) */}
+          {/* Sync Controls (admin only) */}
           {isAdmin && (
-            <Button
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-            >
-              {syncMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Sync Calls
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select value={syncDays.toString()} onValueChange={(v) => setSyncDays(parseInt(v))}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Sync range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="180">Last 6 months</SelectItem>
+                  <SelectItem value="365">Last year</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => syncMutation.mutate(syncDays)}
+                disabled={syncMutation.isPending}
+              >
+                {syncMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Sync Calls
+              </Button>
+            </div>
           )}
         </div>
 

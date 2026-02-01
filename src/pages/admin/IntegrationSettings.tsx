@@ -471,7 +471,7 @@ export default function IntegrationSettings() {
           organization_id: profile.organization_id,
           location_id: profile.location_id,
           refresh_token: organization.rc_refresh_token,
-          hours_back: 24,
+          days_back: 30, // Sync last 30 days by default
         }
       });
 
