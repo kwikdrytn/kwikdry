@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 interface AppHeaderProps {
   title?: string;
@@ -32,12 +32,14 @@ export function AppHeader({ title }: AppHeaderProps) {
 
       <div className="flex items-center gap-4">
         <LocationSelector />
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={profile?.avatar_url ?? undefined} />
-          <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-            {getInitials(profile?.first_name, profile?.last_name)}
-          </AvatarFallback>
-        </Avatar>
+        <Link to="/settings">
+          <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity">
+            <AvatarImage src={profile?.avatar_url ?? undefined} />
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+              {getInitials(profile?.first_name, profile?.last_name)}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
         <Button 
           variant="ghost" 
           size="icon" 
