@@ -1,32 +1,24 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Package, Pencil, Settings2 } from "lucide-react";
+import { ArrowLeft, Package, Pencil, Settings2, Calendar, Clock, Hash } from "lucide-react";
 import { StockBreakdownTable } from "@/components/inventory/StockBreakdownTable";
 import { StockAdjustDialog } from "@/components/inventory/StockAdjustDialog";
 import { TransactionHistory } from "@/components/inventory/TransactionHistory";
-import { UsageTrendChart } from "@/components/inventory/UsageTrendChart";
 import { InventoryFormDialog } from "@/components/inventory/InventoryFormDialog";
 import {
   useInventoryItem,
   useItemStock,
   useItemTransactions,
-  useUsageTrend,
   useUpdateInventoryItem,
   useAdjustStock,
   InventoryItemFormData,
 } from "@/hooks/useInventory";
-import { cn } from "@/lib/utils";
-
-const categoryLabels: Record<string, string> = {
-  cleaning_solution: 'Cleaning Solution',
-  supply: 'Supply',
-  consumable: 'Consumable',
-};
+import { format, parseISO, differenceInDays } from "date-fns";
 
 const unitLabels: Record<string, string> = {
   gallon: 'Gallon',
@@ -40,6 +32,58 @@ const unitLabels: Record<string, string> = {
   bag: 'Bag',
 };
 
+function getDaysLeft(expirationDate: string | null): number | null {
+  if (!expirationDate) return null;
+  try {
+    const expDate = parseISO(expirationDate);
+    return differenceInDays(expDate, new Date());
+  } catch {
+    return null;
+  }
+}
+
+function getDaysLeftDisplay(daysLeft: number | null) {
+  if (daysLeft === null) {
+    return <span className="text-muted-foreground">No expiration set</span>;
+  }
+  
+  if (daysLeft < 0) {
+    return (
+      <Badge variant="destructive" className="text-sm">
+        Expired {Math.abs(daysLeft)} days ago
+      </Badge>
+    );
+  }
+  
+  if (daysLeft === 0) {
+    return (
+      <Badge variant="destructive" className="text-sm">
+        Expires today
+      </Badge>
+    );
+  }
+  
+  if (daysLeft <= 7) {
+    return (
+      <Badge variant="destructive" className="text-sm">
+        {daysLeft} days left
+      </Badge>
+    );
+  }
+  
+  if (daysLeft <= 30) {
+    return (
+      <Badge variant="secondary" className="text-sm">
+        {daysLeft} days left
+      </Badge>
+    );
+  }
+  
+  return (
+    <span className="text-sm text-muted-foreground">{daysLeft} days left</span>
+  );
+}
+
 export default function InventoryDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -50,13 +94,12 @@ export default function InventoryDetail() {
   const { data: item, isLoading: itemLoading } = useInventoryItem(id);
   const { data: stocks = [], isLoading: stocksLoading } = useItemStock(id);
   const { data: transactions = [], isLoading: txLoading } = useItemTransactions(id);
-  const { data: usageTrend = [], isLoading: trendLoading } = useUsageTrend(id);
 
   const updateItem = useUpdateInventoryItem();
   const adjustStock = useAdjustStock();
 
   const totalStock = stocks.reduce((sum, s) => sum + Number(s.quantity), 0);
-  const isLow = item ? totalStock <= item.reorder_threshold : false;
+  const daysLeft = item ? getDaysLeft(item.expiration_date) : null;
 
   const handleUpdateItem = (data: InventoryItemFormData) => {
     if (!id) return;
@@ -128,76 +171,125 @@ export default function InventoryDetail() {
           </div>
         </div>
 
-        {/* Item Header */}
+        {/* Item Details Card */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-6">
               <div className="flex items-start gap-4">
                 <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10">
                   <Package className="h-7 w-7 text-primary" />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <h2 className="text-2xl font-bold">{item.name}</h2>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge variant="outline">{categoryLabels[item.category]}</Badge>
-                    <Badge variant="secondary">{unitLabels[item.unit]}</Badge>
-                    <div className="flex items-center gap-1.5">
-                      <div 
-                        className={cn(
-                          "h-2 w-2 rounded-full",
-                          isLow ? "bg-destructive" : "bg-primary"
-                        )}
-                      />
-                      <span className={cn(
-                        "text-sm font-medium",
-                        isLow ? "text-destructive" : "text-primary"
-                      )}>
-                        {isLow ? "Low Stock" : "In Stock"}
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{unitLabels[item.unit]}</Badge>
                   </div>
-                  {item.description && (
-                    <p className="text-muted-foreground mt-2">{item.description}</p>
-                  )}
                 </div>
-              </div>
-              
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Stock</p>
-                <p className="text-3xl font-bold">{totalStock}</p>
-                <p className="text-sm text-muted-foreground">
-                  Reorder at: {item.reorder_threshold}
-                  {item.par_level && ` · Par: ${item.par_level}`}
-                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Stock Breakdown & Chart */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        {/* Key Metrics Grid */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Expiration Date */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Stock by Location</CardTitle>
-              <CardDescription>Current stock levels across all locations</CardDescription>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Expiration Date
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <StockBreakdownTable 
-                stocks={stocks} 
-                unit={item.unit}
-                isLoading={stocksLoading} 
-              />
+              <p className="text-2xl font-bold">
+                {item.expiration_date 
+                  ? format(parseISO(item.expiration_date), 'MMM d, yyyy')
+                  : '—'
+                }
+              </p>
             </CardContent>
           </Card>
 
-          <UsageTrendChart data={usageTrend} isLoading={trendLoading} />
+          {/* Days Left */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Days Left
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {daysLeft !== null ? (
+                  <span className={daysLeft <= 7 ? 'text-destructive' : daysLeft <= 30 ? 'text-warning' : ''}>
+                    {daysLeft}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </div>
+              {getDaysLeftDisplay(daysLeft)}
+            </CardContent>
+          </Card>
+
+          {/* Quantity */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Hash className="h-4 w-4" />
+                Total Quantity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{totalStock}</p>
+              <p className="text-sm text-muted-foreground">{unitLabels[item.unit]}(s)</p>
+            </CardContent>
+          </Card>
+
+          {/* Unit */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Unit of Measure
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{unitLabels[item.unit]}</p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Notes */}
+        {item.notes && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground whitespace-pre-wrap">{item.notes}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stock Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Stock by Location</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StockBreakdownTable 
+              stocks={stocks} 
+              unit={item.unit}
+              isLoading={stocksLoading} 
+            />
+          </CardContent>
+        </Card>
 
         {/* Transaction History */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Recent Transactions</CardTitle>
-            <CardDescription>Last 20 stock changes</CardDescription>
           </CardHeader>
           <CardContent>
             <TransactionHistory transactions={transactions} isLoading={txLoading} />
