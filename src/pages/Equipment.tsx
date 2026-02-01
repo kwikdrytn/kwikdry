@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, LayoutGrid, Table as TableIcon, Wrench } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,6 @@ import { EquipmentFilters } from "@/components/equipment/EquipmentFilters";
 import { EquipmentTable } from "@/components/equipment/EquipmentTable";
 import { EquipmentCards } from "@/components/equipment/EquipmentCards";
 import { EquipmentFormDialog } from "@/components/equipment/EquipmentFormDialog";
-import { EquipmentDetailDialog } from "@/components/equipment/EquipmentDetailDialog";
 import {
   useEquipmentList,
   useCreateEquipment,
@@ -23,6 +23,8 @@ import { useDebounce } from "@/hooks/useDebounce";
 type ViewMode = "cards" | "table";
 
 export default function EquipmentPage() {
+  const navigate = useNavigate();
+  
   // View toggle
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   
@@ -35,7 +37,6 @@ export default function EquipmentPage() {
   
   // Dialog state
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   
   const debouncedSearch = useDebounce(search, 300);
@@ -53,8 +54,7 @@ export default function EquipmentPage() {
   const deleteEquipment = useDeleteEquipment();
 
   const handleView = (item: Equipment) => {
-    setSelectedEquipment(item);
-    setIsDetailOpen(true);
+    navigate(`/equipment/${item.id}`);
   };
 
   const handleEdit = (item: Equipment) => {
@@ -194,12 +194,6 @@ export default function EquipmentPage() {
         onDelete={handleDelete}
         isLoading={createEquipment.isPending || updateEquipment.isPending}
         isDeleting={deleteEquipment.isPending}
-      />
-
-      <EquipmentDetailDialog
-        open={isDetailOpen}
-        onOpenChange={setIsDetailOpen}
-        equipment={selectedEquipment}
       />
     </DashboardLayout>
   );

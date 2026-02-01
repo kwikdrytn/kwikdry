@@ -349,3 +349,62 @@ export function useCheckSerialNumber(serialNumber: string | null, excludeEquipme
     enabled: !!profile?.organization_id && !!serialNumber && serialNumber.trim() !== '',
   });
 }
+
+export interface MaintenanceFormData {
+  equipment_id: string;
+  type: 'repair' | 'service' | 'inspection' | 'replacement' | 'cleaning';
+  description: string;
+  performed_at: string;
+  performed_by?: string | null;
+  cost?: number | null;
+  vendor?: string | null;
+  next_due?: string | null;
+  notes?: string | null;
+}
+
+export function useCreateMaintenance() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: MaintenanceFormData) => {
+      const insertData: {
+        equipment_id: string;
+        type: 'repair' | 'service' | 'inspection' | 'replacement' | 'cleaning';
+        description: string;
+        performed_at: string;
+        performed_by?: string | null;
+        cost?: number | null;
+        vendor?: string | null;
+        next_due?: string | null;
+        notes?: string | null;
+      } = {
+        equipment_id: data.equipment_id,
+        type: data.type,
+        description: data.description,
+        performed_at: data.performed_at,
+        performed_by: data.performed_by,
+        cost: data.cost,
+        vendor: data.vendor,
+        next_due: data.next_due,
+        notes: data.notes,
+      };
+
+      const { data: newRecord, error } = await supabase
+        .from('equipment_maintenance')
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return newRecord;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['equipment-maintenance', variables.equipment_id] });
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      toast.success('Maintenance record added successfully');
+    },
+    onError: (error) => {
+      toast.error(`Failed to add maintenance record: ${error.message}`);
+    },
+  });
+}

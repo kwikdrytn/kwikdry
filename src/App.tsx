@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Checklists from "./pages/Checklists";
 import Equipment from "./pages/Equipment";
+import EquipmentDetail from "./pages/admin/EquipmentDetail";
 import JobMap from "./pages/JobMap";
 import UserManagement from "./pages/admin/UserManagement";
 import InventoryManagement from "./pages/admin/InventoryManagement";
@@ -106,6 +107,16 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin']}>
                     <Equipment />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/equipment/:id"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <EquipmentDetail />
                   </RoleGuard>
                 </ProtectedRoute>
               }
