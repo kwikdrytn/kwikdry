@@ -203,8 +203,8 @@ export function TemplateFormDialog({ open, onOpenChange, template }: TemplateFor
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0">
+        <DialogHeader className="flex-shrink-0 p-6 pb-4">
           <DialogTitle>{isEditing ? "Edit Template" : "Create Template"}</DialogTitle>
           <DialogDescription>
             {isEditing
@@ -213,11 +213,9 @@ export function TemplateFormDialog({ open, onOpenChange, template }: TemplateFor
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden min-h-0">
-          <ScrollArea className="h-full max-h-[calc(90vh-180px)]">
-            <div className="pr-4">
+        <div className="flex-1 overflow-y-auto px-6">
           <Form {...form}>
-            <form id="template-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form id="template-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-4">
               {/* Basic Info */}
               <div className="space-y-4">
                 <FormField
@@ -492,10 +490,9 @@ export function TemplateFormDialog({ open, onOpenChange, template }: TemplateFor
               </div>
             </form>
           </Form>
-            </div>
-          </ScrollArea>
         </div>
-        <DialogFooter className="mt-4">
+
+        <DialogFooter className="flex-shrink-0 p-6 pt-4 border-t">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
