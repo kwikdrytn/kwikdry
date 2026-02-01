@@ -636,6 +636,35 @@ export type Database = {
           },
         ]
       }
+      equipment_photos: {
+        Row: {
+          created_at: string
+          equipment_id: string
+          file_path: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          equipment_id: string
+          file_path: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          equipment_id?: string
+          file_path?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_photos_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_requests: {
         Row: {
           completed_at: string | null
