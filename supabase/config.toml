@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.test-rc-connection]
 verify_jwt = false
+
+[functions.sync-rc-calls]
+verify_jwt = false
