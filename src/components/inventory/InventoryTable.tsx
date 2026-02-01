@@ -11,17 +11,12 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { differenceInDays, parseISO, format } from "date-fns";
 
 interface InventoryTableProps {
   items: InventoryItem[];
   isLoading: boolean;
 }
-
-const categoryLabels: Record<string, string> = {
-  cleaning_solution: 'Cleaning Solution',
-  supply: 'Supply',
-  consumable: 'Consumable',
-};
 
 const unitLabels: Record<string, string> = {
   gallon: 'gal',
@@ -34,6 +29,52 @@ const unitLabels: Record<string, string> = {
   roll: 'roll',
   bag: 'bag',
 };
+
+function getDaysLeft(expirationDate: string | null): number | null {
+  if (!expirationDate) return null;
+  try {
+    const expDate = parseISO(expirationDate);
+    return differenceInDays(expDate, new Date());
+  } catch {
+    return null;
+  }
+}
+
+function getDaysLeftBadge(daysLeft: number | null) {
+  if (daysLeft === null) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  
+  if (daysLeft < 0) {
+    return (
+      <Badge variant="destructive" className="font-medium">
+        Expired
+      </Badge>
+    );
+  }
+  
+  if (daysLeft <= 7) {
+    return (
+      <Badge variant="destructive" className="font-medium">
+        {daysLeft} days
+      </Badge>
+    );
+  }
+  
+  if (daysLeft <= 30) {
+    return (
+      <Badge variant="secondary" className="font-medium text-warning">
+        {daysLeft} days
+      </Badge>
+    );
+  }
+  
+  return (
+    <Badge variant="outline" className="font-medium">
+      {daysLeft} days
+    </Badge>
+  );
+}
 
 export function InventoryTable({ items, isLoading }: InventoryTableProps) {
   const navigate = useNavigate();
@@ -67,20 +108,21 @@ export function InventoryTable({ items, isLoading }: InventoryTableProps) {
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[300px]">Item</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead className="text-right">Current Stock</TableHead>
-            <TableHead className="text-right">Reorder At</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="min-w-[200px]">Product Name</TableHead>
+            <TableHead>Expiration Date</TableHead>
+            <TableHead>Days Left</TableHead>
+            <TableHead className="text-right">Quantity</TableHead>
+            <TableHead>Unit</TableHead>
+            <TableHead className="min-w-[150px]">Notes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.map((item) => {
-            const isLow = (item.total_stock ?? 0) <= item.reorder_threshold;
+            const daysLeft = getDaysLeft(item.expiration_date);
             
             return (
               <TableRow
@@ -89,41 +131,36 @@ export function InventoryTable({ items, isLoading }: InventoryTableProps) {
                 onClick={() => navigate(`/admin/inventory/${item.id}`)}
               >
                 <TableCell>
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    {item.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
+                  <p className="font-medium">{item.name}</p>
+                </TableCell>
+                <TableCell>
+                  {item.expiration_date ? (
+                    <span className="text-sm">
+                      {format(parseISO(item.expiration_date), 'MMM d, yyyy')}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {getDaysLeftBadge(daysLeft)}
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {item.total_stock ?? 0}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline">
-                    {categoryLabels[item.category] ?? item.category}
+                    {unitLabels[item.unit] ?? item.unit}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right font-medium">
-                  {item.total_stock ?? 0} {unitLabels[item.unit] ?? item.unit}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {item.reorder_threshold} {unitLabels[item.unit] ?? item.unit}
-                </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className={cn(
-                        "h-2.5 w-2.5 rounded-full",
-                        isLow ? "bg-destructive" : "bg-primary"
-                      )}
-                    />
-                    <span className={cn(
-                      "text-sm font-medium",
-                      isLow ? "text-destructive" : "text-primary"
-                    )}>
-                      {isLow ? "Low Stock" : "In Stock"}
-                    </span>
-                  </div>
+                  {item.notes ? (
+                    <p className="text-sm text-muted-foreground line-clamp-1 max-w-[200px]">
+                      {item.notes}
+                    </p>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
               </TableRow>
             );

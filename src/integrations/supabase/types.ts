@@ -949,9 +949,11 @@ export type Database = {
           created_at: string | null
           deleted_at: string | null
           description: string | null
+          expiration_date: string | null
           id: string
           is_active: boolean | null
           name: string
+          notes: string | null
           organization_id: string
           par_level: number | null
           reorder_threshold: number
@@ -963,9 +965,11 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           description?: string | null
+          expiration_date?: string | null
           id?: string
           is_active?: boolean | null
           name: string
+          notes?: string | null
           organization_id: string
           par_level?: number | null
           reorder_threshold?: number
@@ -977,9 +981,11 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           description?: string | null
+          expiration_date?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
+          notes?: string | null
           organization_id?: string
           par_level?: number | null
           reorder_threshold?: number

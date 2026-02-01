@@ -27,7 +27,7 @@ import {
   Loader2,
   X 
 } from "lucide-react";
-import { InventoryCategory, InventoryUnit } from "@/hooks/useInventory";
+import { InventoryUnit } from "@/hooks/useInventory";
 
 interface CsvImportDialogProps {
   open: boolean;
@@ -38,14 +38,16 @@ interface CsvImportDialogProps {
 
 export interface ParsedItem {
   name: string;
-  description?: string;
-  category: InventoryCategory;
+  expiration_date?: string | null;
   unit: InventoryUnit;
+  notes?: string;
+  // Keep for backwards compatibility
+  category: 'cleaning_solution' | 'supply' | 'consumable';
   reorder_threshold: number;
   par_level?: number | null;
 }
 
-type FieldKey = 'name' | 'description' | 'category' | 'unit' | 'reorder_threshold' | 'par_level';
+type FieldKey = 'name' | 'expiration_date' | 'quantity' | 'unit' | 'notes';
 
 interface FieldMapping {
   field: FieldKey;
@@ -55,23 +57,12 @@ interface FieldMapping {
 }
 
 const INVENTORY_FIELDS: Omit<FieldMapping, 'csvHeader'>[] = [
-  { field: 'name', label: 'Name', required: true },
-  { field: 'description', label: 'Description', required: false },
-  { field: 'category', label: 'Category', required: true },
+  { field: 'name', label: 'Product Name', required: true },
+  { field: 'expiration_date', label: 'Expiration Date', required: false },
+  { field: 'quantity', label: 'Quantity', required: false },
   { field: 'unit', label: 'Unit', required: true },
-  { field: 'reorder_threshold', label: 'Reorder Threshold', required: true },
-  { field: 'par_level', label: 'Par Level', required: false },
+  { field: 'notes', label: 'Notes', required: false },
 ];
-
-const CATEGORY_MAP: Record<string, InventoryCategory> = {
-  'cleaning_solution': 'cleaning_solution',
-  'cleaning solution': 'cleaning_solution',
-  'solution': 'cleaning_solution',
-  'supply': 'supply',
-  'supplies': 'supply',
-  'consumable': 'consumable',
-  'consumables': 'consumable',
-};
 
 const UNIT_MAP: Record<string, InventoryUnit> = {
   'gallon': 'gallon',
@@ -136,35 +127,67 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
 function autoMapHeaders(csvHeaders: string[]): Record<FieldKey, string | null> {
   const mapping: Record<FieldKey, string | null> = {
     name: null,
-    description: null,
-    category: null,
+    expiration_date: null,
+    quantity: null,
     unit: null,
-    reorder_threshold: null,
-    par_level: null,
+    notes: null,
   };
 
   const lowerHeaders = csvHeaders.map(h => h.toLowerCase().trim());
 
-  // Auto-match common header names
   lowerHeaders.forEach((header, index) => {
     const originalHeader = csvHeaders[index];
     
-    if (['name', 'item name', 'item_name', 'product', 'product name'].includes(header)) {
+    if (['name', 'product name', 'product_name', 'item name', 'item_name', 'product'].includes(header)) {
       mapping.name = originalHeader;
-    } else if (['description', 'desc', 'details'].includes(header)) {
-      mapping.description = originalHeader;
-    } else if (['category', 'type', 'item type', 'item_type'].includes(header)) {
-      mapping.category = originalHeader;
+    } else if (['expiration_date', 'expiration date', 'exp date', 'exp_date', 'expires', 'expiry', 'expiry_date', 'expiry date'].includes(header)) {
+      mapping.expiration_date = originalHeader;
+    } else if (['quantity', 'qty', 'amount', 'count', 'stock'].includes(header)) {
+      mapping.quantity = originalHeader;
     } else if (['unit', 'uom', 'unit of measure', 'units'].includes(header)) {
       mapping.unit = originalHeader;
-    } else if (['reorder_threshold', 'reorder threshold', 'reorder', 'min stock', 'minimum'].includes(header)) {
-      mapping.reorder_threshold = originalHeader;
-    } else if (['par_level', 'par level', 'par', 'max stock', 'maximum', 'target'].includes(header)) {
-      mapping.par_level = originalHeader;
+    } else if (['notes', 'note', 'comments', 'comment', 'description', 'desc'].includes(header)) {
+      mapping.notes = originalHeader;
     }
   });
 
   return mapping;
+}
+
+function parseDate(dateStr: string): string | null {
+  if (!dateStr) return null;
+  
+  // Try common date formats
+  const formats = [
+    /^(\d{4})-(\d{2})-(\d{2})$/,           // YYYY-MM-DD
+    /^(\d{2})\/(\d{2})\/(\d{4})$/,          // MM/DD/YYYY
+    /^(\d{2})-(\d{2})-(\d{4})$/,            // MM-DD-YYYY
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,      // M/D/YYYY
+  ];
+  
+  for (const format of formats) {
+    const match = dateStr.match(format);
+    if (match) {
+      if (format === formats[0]) {
+        return dateStr; // Already in YYYY-MM-DD format
+      }
+      // Convert to YYYY-MM-DD
+      const [, m, d, y] = match;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+  
+  // Try native Date parsing
+  try {
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  } catch {
+    // ignore
+  }
+  
+  return null;
 }
 
 export function CsvImportDialog({
@@ -177,11 +200,10 @@ export function CsvImportDialog({
   const [csvData, setCsvData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
   const [mapping, setMapping] = useState<Record<FieldKey, string | null>>({
     name: null,
-    description: null,
-    category: null,
+    expiration_date: null,
+    quantity: null,
     unit: null,
-    reorder_threshold: null,
-    par_level: null,
+    notes: null,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -217,10 +239,8 @@ export function CsvImportDialog({
 
   const validationErrors = useMemo(() => {
     const errors: string[] = [];
-    if (!mapping.name) errors.push('Name field is required');
-    if (!mapping.category) errors.push('Category field is required');
+    if (!mapping.name) errors.push('Product Name field is required');
     if (!mapping.unit) errors.push('Unit field is required');
-    if (!mapping.reorder_threshold) errors.push('Reorder Threshold field is required');
     return errors;
   }, [mapping]);
 
@@ -240,14 +260,8 @@ export function CsvImportDialog({
 
       const name = getValue('name');
       if (!name) {
-        warnings.push(`Row ${rowIndex + 2}: Skipped - no name`);
+        warnings.push(`Row ${rowIndex + 2}: Skipped - no product name`);
         return;
-      }
-
-      const categoryRaw = getValue('category').toLowerCase();
-      const category = CATEGORY_MAP[categoryRaw];
-      if (!category) {
-        warnings.push(`Row ${rowIndex + 2}: Invalid category "${getValue('category')}" - defaulting to "supply"`);
       }
 
       const unitRaw = getValue('unit').toLowerCase();
@@ -256,17 +270,21 @@ export function CsvImportDialog({
         warnings.push(`Row ${rowIndex + 2}: Invalid unit "${getValue('unit')}" - defaulting to "each"`);
       }
 
-      const reorderThreshold = parseFloat(getValue('reorder_threshold')) || 0;
-      const parLevelStr = getValue('par_level');
-      const parLevel = parLevelStr ? parseFloat(parLevelStr) || null : null;
+      const expirationDateRaw = getValue('expiration_date');
+      const expirationDate = parseDate(expirationDateRaw);
+      if (expirationDateRaw && !expirationDate) {
+        warnings.push(`Row ${rowIndex + 2}: Could not parse expiration date "${expirationDateRaw}"`);
+      }
 
       items.push({
         name,
-        description: getValue('description') || undefined,
-        category: category || 'supply',
+        expiration_date: expirationDate,
         unit: unit || 'each',
-        reorder_threshold: reorderThreshold,
-        par_level: parLevel,
+        notes: getValue('notes') || undefined,
+        // Default values for backwards compatibility
+        category: 'supply',
+        reorder_threshold: 0,
+        par_level: null,
       });
     });
 
@@ -284,11 +302,10 @@ export function CsvImportDialog({
     setCsvData(null);
     setMapping({
       name: null,
-      description: null,
-      category: null,
+      expiration_date: null,
+      quantity: null,
       unit: null,
-      reorder_threshold: null,
-      par_level: null,
+      notes: null,
     });
     setError(null);
     onOpenChange(false);
@@ -433,19 +450,17 @@ export function CsvImportDialog({
                       <table className="w-full text-xs">
                         <thead className="bg-muted">
                           <tr>
-                            <th className="px-2 py-1.5 text-left font-medium">Name</th>
-                            <th className="px-2 py-1.5 text-left font-medium">Category</th>
+                            <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
+                            <th className="px-2 py-1.5 text-left font-medium">Expiration</th>
                             <th className="px-2 py-1.5 text-left font-medium">Unit</th>
-                            <th className="px-2 py-1.5 text-right font-medium">Reorder</th>
                           </tr>
                         </thead>
                         <tbody>
                           {parsedItems.items.slice(0, 3).map((item, i) => (
                             <tr key={i} className="border-t">
                               <td className="px-2 py-1.5">{item.name}</td>
-                              <td className="px-2 py-1.5 capitalize">{item.category.replace('_', ' ')}</td>
+                              <td className="px-2 py-1.5">{item.expiration_date || '—'}</td>
                               <td className="px-2 py-1.5">{item.unit}</td>
-                              <td className="px-2 py-1.5 text-right">{item.reorder_threshold}</td>
                             </tr>
                           ))}
                         </tbody>
