@@ -25,6 +25,40 @@ interface TechnicianWithLocation {
   home_lng: number;
   address: string;
   distanceFromJob?: number;
+  drivingDistanceMiles?: number;
+  drivingDurationMinutes?: number;
+}
+
+// Fetch driving distance from Mapbox Directions API
+async function getDrivingDistance(
+  fromLng: number,
+  fromLat: number,
+  toLng: number,
+  toLat: number,
+  mapboxToken: string
+): Promise<{ distanceMiles: number; durationMinutes: number } | null> {
+  try {
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${fromLng},${fromLat};${toLng},${toLat}?access_token=${mapboxToken}&overview=false`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error("Mapbox API error:", response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    if (data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      return {
+        distanceMiles: route.distance / 1609.34, // meters to miles
+        durationMinutes: route.duration / 60, // seconds to minutes
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching driving distance:", error);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -36,6 +70,11 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    const MAPBOX_TOKEN = Deno.env.get("VITE_MAPBOX_TOKEN");
+    if (!MAPBOX_TOKEN) {
+      console.warn("VITE_MAPBOX_TOKEN not configured, driving distances will not be available");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -101,7 +140,7 @@ serve(async (req) => {
       console.error("Error fetching technicians:", techError);
     }
 
-    // Process technicians with distances
+    // Process technicians with straight-line distances first
     const techsWithDistance: TechnicianWithLocation[] = (technicians || []).map((tech) => {
       const name = `${tech.first_name || ""} ${tech.last_name || ""}`.trim() || "Unknown";
       const techAddress = [tech.address, tech.city, tech.state, tech.zip].filter(Boolean).join(", ");
@@ -120,6 +159,32 @@ serve(async (req) => {
         distanceFromJob: distance,
       };
     }).sort((a, b) => (a.distanceFromJob || 999) - (b.distanceFromJob || 999));
+
+    // Fetch driving distances for top technicians (limit to avoid rate limits)
+    if (MAPBOX_TOKEN && techsWithDistance.length > 0) {
+      console.log("Fetching driving distances for technicians...");
+      const drivingPromises = techsWithDistance.slice(0, 5).map(async (tech) => {
+        const driving = await getDrivingDistance(
+          tech.home_lng,
+          tech.home_lat,
+          coordinates.lng,
+          coordinates.lat,
+          MAPBOX_TOKEN
+        );
+        if (driving) {
+          tech.drivingDistanceMiles = driving.distanceMiles;
+          tech.drivingDurationMinutes = driving.durationMinutes;
+        }
+      });
+      await Promise.all(drivingPromises);
+      
+      // Re-sort by driving distance if available
+      techsWithDistance.sort((a, b) => {
+        const aDist = a.drivingDistanceMiles ?? a.distanceFromJob ?? 999;
+        const bDist = b.drivingDistanceMiles ?? b.distanceFromJob ?? 999;
+        return aDist - bDist;
+      });
+    }
 
     // Determine which zone the new address is in (simple point-in-polygon check)
     let matchingZone = null;
@@ -189,12 +254,15 @@ serve(async (req) => {
       })
       .join("\n\n");
 
-    // Build technician location context
+    // Build technician location context with driving distances
     const techLocationContext = techsWithDistance.length > 0
       ? `TECHNICIAN HOME LOCATIONS (sorted by distance from job):
-${techsWithDistance.slice(0, 5).map((tech) => 
-  `- ${tech.name}: ${tech.distanceFromJob?.toFixed(1)} miles from job location (${tech.address})`
-).join("\n")}
+${techsWithDistance.slice(0, 5).map((tech) => {
+  const drivingInfo = tech.drivingDistanceMiles 
+    ? `${tech.drivingDistanceMiles.toFixed(1)} miles / ${Math.round(tech.drivingDurationMinutes || 0)} min drive`
+    : `${tech.distanceFromJob?.toFixed(1)} miles (straight-line)`;
+  return `- ${tech.name}: ${drivingInfo} from job location`;
+}).join("\n")}
 
 Consider these technicians for optimal routing - technicians living closer can start the day with this job or end their day here with less travel time.`
       : "No technician home locations available.";
@@ -312,6 +380,14 @@ Analyze this data and suggest the optimal times to book this job. When making su
         warnings: ["Could not parse structured suggestions"],
       };
     }
+
+    // Add technician driving distances to the response
+    suggestions.technicians = techsWithDistance.slice(0, 5).map((tech) => ({
+      name: tech.name,
+      drivingDistanceMiles: tech.drivingDistanceMiles,
+      drivingDurationMinutes: tech.drivingDurationMinutes,
+      straightLineDistance: tech.distanceFromJob,
+    }));
 
     console.log("Generated suggestions:", suggestions);
 
