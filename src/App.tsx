@@ -21,6 +21,7 @@ import ChecklistReview from "./pages/admin/ChecklistReview";
 import ChecklistSubmissionDetail from "./pages/admin/ChecklistSubmissionDetail";
 import WeeklyChecklist from "./pages/technician/WeeklyChecklist";
 import LocationManagement from "./pages/admin/LocationManagement";
+import IntegrationSettings from "./pages/admin/IntegrationSettings";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -156,6 +157,16 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin']}>
                     <Settings />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings/integrations"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <IntegrationSettings />
                   </RoleGuard>
                 </ProtectedRoute>
               }
