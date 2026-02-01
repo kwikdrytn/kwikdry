@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Check } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Camera, Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -95,16 +95,15 @@ export function ChecklistForm({ items, onSubmit, isSubmitting }: ChecklistFormPr
             </CardHeader>
             <CardContent className="space-y-3">
               {item.type === "boolean" && (
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id={item.key}
-                    checked={response?.value === "true"}
-                    onCheckedChange={(checked) => handleValueChange(item.key, String(checked))}
-                  />
-                  <Label htmlFor={item.key}>
-                    {response?.value === "true" ? "Yes" : "No"}
-                  </Label>
-                </div>
+                <Button
+                  type="button"
+                  variant={response?.value === "true" ? "default" : "outline"}
+                  className="gap-2"
+                  onClick={() => handleValueChange(item.key, response?.value === "true" ? "false" : "true")}
+                >
+                  <Check className="h-4 w-4" />
+                  {response?.value === "true" ? "Checked" : "Check"}
+                </Button>
               )}
 
               {item.type === "text" && (
