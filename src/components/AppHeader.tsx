@@ -38,7 +38,12 @@ export function AppHeader({
         <Separator orientation="vertical" className="h-6" />
         
         {/* Organization Name */}
-        {organization}
+        {organization && (
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">{organization.name}</span>
+          </div>
+        )}
 
         {title && <>
             <Separator orientation="vertical" className="h-6 hidden sm:block" />
