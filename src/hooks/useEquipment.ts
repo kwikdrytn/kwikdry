@@ -272,7 +272,7 @@ export function useTechnicians() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, location_id')
         .eq('organization_id', profile.organization_id)
         .eq('role', 'technician')
         .eq('is_active', true)
@@ -283,5 +283,69 @@ export function useTechnicians() {
       return data;
     },
     enabled: !!profile?.organization_id,
+  });
+}
+
+export function useTechniciansByLocation(locationId: string | null | undefined) {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ['technicians-by-location', profile?.organization_id, locationId],
+    queryFn: async () => {
+      if (!profile?.organization_id) return [];
+
+      let query = supabase
+        .from('profiles')
+        .select('id, first_name, last_name, location_id')
+        .eq('organization_id', profile.organization_id)
+        .eq('role', 'technician')
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .order('first_name');
+
+      // If location is specified, filter by it
+      if (locationId) {
+        query = query.eq('location_id', locationId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.organization_id,
+  });
+}
+
+export function useCheckSerialNumber(serialNumber: string | null, excludeEquipmentId: string | null) {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ['check-serial-number', profile?.organization_id, serialNumber, excludeEquipmentId],
+    queryFn: async () => {
+      if (!profile?.organization_id || !serialNumber || serialNumber.trim() === '') {
+        return { isDuplicate: false, existingName: null };
+      }
+
+      let query = supabase
+        .from('equipment')
+        .select('id, name, serial_number')
+        .eq('organization_id', profile.organization_id)
+        .eq('serial_number', serialNumber.trim())
+        .is('deleted_at', null);
+
+      if (excludeEquipmentId) {
+        query = query.neq('id', excludeEquipmentId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        return { isDuplicate: true, existingName: data[0].name };
+      }
+      
+      return { isDuplicate: false, existingName: null };
+    },
+    enabled: !!profile?.organization_id && !!serialNumber && serialNumber.trim() !== '',
   });
 }
