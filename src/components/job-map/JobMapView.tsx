@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { MapFilters } from "./MapFilters";
 import { MapLegend } from "./MapLegend";
-import { useJobsForDate, useServiceZones, useFirstLocation, HCPJob } from "@/hooks/useJobMap";
+import { useJobsForDate, useServiceZones, useFirstLocation, HCPJob, ServiceZone } from "@/hooks/useJobMap";
 
 // Get Mapbox token from environment
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -36,7 +36,6 @@ function getStatusColor(status: string | null): string {
 
 function formatTime(time: string | null): string {
   if (!time) return '';
-  // Parse time like "09:00:00" or "9:00"
   const parts = time.split(':');
   if (parts.length < 2) return time;
   const hours = parseInt(parts[0], 10);
@@ -82,15 +81,64 @@ function createPopupContent(job: HCPJob): string {
   `;
 }
 
+// Calculate polygon centroid for label placement
+function getPolygonCentroid(coordinates: number[][]): [number, number] {
+  let x = 0, y = 0, area = 0;
+  const n = coordinates.length;
+  
+  for (let i = 0; i < n - 1; i++) {
+    const x0 = coordinates[i][0];
+    const y0 = coordinates[i][1];
+    const x1 = coordinates[i + 1][0];
+    const y1 = coordinates[i + 1][1];
+    
+    const cross = x0 * y1 - x1 * y0;
+    area += cross;
+    x += (x0 + x1) * cross;
+    y += (y0 + y1) * cross;
+  }
+  
+  area /= 2;
+  if (area === 0) {
+    // Fallback to simple average
+    const avgX = coordinates.reduce((sum, c) => sum + c[0], 0) / n;
+    const avgY = coordinates.reduce((sum, c) => sum + c[1], 0) / n;
+    return [avgX, avgY];
+  }
+  
+  x /= (6 * area);
+  y /= (6 * area);
+  
+  return [x, y];
+}
+
+// Calculate bounding box for zoom
+function getPolygonBounds(coordinates: number[][]): [[number, number], [number, number]] {
+  let minLng = Infinity, maxLng = -Infinity;
+  let minLat = Infinity, maxLat = -Infinity;
+  
+  coordinates.forEach(([lng, lat]) => {
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  });
+  
+  return [[minLng, minLat], [maxLng, maxLat]];
+}
+
 export function JobMapView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const popupsRef = useRef<mapboxgl.Popup[]>([]);
+  const zonePopupRef = useRef<mapboxgl.Popup | null>(null);
+  const hoveredZoneRef = useRef<string | null>(null);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [technicianFilter, setTechnicianFilter] = useState<string>("all");
   const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [showZones, setShowZones] = useState<boolean>(true);
   const [mapLoaded, setMapLoaded] = useState(false);
 
   const { data: jobs, isLoading: jobsLoading } = useJobsForDate(
@@ -130,11 +178,10 @@ export function JobMapView() {
     };
   }, []);
 
-  // Update map center based on first location or first job
+  // Update map center based on first job
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    // If we have jobs with coordinates, center on the first one
     const jobsWithCoords = jobs?.filter(j => j.lat && j.lng) || [];
     if (jobsWithCoords.length > 0) {
       const firstJob = jobsWithCoords[0];
@@ -146,51 +193,93 @@ export function JobMapView() {
     }
   }, [jobs, mapLoaded]);
 
-  // Add service zone polygons
+  // Add service zone polygons with labels and hover
   useEffect(() => {
     if (!map.current || !mapLoaded || !zones) return;
 
-    // Remove existing zone layers
-    zones.forEach((zone, idx) => {
+    const currentMap = map.current;
+
+    // Remove existing zone layers and sources
+    zones.forEach((zone) => {
       const sourceId = `zone-${zone.id}`;
-      if (map.current?.getSource(sourceId)) {
-        if (map.current.getLayer(`${sourceId}-fill`)) {
-          map.current.removeLayer(`${sourceId}-fill`);
+      const labelSourceId = `zone-label-${zone.id}`;
+      
+      [`${sourceId}-fill`, `${sourceId}-line`, `${sourceId}-highlight`, `${labelSourceId}-label`].forEach(layerId => {
+        if (currentMap.getLayer(layerId)) {
+          currentMap.removeLayer(layerId);
         }
-        if (map.current.getLayer(`${sourceId}-line`)) {
-          map.current.removeLayer(`${sourceId}-line`);
-        }
-        map.current.removeSource(sourceId);
+      });
+      
+      if (currentMap.getSource(sourceId)) {
+        currentMap.removeSource(sourceId);
+      }
+      if (currentMap.getSource(labelSourceId)) {
+        currentMap.removeSource(labelSourceId);
       }
     });
 
     // Add zone polygons
     zones.forEach((zone, idx) => {
-      if (!zone.polygon_geojson) return;
+      if (!zone.polygon_geojson?.coordinates?.[0]) return;
 
       const sourceId = `zone-${zone.id}`;
+      const labelSourceId = `zone-label-${zone.id}`;
       const color = zone.color || DEFAULT_ZONE_COLORS[idx % DEFAULT_ZONE_COLORS.length];
+      const centroid = getPolygonCentroid(zone.polygon_geojson.coordinates[0]);
 
-      map.current!.addSource(sourceId, {
+      // Add polygon source
+      currentMap.addSource(sourceId, {
         type: "geojson",
         data: {
           type: "Feature",
-          properties: { name: zone.name },
+          properties: { name: zone.name, id: zone.id, color },
           geometry: zone.polygon_geojson,
         },
       });
 
-      map.current!.addLayer({
+      // Add label source (point at centroid)
+      currentMap.addSource(labelSourceId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: { name: zone.name },
+          geometry: {
+            type: "Point",
+            coordinates: centroid,
+          },
+        },
+      });
+
+      // Fill layer (20% opacity)
+      currentMap.addLayer({
         id: `${sourceId}-fill`,
         type: "fill",
         source: sourceId,
         paint: {
           "fill-color": color,
-          "fill-opacity": 0.15,
+          "fill-opacity": 0.2,
+        },
+        layout: {
+          visibility: showZones ? "visible" : "none",
         },
       });
 
-      map.current!.addLayer({
+      // Highlight layer (hidden by default, shown on hover)
+      currentMap.addLayer({
+        id: `${sourceId}-highlight`,
+        type: "fill",
+        source: sourceId,
+        paint: {
+          "fill-color": color,
+          "fill-opacity": 0.4,
+        },
+        layout: {
+          visibility: "none",
+        },
+      });
+
+      // Border line layer
+      currentMap.addLayer({
         id: `${sourceId}-line`,
         type: "line",
         source: sourceId,
@@ -198,9 +287,94 @@ export function JobMapView() {
           "line-color": color,
           "line-width": 2,
         },
+        layout: {
+          visibility: showZones ? "visible" : "none",
+        },
+      });
+
+      // Zone name label
+      currentMap.addLayer({
+        id: `${labelSourceId}-label`,
+        type: "symbol",
+        source: labelSourceId,
+        layout: {
+          "text-field": ["get", "name"],
+          "text-size": 12,
+          "text-font": ["DIN Pro Medium", "Arial Unicode MS Bold"],
+          "text-anchor": "center",
+          visibility: showZones ? "visible" : "none",
+        },
+        paint: {
+          "text-color": color,
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 2,
+        },
+      });
+
+      // Add hover events for fill layer
+      currentMap.on("mouseenter", `${sourceId}-fill`, (e) => {
+        if (!showZones) return;
+        
+        currentMap.getCanvas().style.cursor = "pointer";
+        hoveredZoneRef.current = zone.id;
+        
+        // Show highlight
+        currentMap.setLayoutProperty(`${sourceId}-highlight`, "visibility", "visible");
+        
+        // Show zone name tooltip
+        if (e.lngLat) {
+          zonePopupRef.current?.remove();
+          zonePopupRef.current = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            className: "zone-tooltip",
+          })
+            .setLngLat(e.lngLat)
+            .setHTML(`<div style="font-weight: 600; font-size: 13px;">${zone.name}</div>`)
+            .addTo(currentMap);
+        }
+      });
+
+      currentMap.on("mouseleave", `${sourceId}-fill`, () => {
+        currentMap.getCanvas().style.cursor = "";
+        hoveredZoneRef.current = null;
+        
+        // Hide highlight
+        if (currentMap.getLayer(`${sourceId}-highlight`)) {
+          currentMap.setLayoutProperty(`${sourceId}-highlight`, "visibility", "none");
+        }
+        
+        // Remove tooltip
+        zonePopupRef.current?.remove();
+        zonePopupRef.current = null;
       });
     });
-  }, [zones, mapLoaded]);
+  }, [zones, mapLoaded, showZones]);
+
+  // Toggle zone visibility
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !zones) return;
+
+    zones.forEach((zone) => {
+      const sourceId = `zone-${zone.id}`;
+      const labelSourceId = `zone-label-${zone.id}`;
+      const visibility = showZones ? "visible" : "none";
+
+      if (map.current?.getLayer(`${sourceId}-fill`)) {
+        map.current.setLayoutProperty(`${sourceId}-fill`, "visibility", visibility);
+      }
+      if (map.current?.getLayer(`${sourceId}-line`)) {
+        map.current.setLayoutProperty(`${sourceId}-line`, "visibility", visibility);
+      }
+      if (map.current?.getLayer(`${labelSourceId}-label`)) {
+        map.current.setLayoutProperty(`${labelSourceId}-label`, "visibility", visibility);
+      }
+      // Always hide highlight when toggling
+      if (map.current?.getLayer(`${sourceId}-highlight`)) {
+        map.current.setLayoutProperty(`${sourceId}-highlight`, "visibility", "none");
+      }
+    });
+  }, [showZones, zones, mapLoaded]);
 
   // Add job markers
   useEffect(() => {
@@ -220,7 +394,6 @@ export function JobMapView() {
 
       const color = getStatusColor(job.status);
 
-      // Create custom marker element
       const el = document.createElement("div");
       el.className = "job-marker";
       el.style.cssText = `
@@ -258,6 +431,18 @@ export function JobMapView() {
     });
   }, [jobs, mapLoaded]);
 
+  // Handle zone click from legend
+  const handleZoneClick = useCallback((zone: ServiceZone) => {
+    if (!map.current || !zone.polygon_geojson?.coordinates?.[0]) return;
+
+    const bounds = getPolygonBounds(zone.polygon_geojson.coordinates[0]);
+    
+    map.current.fitBounds(bounds, {
+      padding: 50,
+      duration: 1000,
+    });
+  }, []);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="flex h-full items-center justify-center bg-muted/50">
@@ -282,9 +467,16 @@ export function JobMapView() {
         onTechnicianChange={setTechnicianFilter}
         serviceFilter={serviceFilter}
         onServiceChange={setServiceFilter}
+        showZones={showZones}
+        onShowZonesChange={setShowZones}
       />
 
-      <MapLegend zones={zones || []} jobCount={jobs?.length || 0} />
+      <MapLegend 
+        zones={zones || []} 
+        jobs={jobs || []}
+        showZones={showZones}
+        onZoneClick={handleZoneClick}
+      />
 
       {jobsLoading && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-background/80 rounded-lg p-4 shadow-lg">
