@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { MapFilters } from "./MapFilters";
 import { MapLegend } from "./MapLegend";
 import { AddressSearch } from "./AddressSearch";
+import { BookingSuggestionPanel } from "./BookingSuggestionPanel";
 import { 
   useJobsForDateRange, 
   useServiceZones, 
@@ -775,6 +776,14 @@ export function JobMapView() {
         filters={filters}
         onZoneClick={handleZoneClick}
       />
+
+      {/* AI Booking Suggestions Panel */}
+      {searchedLocation && (
+        <BookingSuggestionPanel
+          searchedLocation={searchedLocation}
+          onClose={handleClearSearch}
+        />
+      )}
 
       {jobsLoading && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-background/80 rounded-lg p-4 shadow-lg">
