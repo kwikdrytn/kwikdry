@@ -20,7 +20,7 @@ import InventoryDetail from "./pages/admin/InventoryDetail";
 import ChecklistReview from "./pages/admin/ChecklistReview";
 import ChecklistSubmissionDetail from "./pages/admin/ChecklistSubmissionDetail";
 import WeeklyChecklist from "./pages/technician/WeeklyChecklist";
-import LocationsPage from "./pages/Locations";
+import LocationManagement from "./pages/admin/LocationManagement";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -145,7 +145,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin']}>
-                    <LocationsPage />
+                    <LocationManagement />
                   </RoleGuard>
                 </ProtectedRoute>
               }
