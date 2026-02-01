@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Equipment } from "@/hooks/useEquipment";
-import { EquipmentStatusBadge, MaintenanceBadge } from "./EquipmentStatusBadge";
+import { EquipmentStatusBadge, MaintenanceBadge, MaintenanceWarningIcon } from "./EquipmentStatusBadge";
 
 interface EquipmentCardsProps {
   equipment: Equipment[];
@@ -53,7 +53,10 @@ export function EquipmentCards({ equipment, isLoading, onView, onEdit }: Equipme
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
-                  <CardTitle className="text-lg">{item.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <MaintenanceWarningIcon nextDue={item.next_maintenance_due} />
+                    <CardTitle className="text-lg">{item.name}</CardTitle>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">
                       {TYPE_LABELS[item.type] || item.type}

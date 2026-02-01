@@ -17,9 +17,11 @@ import {
   ClipboardCheck,
   AlertTriangle,
   Activity,
-  ChevronRight
+  ChevronRight,
+  Wrench
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEquipmentNeedingMaintenance } from "@/hooks/useEquipment";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -34,6 +36,9 @@ export function AdminDashboard() {
   const firstName = profile?.first_name || "Admin";
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
+  
+  // Get equipment needing maintenance
+  const { data: equipmentNeedingMaintenance = [], isLoading: maintenanceLoading } = useEquipmentNeedingMaintenance();
 
   // Fetch today's jobs count (placeholder - will integrate HCP later)
   const { data: jobsCount, isLoading: jobsLoading } = useQuery({
@@ -373,8 +378,49 @@ export function AdminDashboard() {
               ))
             ) : null}
 
+            {/* Equipment Needing Maintenance Alerts */}
+            {equipmentNeedingMaintenance.length > 0 ? (
+              equipmentNeedingMaintenance.slice(0, 5).map((equip: any) => (
+                <div 
+                  key={equip.id}
+                  onClick={() => navigate(`/equipment/${equip.id}`)}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-colors hover:bg-muted/50",
+                    equip.is_overdue 
+                      ? "border-destructive/30 bg-destructive/5" 
+                      : "border-warning/30 bg-warning/5"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Wrench className={cn(
+                      "h-4 w-4",
+                      equip.is_overdue ? "text-destructive" : "text-warning"
+                    )} />
+                    <div>
+                      <p className="font-medium text-sm">{equip.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {equip.is_overdue 
+                          ? `Overdue by ${Math.abs(equip.days_until_due)} day${Math.abs(equip.days_until_due) !== 1 ? 's' : ''}`
+                          : `Due in ${equip.days_until_due} day${equip.days_until_due !== 1 ? 's' : ''}`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={equip.is_overdue ? "destructive" : "secondary"}
+                    className={cn(
+                      "text-xs",
+                      !equip.is_overdue && "bg-warning/10 text-warning border-warning/30"
+                    )}
+                  >
+                    {equip.is_overdue ? 'Overdue' : 'Due Soon'}
+                  </Badge>
+                </div>
+              ))
+            ) : null}
+
             {/* No Alerts */}
-            {(!lowStockData?.items?.length && !pendingChecklists?.technicians?.length) && (
+            {(!lowStockData?.items?.length && !pendingChecklists?.technicians?.length && !equipmentNeedingMaintenance.length) && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="rounded-full bg-primary/10 p-3 mb-3">
                   <AlertTriangle className="h-6 w-6 text-primary" />

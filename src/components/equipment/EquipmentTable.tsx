@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Equipment } from "@/hooks/useEquipment";
-import { EquipmentStatusBadge, MaintenanceBadge } from "./EquipmentStatusBadge";
+import { EquipmentStatusBadge, MaintenanceBadge, MaintenanceWarningIcon } from "./EquipmentStatusBadge";
 
 interface EquipmentTableProps {
   equipment: Equipment[];
@@ -71,7 +71,12 @@ export function EquipmentTable({ equipment, isLoading, onView, onEdit }: Equipme
 
             return (
               <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <MaintenanceWarningIcon nextDue={item.next_maintenance_due} />
+                    <span className="font-medium">{item.name}</span>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">
                     {TYPE_LABELS[item.type] || item.type}

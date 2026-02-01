@@ -408,3 +408,104 @@ export function useCreateMaintenance() {
     },
   });
 }
+
+// Get total maintenance cost for an equipment
+export function useEquipmentMaintenanceCost(equipmentId: string | undefined) {
+  return useQuery({
+    queryKey: ['equipment-maintenance-cost', equipmentId],
+    queryFn: async () => {
+      if (!equipmentId) return 0;
+
+      const { data, error } = await supabase
+        .from('equipment_maintenance')
+        .select('cost')
+        .eq('equipment_id', equipmentId);
+
+      if (error) throw error;
+      
+      const total = data?.reduce((sum, record) => sum + (Number(record.cost) || 0), 0) || 0;
+      return total;
+    },
+    enabled: !!equipmentId,
+  });
+}
+
+// Get all equipment needing maintenance (overdue or due within 7 days)
+export function useEquipmentNeedingMaintenance() {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ['equipment-needing-maintenance', profile?.organization_id],
+    queryFn: async () => {
+      if (!profile?.organization_id) return [];
+
+      // Get all equipment with maintenance records
+      const { data: equipment, error: equipError } = await supabase
+        .from('equipment')
+        .select(`
+          id,
+          name,
+          type,
+          status,
+          locations:location_id (name)
+        `)
+        .eq('organization_id', profile.organization_id)
+        .is('deleted_at', null)
+        .neq('status', 'retired');
+
+      if (equipError) throw equipError;
+
+      const equipmentIds = equipment.map(e => e.id);
+
+      // Get all maintenance records with next_due
+      const { data: maintenanceData, error: maintError } = await supabase
+        .from('equipment_maintenance')
+        .select('equipment_id, next_due')
+        .in('equipment_id', equipmentIds)
+        .not('next_due', 'is', null)
+        .order('next_due', { ascending: true });
+
+      if (maintError) throw maintError;
+
+      // Get the earliest next_due for each equipment
+      const nextDueMap: Record<string, string> = {};
+      maintenanceData?.forEach(m => {
+        if (!nextDueMap[m.equipment_id] && m.next_due) {
+          nextDueMap[m.equipment_id] = m.next_due;
+        }
+      });
+
+      const today = new Date();
+      const sevenDaysFromNow = new Date(today);
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+      // Filter equipment needing maintenance
+      const needingMaintenance = equipment
+        .filter(e => {
+          const nextDue = nextDueMap[e.id];
+          if (!nextDue) return false;
+          const dueDate = new Date(nextDue);
+          return dueDate <= sevenDaysFromNow;
+        })
+        .map(e => {
+          const nextDue = nextDueMap[e.id];
+          const dueDate = new Date(nextDue);
+          const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            id: e.id,
+            name: e.name,
+            type: e.type,
+            status: e.status,
+            location_name: (e as any).locations?.name || null,
+            next_due: nextDue,
+            days_until_due: daysUntilDue,
+            is_overdue: daysUntilDue < 0,
+          };
+        })
+        .sort((a, b) => a.days_until_due - b.days_until_due);
+
+      return needingMaintenance;
+    },
+    enabled: !!profile?.organization_id,
+  });
+}
