@@ -105,7 +105,108 @@ function createHoverContent(job: HCPJob, isWeekView: boolean): string {
   `;
 }
 
-// Polygon centroid calculation is below
+function createClickContent(
+  job: HCPJob, 
+  isWeekView: boolean, 
+  drivingInfo?: { duration: string; distance: string } | null,
+  fromAddress?: string
+): string {
+  const dateStr = job.scheduled_date ? format(parseISO(job.scheduled_date), 'EEE, MMM d') : '';
+  const timeRange = formatTimeRange(job.scheduled_time, job.scheduled_end);
+  const services = job.services as { name?: string }[] | null;
+  const serviceList = services?.map(s => s.name).filter(Boolean).join(', ') || 'N/A';
+  
+  return `
+    <div style="min-width: 260px; max-width: 320px; font-family: system-ui, sans-serif;">
+      <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px; color: #0f172a;">
+        ${job.customer_name || 'Unknown Customer'}
+      </div>
+      <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;">
+        ${[job.address, job.city, job.state, job.zip].filter(Boolean).join(', ')}
+      </div>
+      
+      ${drivingInfo ? `
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 8px; padding: 10px; margin-bottom: 10px; color: white;">
+          <div style="font-size: 11px; opacity: 0.9; margin-bottom: 4px;">Driving from ${fromAddress || 'searched location'}</div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 20px; font-weight: 700;">${drivingInfo.duration}</div>
+              <div style="font-size: 11px; opacity: 0.8;">drive time</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 16px; font-weight: 600;">${drivingInfo.distance}</div>
+              <div style="font-size: 11px; opacity: 0.8;">distance</div>
+            </div>
+          </div>
+        </div>
+      ` : fromAddress === undefined ? '' : `
+        <div style="background: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center;">
+          <div style="font-size: 12px; color: #64748b;">
+            Search an address to see driving time
+          </div>
+        </div>
+      `}
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+        ${isWeekView ? `
+          <div>
+            <div style="color: #94a3b8; font-size: 11px;">Date</div>
+            <div style="font-weight: 500; color: #1e293b;">${dateStr}</div>
+          </div>
+        ` : ''}
+        <div>
+          <div style="color: #94a3b8; font-size: 11px;">Time</div>
+          <div style="font-weight: 500; color: #1e293b;">${timeRange}</div>
+        </div>
+        <div>
+          <div style="color: #94a3b8; font-size: 11px;">Technician</div>
+          <div style="font-weight: 500; color: #1e293b;">${job.technician_name || 'Unassigned'}</div>
+        </div>
+        <div>
+          <div style="color: #94a3b8; font-size: 11px;">Status</div>
+          <div style="font-weight: 500; color: #1e293b; text-transform: capitalize;">${job.status || 'Scheduled'}</div>
+        </div>
+      </div>
+      <div style="margin-top: 10px; font-size: 12px;">
+        <div style="color: #94a3b8; font-size: 11px;">Services</div>
+        <div style="font-weight: 500; color: #1e293b;">${serviceList}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function fetchDrivingDirections(
+  from: [number, number], 
+  to: [number, number]
+): Promise<{ duration: string; distance: string } | null> {
+  if (!MAPBOX_TOKEN) return null;
+  
+  try {
+    const response = await fetch(
+      `https://api.mapbox.com/directions/v5/mapbox/driving/${from[0]},${from[1]};${to[0]},${to[1]}?access_token=${MAPBOX_TOKEN}&overview=false`
+    );
+    const data = await response.json();
+    
+    if (data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      const durationMins = Math.round(route.duration / 60);
+      const distanceMiles = (route.distance / 1609.34).toFixed(1);
+      
+      const hours = Math.floor(durationMins / 60);
+      const mins = durationMins % 60;
+      const durationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
+      
+      return {
+        duration: durationStr,
+        distance: `${distanceMiles} mi`,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching directions:', error);
+    return null;
+  }
+}
 
 // Calculate polygon centroid for label placement
 function getPolygonCentroid(coordinates: number[][]): [number, number] {
@@ -173,6 +274,7 @@ export function JobMapView() {
   const hoveredZoneRef = useRef<string | null>(null);
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const searchedLocationRef = useRef<{ coords: [number, number]; name: string } | null>(null);
+  const clickPopupRef = useRef<mapboxgl.Popup | null>(null);
   const initialFiltersApplied = useRef(false);
 
   // Initialize filters from URL params
@@ -227,6 +329,11 @@ export function JobMapView() {
       setMapLoaded(true);
     });
 
+    // Close click popup when clicking on the map (outside markers)
+    map.current.on("click", () => {
+      clickPopupRef.current?.remove();
+      clickPopupRef.current = null;
+    });
 
     return () => {
       map.current?.remove();
@@ -516,7 +623,10 @@ export function JobMapView() {
 
       el.addEventListener("mouseenter", () => {
         el.style.transform = "scale(1.2)";
-        hoverPopup.addTo(map.current!);
+        // Only show hover popup if click popup is not open
+        if (!clickPopupRef.current?.isOpen()) {
+          hoverPopup.addTo(map.current!);
+        }
       });
       
       el.addEventListener("mouseleave", () => {
@@ -524,6 +634,47 @@ export function JobMapView() {
         hoverPopup.remove();
       });
 
+      // Click handler for driving directions
+      el.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        hoverPopup.remove();
+        
+        // Close any existing click popup
+        clickPopupRef.current?.remove();
+        
+        const searchLoc = searchedLocationRef.current;
+        
+        // Show loading state
+        const loadingPopup = new mapboxgl.Popup({
+          offset: 15,
+          closeButton: true,
+          closeOnClick: false,
+          maxWidth: "340px",
+          className: "job-click-popup",
+        })
+          .setLngLat([job.lng!, job.lat!])
+          .setHTML(searchLoc 
+            ? createClickContent(job, filters.weekView, undefined, searchLoc.name) 
+              .replace('</div></div></div>', '<div style="text-align: center; padding: 10px; color: #64748b;">Calculating route...</div></div></div></div>')
+            : createClickContent(job, filters.weekView, null, '')
+          )
+          .addTo(map.current!);
+        
+        clickPopupRef.current = loadingPopup;
+        
+        if (searchLoc) {
+          // Fetch driving directions
+          const drivingInfo = await fetchDrivingDirections(
+            searchLoc.coords,
+            [job.lng!, job.lat!]
+          );
+          
+          // Update popup with driving info
+          if (clickPopupRef.current === loadingPopup && loadingPopup.isOpen()) {
+            loadingPopup.setHTML(createClickContent(job, filters.weekView, drivingInfo, searchLoc.name));
+          }
+        }
+      });
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([job.lng, job.lat])
