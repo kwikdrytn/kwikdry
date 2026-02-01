@@ -86,26 +86,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        {/* Settings Button */}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              asChild 
-              isActive={location.pathname === '/settings'}
-              tooltip="Settings"
-            >
-              <NavLink 
-                to="/settings" 
-                className="flex items-center gap-3"
-                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-              >
-                <Settings className="h-5 w-5" />
-                <span>Settings</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
         {/* Profile Button */}
         <Link 
           to="/settings" 
@@ -129,8 +109,37 @@ export function AppSidebar() {
           )}
         </Link>
 
-        {/* Collapse/Expand Button */}
-        <SidebarTrigger className="w-full justify-start text-white hover:text-white hover:bg-sidebar-accent" />
+        {/* Settings Button */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              asChild 
+              isActive={location.pathname === '/settings'}
+              tooltip="Settings"
+            >
+              <NavLink 
+                to="/settings" 
+                className="flex items-center gap-3"
+                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+              >
+                <Settings className="h-5 w-5" />
+                <span>Settings</span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          {/* Collapse/Expand Button */}
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              asChild
+              tooltip="Collapse"
+            >
+              <SidebarTrigger className="w-full justify-start gap-3">
+                <span>Collapse</span>
+              </SidebarTrigger>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );
