@@ -118,7 +118,7 @@ export function UserFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-background flex flex-col overflow-hidden">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-background flex flex-col overflow-hidden min-h-0">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>{isEditing ? 'Edit User' : 'Add New User'}</DialogTitle>
           <DialogDescription>
