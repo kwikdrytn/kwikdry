@@ -1,11 +1,23 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { format } from "date-fns";
+import { format, parseISO, startOfDay } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { MapFilters } from "./MapFilters";
 import { MapLegend } from "./MapLegend";
-import { useJobsForDate, useServiceZones, useFirstLocation, HCPJob, ServiceZone } from "@/hooks/useJobMap";
+import { 
+  useJobsForDateRange, 
+  useServiceZones, 
+  useFirstLocation, 
+  HCPJob, 
+  ServiceZone,
+  MapFilters as MapFiltersType,
+  DEFAULT_FILTERS,
+  DAY_COLORS,
+  filtersToSearchParams,
+  searchParamsToFilters
+} from "@/hooks/useJobMap";
 
 // Get Mapbox token from environment
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -45,9 +57,10 @@ function formatTime(time: string | null): string {
   return `${hour12}:${minutes} ${ampm}`;
 }
 
-function createPopupContent(job: HCPJob): string {
+function createPopupContent(job: HCPJob, isWeekView: boolean): string {
   const services = job.services as { name?: string }[] | null;
   const serviceList = services?.map(s => s.name).filter(Boolean).join(', ') || 'N/A';
+  const dateStr = job.scheduled_date ? format(parseISO(job.scheduled_date), 'EEE, MMM d') : '';
   
   return `
     <div style="min-width: 200px; font-family: system-ui, sans-serif;">
@@ -58,6 +71,12 @@ function createPopupContent(job: HCPJob): string {
         ${[job.address, job.city, job.state].filter(Boolean).join(', ')}
       </div>
       <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 12px;">
+        ${isWeekView ? `
+          <div>
+            <div style="color: #64748b;">Date</div>
+            <div style="font-weight: 500;">${dateStr}</div>
+          </div>
+        ` : ''}
         <div>
           <div style="color: #64748b;">Time</div>
           <div style="font-weight: 500;">${formatTime(job.scheduled_time) || 'TBD'}</div>
@@ -100,7 +119,6 @@ function getPolygonCentroid(coordinates: number[][]): [number, number] {
   
   area /= 2;
   if (area === 0) {
-    // Fallback to simple average
     const avgX = coordinates.reduce((sum, c) => sum + c[0], 0) / n;
     const avgY = coordinates.reduce((sum, c) => sum + c[1], 0) / n;
     return [avgX, avgY];
@@ -127,25 +145,45 @@ function getPolygonBounds(coordinates: number[][]): [[number, number], [number, 
   return [[minLng, minLat], [maxLng, maxLat]];
 }
 
+// Get marker color based on view mode
+function getMarkerColor(job: HCPJob, isWeekView: boolean, startDate: Date): string {
+  if (isWeekView && job.scheduled_date) {
+    const jobDate = parseISO(job.scheduled_date);
+    const dayOfWeek = jobDate.getDay();
+    return DAY_COLORS[dayOfWeek];
+  }
+  return getStatusColor(job.status);
+}
+
 export function JobMapView() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const popupsRef = useRef<mapboxgl.Popup[]>([]);
   const zonePopupRef = useRef<mapboxgl.Popup | null>(null);
   const hoveredZoneRef = useRef<string | null>(null);
+  const initialFiltersApplied = useRef(false);
 
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [technicianFilter, setTechnicianFilter] = useState<string>("all");
-  const [serviceFilter, setServiceFilter] = useState<string>("all");
-  const [showZones, setShowZones] = useState<boolean>(true);
+  // Initialize filters from URL params
+  const [filters, setFilters] = useState<MapFiltersType>(() => {
+    const urlFilters = searchParamsToFilters(searchParams);
+    return { ...DEFAULT_FILTERS, ...urlFilters };
+  });
+  
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const { data: jobs, isLoading: jobsLoading } = useJobsForDate(
-    selectedDate,
-    technicianFilter,
-    serviceFilter
-  );
+  // Update URL when filters change
+  useEffect(() => {
+    if (!initialFiltersApplied.current) {
+      initialFiltersApplied.current = true;
+      return;
+    }
+    const newParams = filtersToSearchParams(filters);
+    setSearchParams(newParams, { replace: true });
+  }, [filters, setSearchParams]);
+
+  const { data: jobs, isLoading: jobsLoading } = useJobsForDateRange(filters);
   const { data: zones } = useServiceZones();
   const { data: firstLocation } = useFirstLocation();
 
@@ -260,7 +298,7 @@ export function JobMapView() {
           "fill-opacity": 0.2,
         },
         layout: {
-          visibility: showZones ? "visible" : "none",
+          visibility: filters.showZones ? "visible" : "none",
         },
       });
 
@@ -288,7 +326,7 @@ export function JobMapView() {
           "line-width": 2,
         },
         layout: {
-          visibility: showZones ? "visible" : "none",
+          visibility: filters.showZones ? "visible" : "none",
         },
       });
 
@@ -302,7 +340,7 @@ export function JobMapView() {
           "text-size": 12,
           "text-font": ["DIN Pro Medium", "Arial Unicode MS Bold"],
           "text-anchor": "center",
-          visibility: showZones ? "visible" : "none",
+          visibility: filters.showZones ? "visible" : "none",
         },
         paint: {
           "text-color": color,
@@ -313,15 +351,13 @@ export function JobMapView() {
 
       // Add hover events for fill layer
       currentMap.on("mouseenter", `${sourceId}-fill`, (e) => {
-        if (!showZones) return;
+        if (!filters.showZones) return;
         
         currentMap.getCanvas().style.cursor = "pointer";
         hoveredZoneRef.current = zone.id;
         
-        // Show highlight
         currentMap.setLayoutProperty(`${sourceId}-highlight`, "visibility", "visible");
         
-        // Show zone name tooltip
         if (e.lngLat) {
           zonePopupRef.current?.remove();
           zonePopupRef.current = new mapboxgl.Popup({
@@ -339,17 +375,15 @@ export function JobMapView() {
         currentMap.getCanvas().style.cursor = "";
         hoveredZoneRef.current = null;
         
-        // Hide highlight
         if (currentMap.getLayer(`${sourceId}-highlight`)) {
           currentMap.setLayoutProperty(`${sourceId}-highlight`, "visibility", "none");
         }
         
-        // Remove tooltip
         zonePopupRef.current?.remove();
         zonePopupRef.current = null;
       });
     });
-  }, [zones, mapLoaded, showZones]);
+  }, [zones, mapLoaded, filters.showZones]);
 
   // Toggle zone visibility
   useEffect(() => {
@@ -358,7 +392,7 @@ export function JobMapView() {
     zones.forEach((zone) => {
       const sourceId = `zone-${zone.id}`;
       const labelSourceId = `zone-label-${zone.id}`;
-      const visibility = showZones ? "visible" : "none";
+      const visibility = filters.showZones ? "visible" : "none";
 
       if (map.current?.getLayer(`${sourceId}-fill`)) {
         map.current.setLayoutProperty(`${sourceId}-fill`, "visibility", visibility);
@@ -369,12 +403,11 @@ export function JobMapView() {
       if (map.current?.getLayer(`${labelSourceId}-label`)) {
         map.current.setLayoutProperty(`${labelSourceId}-label`, "visibility", visibility);
       }
-      // Always hide highlight when toggling
       if (map.current?.getLayer(`${sourceId}-highlight`)) {
         map.current.setLayoutProperty(`${sourceId}-highlight`, "visibility", "none");
       }
     });
-  }, [showZones, zones, mapLoaded]);
+  }, [filters.showZones, zones, mapLoaded]);
 
   // Add job markers
   useEffect(() => {
@@ -392,7 +425,7 @@ export function JobMapView() {
     jobs.forEach((job) => {
       if (!job.lat || !job.lng) return;
 
-      const color = getStatusColor(job.status);
+      const color = getMarkerColor(job, filters.weekView, filters.startDate);
 
       const el = document.createElement("div");
       el.className = "job-marker";
@@ -419,7 +452,7 @@ export function JobMapView() {
         closeButton: true,
         closeOnClick: false,
         maxWidth: "280px",
-      }).setHTML(createPopupContent(job));
+      }).setHTML(createPopupContent(job, filters.weekView));
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([job.lng, job.lat])
@@ -429,7 +462,7 @@ export function JobMapView() {
       markersRef.current.push(marker);
       popupsRef.current.push(popup);
     });
-  }, [jobs, mapLoaded]);
+  }, [jobs, mapLoaded, filters.weekView, filters.startDate]);
 
   // Handle zone click from legend
   const handleZoneClick = useCallback((zone: ServiceZone) => {
@@ -461,20 +494,14 @@ export function JobMapView() {
       <div ref={mapContainer} className="h-full w-full" />
       
       <MapFilters
-        selectedDate={selectedDate}
-        onDateChange={setSelectedDate}
-        technicianFilter={technicianFilter}
-        onTechnicianChange={setTechnicianFilter}
-        serviceFilter={serviceFilter}
-        onServiceChange={setServiceFilter}
-        showZones={showZones}
-        onShowZonesChange={setShowZones}
+        filters={filters}
+        onFiltersChange={setFilters}
       />
 
       <MapLegend 
         zones={zones || []} 
         jobs={jobs || []}
-        showZones={showZones}
+        filters={filters}
         onZoneClick={handleZoneClick}
       />
 

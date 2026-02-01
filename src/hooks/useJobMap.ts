@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { format } from "date-fns";
+import { format, addDays, startOfDay } from "date-fns";
 
 export interface HCPJob {
   id: string;
@@ -34,11 +34,59 @@ export interface ServiceZone {
   } | null;
 }
 
-export function useJobsForDate(selectedDate: Date, technicianFilter?: string, serviceFilter?: string) {
+export interface MapFilters {
+  startDate: Date;
+  weekView: boolean;
+  technicians: string[]; // 'all' | 'unassigned' | hcp_employee_id[]
+  serviceTypes: string[]; // 'all' | service names
+  statuses: string[]; // 'all' | status values
+  showZones: boolean;
+}
+
+export const DEFAULT_FILTERS: MapFilters = {
+  startDate: new Date(),
+  weekView: false,
+  technicians: ['all'],
+  serviceTypes: ['all'],
+  statuses: ['all'],
+  showZones: true,
+};
+
+// Status options
+export const JOB_STATUSES = [
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+// Day colors for week view
+export const DAY_COLORS = [
+  '#6366f1', // Sunday - indigo
+  '#3b82f6', // Monday - blue
+  '#10b981', // Tuesday - emerald
+  '#f59e0b', // Wednesday - amber
+  '#ef4444', // Thursday - red
+  '#8b5cf6', // Friday - violet
+  '#ec4899', // Saturday - pink
+];
+
+export function useJobsForDateRange(filters: MapFilters) {
   const { profile } = useAuth();
 
+  const startDate = startOfDay(filters.startDate);
+  const endDate = filters.weekView ? addDays(startDate, 6) : startDate;
+
   return useQuery({
-    queryKey: ['job-map-jobs', profile?.organization_id, format(selectedDate, 'yyyy-MM-dd'), technicianFilter, serviceFilter],
+    queryKey: [
+      'job-map-jobs-range',
+      profile?.organization_id,
+      format(startDate, 'yyyy-MM-dd'),
+      format(endDate, 'yyyy-MM-dd'),
+      filters.technicians,
+      filters.serviceTypes,
+      filters.statuses,
+    ],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
@@ -46,24 +94,41 @@ export function useJobsForDate(selectedDate: Date, technicianFilter?: string, se
         .from('hcp_jobs')
         .select('*')
         .eq('organization_id', profile.organization_id)
-        .eq('scheduled_date', format(selectedDate, 'yyyy-MM-dd'));
+        .gte('scheduled_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('scheduled_date', format(endDate, 'yyyy-MM-dd'));
 
-      if (technicianFilter && technicianFilter !== 'all') {
-        query = query.eq('technician_hcp_id', technicianFilter);
-      }
-
-      const { data, error } = await query.order('scheduled_time');
+      const { data, error } = await query.order('scheduled_date').order('scheduled_time');
 
       if (error) throw error;
 
       let jobs = (data || []) as HCPJob[];
 
-      // Filter by service type if specified
-      if (serviceFilter && serviceFilter !== 'all') {
+      // Filter by technicians
+      if (!filters.technicians.includes('all')) {
+        jobs = jobs.filter(job => {
+          if (filters.technicians.includes('unassigned')) {
+            if (!job.technician_hcp_id) return true;
+          }
+          return job.technician_hcp_id && filters.technicians.includes(job.technician_hcp_id);
+        });
+      }
+
+      // Filter by service types
+      if (!filters.serviceTypes.includes('all')) {
         jobs = jobs.filter(job => {
           const services = job.services as { name?: string; code?: string }[] | null;
           if (!services) return false;
-          return services.some(s => s.name === serviceFilter || s.code === serviceFilter);
+          return services.some(s => 
+            s.name && filters.serviceTypes.includes(s.name)
+          );
+        });
+      }
+
+      // Filter by statuses
+      if (!filters.statuses.includes('all')) {
+        jobs = jobs.filter(job => {
+          const status = (job.status || 'scheduled').toLowerCase().replace(/\s+/g, '_');
+          return filters.statuses.includes(status);
         });
       }
 
@@ -101,14 +166,20 @@ export function useTechnicians() {
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      const { data, error } = await supabase
+      // Get HCP employees (prefer linked ones)
+      const { data: hcpEmployees, error: hcpError } = await supabase
         .from('hcp_employees')
-        .select('hcp_employee_id, name')
+        .select('hcp_employee_id, name, linked_user_id')
         .eq('organization_id', profile.organization_id)
         .order('name');
 
-      if (error) throw error;
-      return data || [];
+      if (hcpError) throw hcpError;
+      
+      return (hcpEmployees || []).map(e => ({
+        id: e.hcp_employee_id,
+        name: e.name,
+        isLinked: !!e.linked_user_id,
+      }));
     },
     enabled: !!profile?.organization_id
   });
@@ -122,7 +193,6 @@ export function useServiceTypes() {
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      // Get distinct service types from recent jobs
       const { data, error } = await supabase
         .from('hcp_jobs')
         .select('services')
@@ -170,4 +240,61 @@ export function useFirstLocation() {
     },
     enabled: !!profile?.organization_id
   });
+}
+
+// URL state helpers
+export function filtersToSearchParams(filters: MapFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  
+  params.set('date', format(filters.startDate, 'yyyy-MM-dd'));
+  if (filters.weekView) params.set('week', '1');
+  if (!filters.technicians.includes('all')) {
+    params.set('techs', filters.technicians.join(','));
+  }
+  if (!filters.serviceTypes.includes('all')) {
+    params.set('services', filters.serviceTypes.join(','));
+  }
+  if (!filters.statuses.includes('all')) {
+    params.set('statuses', filters.statuses.join(','));
+  }
+  if (!filters.showZones) params.set('zones', '0');
+  
+  return params;
+}
+
+export function searchParamsToFilters(params: URLSearchParams): Partial<MapFilters> {
+  const result: Partial<MapFilters> = {};
+  
+  const dateStr = params.get('date');
+  if (dateStr) {
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) {
+      result.startDate = parsed;
+    }
+  }
+  
+  if (params.get('week') === '1') result.weekView = true;
+  
+  const techs = params.get('techs');
+  if (techs) result.technicians = techs.split(',');
+  
+  const services = params.get('services');
+  if (services) result.serviceTypes = services.split(',');
+  
+  const statuses = params.get('statuses');
+  if (statuses) result.statuses = statuses.split(',');
+  
+  if (params.get('zones') === '0') result.showZones = false;
+  
+  return result;
+}
+
+// Count active filters
+export function countActiveFilters(filters: MapFilters): number {
+  let count = 0;
+  if (!filters.technicians.includes('all')) count++;
+  if (!filters.serviceTypes.includes('all')) count++;
+  if (!filters.statuses.includes('all')) count++;
+  if (filters.weekView) count++;
+  return count;
 }
