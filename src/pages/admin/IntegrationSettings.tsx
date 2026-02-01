@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
+import { SyncResult, SyncProgress } from "@/lib/housecallpro";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -19,7 +21,8 @@ import {
   Eye, 
   EyeOff,
   Save,
-  Zap
+  Zap,
+  AlertCircle
 } from "lucide-react";
 
 interface HCPConnectionResult {
@@ -31,6 +34,7 @@ interface HCPConnectionResult {
 interface SyncCounts {
   jobs: number;
   customers: number;
+  employees: number;
   serviceZones: number;
 }
 
@@ -42,6 +46,10 @@ export default function IntegrationSettings() {
   const [companyId, setCompanyId] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress>({
+    stage: 'idle',
+    message: '',
+  });
 
   // Fetch organization data
   const { data: organization, isLoading: orgLoading } = useQuery({
@@ -68,15 +76,17 @@ export default function IntegrationSettings() {
   });
 
   // Fetch sync counts
-  const { data: syncCounts } = useQuery({
+  const { data: syncCounts, refetch: refetchCounts } = useQuery({
     queryKey: ['hcp-sync-counts', profile?.organization_id],
     queryFn: async () => {
       if (!profile?.organization_id) return null;
       
-      const [jobsResult, customersResult, zonesResult] = await Promise.all([
+      const [jobsResult, customersResult, employeesResult, zonesResult] = await Promise.all([
         supabase.from('hcp_jobs').select('id', { count: 'exact', head: true })
           .eq('organization_id', profile.organization_id),
         supabase.from('hcp_customers').select('id', { count: 'exact', head: true })
+          .eq('organization_id', profile.organization_id),
+        supabase.from('hcp_employees').select('id', { count: 'exact', head: true })
           .eq('organization_id', profile.organization_id),
         supabase.from('hcp_service_zones').select('id', { count: 'exact', head: true })
           .eq('organization_id', profile.organization_id)
@@ -85,6 +95,7 @@ export default function IntegrationSettings() {
       return {
         jobs: jobsResult.count || 0,
         customers: customersResult.count || 0,
+        employees: employeesResult.count || 0,
         serviceZones: zonesResult.count || 0
       } as SyncCounts;
     },
@@ -92,7 +103,7 @@ export default function IntegrationSettings() {
   });
 
   // Get last sync timestamp from latest synced job
-  const { data: lastSync } = useQuery({
+  const { data: lastSync, refetch: refetchLastSync } = useQuery({
     queryKey: ['hcp-last-sync', profile?.organization_id],
     queryFn: async () => {
       if (!profile?.organization_id) return null;
@@ -178,6 +189,74 @@ export default function IntegrationSettings() {
     }
   });
 
+  // Sync data mutation
+  const syncDataMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile?.organization_id) throw new Error("No organization");
+      if (!organization?.hcp_api_key) throw new Error("No API key configured");
+
+      setSyncProgress({
+        stage: 'syncing',
+        message: 'Starting sync...',
+        details: 'Connecting to HouseCall Pro',
+      });
+
+      const { data, error } = await supabase.functions.invoke('sync-hcp-data', {
+        body: {
+          organization_id: profile.organization_id,
+          api_key: organization.hcp_api_key,
+          location_id: profile.location_id,
+        }
+      });
+
+      if (error) throw error;
+      return data as SyncResult;
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setSyncProgress({
+          stage: 'complete',
+          message: 'Sync complete!',
+          details: `Synced ${data.synced?.jobs || 0} jobs, ${data.synced?.customers || 0} customers, ${data.synced?.employees || 0} employees, ${data.synced?.serviceZones || 0} zones`,
+        });
+        
+        // Refresh counts
+        refetchCounts();
+        refetchLastSync();
+        
+        toast({
+          title: "Sync complete",
+          description: `Successfully synced ${data.synced?.jobs || 0} jobs and ${data.synced?.customers || 0} customers`,
+        });
+      } else {
+        setSyncProgress({
+          stage: 'error',
+          message: 'Sync failed',
+          details: data.error || 'Unknown error',
+        });
+        
+        toast({
+          title: "Sync failed",
+          description: data.error || "Unable to sync data from HouseCall Pro",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      setSyncProgress({
+        stage: 'error',
+        message: 'Sync failed',
+        details: error.message,
+      });
+      
+      toast({
+        title: "Sync failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
     setHasChanges(value !== (organization?.hcp_api_key || "") || companyId !== (organization?.hcp_company_id || ""));
@@ -189,10 +268,20 @@ export default function IntegrationSettings() {
   };
 
   const isConnected = !!(organization?.hcp_api_key);
+  const isSyncing = syncDataMutation.isPending;
 
   const formatLastSync = (timestamp: string | null | undefined) => {
     if (!timestamp) return "Never";
     return new Date(timestamp).toLocaleString();
+  };
+
+  const getSyncProgressColor = () => {
+    switch (syncProgress.stage) {
+      case 'syncing': return 'text-primary';
+      case 'complete': return 'text-green-600';
+      case 'error': return 'text-destructive';
+      default: return 'text-muted-foreground';
+    }
   };
 
   if (orgLoading) {
@@ -326,13 +415,50 @@ export default function IntegrationSettings() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Sync Status</h4>
-                    <Button variant="outline" size="sm" disabled={!isConnected}>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Sync Now
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      disabled={!isConnected || isSyncing}
+                      onClick={() => syncDataMutation.mutate()}
+                    >
+                      {isSyncing ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      {isSyncing ? 'Syncing...' : 'Sync Now'}
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Sync Progress */}
+                  {syncProgress.stage !== 'idle' && (
+                    <div className="rounded-lg border p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        {syncProgress.stage === 'syncing' && (
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        )}
+                        {syncProgress.stage === 'complete' && (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        )}
+                        {syncProgress.stage === 'error' && (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        <span className={`font-medium ${getSyncProgressColor()}`}>
+                          {syncProgress.message}
+                        </span>
+                      </div>
+                      {syncProgress.details && (
+                        <p className="text-sm text-muted-foreground">
+                          {syncProgress.details}
+                        </p>
+                      )}
+                      {syncProgress.stage === 'syncing' && (
+                        <Progress value={undefined} className="h-2" />
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="rounded-lg border p-3">
                       <p className="text-xs text-muted-foreground">Last Sync</p>
                       <p className="text-sm font-medium truncate">
@@ -348,14 +474,17 @@ export default function IntegrationSettings() {
                       <p className="text-2xl font-semibold">{syncCounts?.customers ?? 0}</p>
                     </div>
                     <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">Employees</p>
+                      <p className="text-2xl font-semibold">{syncCounts?.employees ?? 0}</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
                       <p className="text-xs text-muted-foreground">Service Zones</p>
                       <p className="text-2xl font-semibold">{syncCounts?.serviceZones ?? 0}</p>
                     </div>
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Automatic syncing will be available once Edge Functions are configured.
-                    Use "Sync Now" to manually trigger a sync.
+                    Syncs jobs scheduled for the next 30 days along with customers, employees, and service zones.
                   </p>
                 </div>
               </CardContent>
