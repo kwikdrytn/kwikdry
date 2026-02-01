@@ -150,7 +150,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
   if (!searchedLocation) return null;
 
   return (
-    <Card className="absolute bottom-4 left-4 z-10 w-96 shadow-lg max-h-[70vh] flex flex-col">
+    <Card className="absolute bottom-4 left-4 z-10 w-96 shadow-lg max-h-[70vh] flex flex-col overflow-hidden">
       <CardHeader className="p-4 pb-2 flex-shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
@@ -167,8 +167,9 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
         </div>
       </CardHeader>
 
-      <ScrollArea className="flex-1 min-h-0">
-        <CardContent className="p-4 pt-2">
+      <div className="flex-1 overflow-hidden min-h-0">
+        <ScrollArea className="h-full max-h-[calc(70vh-80px)]">
+          <CardContent className="p-4 pt-2">
           {!suggestions ? (
             <div className="space-y-4">
               {/* Job Duration */}
@@ -374,7 +375,8 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
             </div>
           )}
         </CardContent>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </Card>
   );
 }
