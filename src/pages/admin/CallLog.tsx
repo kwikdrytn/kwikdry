@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPhoneNumber } from "@/lib/ringcentral";
 import { CallDetailPanel } from "@/components/calls/CallDetailPanel";
+import { QuickBookingPopover } from "@/components/calls/QuickBookingPopover";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -67,6 +68,7 @@ interface CallLogEntry {
   linked_job_id: string | null;
   resulted_in_booking: boolean | null;
   booking_service_type: string | null;
+  booking_job_id: string | null;
   recording_url: string | null;
   notes: string | null;
   synced_at: string | null;
@@ -228,18 +230,22 @@ export default function CallLog() {
     },
   });
 
-  // Toggle booking status mutation
+  // Toggle booking status mutation (for direct toggle without service type)
   const toggleBookingMutation = useMutation({
-    mutationFn: async ({ callId, booked }: { callId: string; booked: boolean }) => {
+    mutationFn: async ({ callId, booked, serviceType }: { callId: string; booked: boolean; serviceType?: string }) => {
       const { error } = await supabase
         .from("call_log")
-        .update({ resulted_in_booking: booked })
+        .update({ 
+          resulted_in_booking: booked,
+          booking_service_type: booked ? serviceType || null : null,
+        })
         .eq("id", callId);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["call-log"] });
+      queryClient.invalidateQueries({ queryKey: ["call-metrics"] });
     },
     onError: (error: Error) => {
       toast({
@@ -264,14 +270,6 @@ export default function CallLog() {
   const handleRowClick = (call: CallLogEntry) => {
     setSelectedCall(call);
     setDetailOpen(true);
-  };
-
-  const handleToggleBooking = (e: React.MouseEvent, call: CallLogEntry) => {
-    e.stopPropagation();
-    toggleBookingMutation.mutate({
-      callId: call.id,
-      booked: !call.resulted_in_booking,
-    });
   };
 
   return (
@@ -485,17 +483,14 @@ export default function CallLog() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <button
-                          onClick={(e) => handleToggleBooking(e, call)}
-                          className={cn(
-                            "h-5 w-5 rounded border inline-flex items-center justify-center transition-colors",
-                            call.resulted_in_booking
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-muted-foreground/30 hover:border-primary"
-                          )}
-                        >
-                          {call.resulted_in_booking && <Check className="h-3 w-3" />}
-                        </button>
+                        <QuickBookingPopover
+                          callId={call.id}
+                          isBooked={!!call.resulted_in_booking}
+                          currentServiceType={call.booking_service_type}
+                          onToggle={(booked, serviceType) => {
+                            toggleBookingMutation.mutate({ callId: call.id, booked, serviceType });
+                          }}
+                        />
                       </TableCell>
                       <TableCell>
                         <Button
