@@ -25,7 +25,8 @@ import {
   Save,
   Zap,
   AlertCircle,
-  MapPin
+  MapPin,
+  Phone
 } from "lucide-react";
 
 interface HCPConnectionResult {
@@ -39,6 +40,14 @@ interface SyncCounts {
   customers: number;
   employees: number;
   serviceZones: number;
+}
+
+interface RCConnectionResult {
+  success: boolean;
+  account_name?: string;
+  account_id?: string;
+  refresh_token?: string;
+  error?: string;
 }
 
 interface ServiceZone {
@@ -66,6 +75,7 @@ export default function IntegrationSettings() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   
+  // HouseCall Pro state
   const [apiKey, setApiKey] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
@@ -75,23 +85,34 @@ export default function IntegrationSettings() {
     message: '',
   });
 
-  // Fetch organization data
+  // RingCentral state
+  const [rcClientId, setRcClientId] = useState("");
+  const [rcClientSecret, setRcClientSecret] = useState("");
+  const [rcJwtToken, setRcJwtToken] = useState("");
+  const [showRcSecret, setShowRcSecret] = useState(false);
+  const [showRcJwt, setShowRcJwt] = useState(false);
+  const [hasRcChanges, setHasRcChanges] = useState(false);
+
+  // Fetch organization data (including RingCentral fields)
   const { data: organization, isLoading: orgLoading } = useQuery({
     queryKey: ['organization-integration', profile?.organization_id],
     queryFn: async () => {
       if (!profile?.organization_id) return null;
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, hcp_api_key, hcp_company_id')
+        .select('id, name, hcp_api_key, hcp_company_id, rc_client_id, rc_client_secret, rc_refresh_token, rc_account_id')
         .eq('id', profile.organization_id)
         .maybeSingle();
       
       if (error) throw error;
       
-      // Set initial values
+      // Set initial values for HCP
       if (data) {
         setApiKey(data.hcp_api_key || "");
         setCompanyId(data.hcp_company_id || "");
+        // Set initial values for RingCentral
+        setRcClientId(data.rc_client_id || "");
+        setRcClientSecret(data.rc_client_secret || "");
       }
       
       return data;
@@ -327,6 +348,123 @@ export default function IntegrationSettings() {
     }
   });
 
+  // RingCentral test connection mutation
+  const testRcConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('test-rc-connection', {
+        body: { 
+          client_id: rcClientId,
+          client_secret: rcClientSecret,
+          jwt_token: rcJwtToken
+        }
+      });
+      
+      if (error) throw error;
+      return data as RCConnectionResult;
+    },
+    onSuccess: async (data) => {
+      if (data.success) {
+        // Save the refresh token if returned
+        if (data.refresh_token && profile?.organization_id) {
+          await supabase
+            .from('organizations')
+            .update({
+              rc_refresh_token: data.refresh_token,
+              rc_account_id: data.account_id
+            })
+            .eq('id', profile.organization_id);
+          
+          queryClient.invalidateQueries({ queryKey: ['organization-integration'] });
+        }
+        
+        toast({
+          title: "Connection successful",
+          description: `Connected to: ${data.account_name}`,
+        });
+      } else {
+        toast({
+          title: "Connection failed",
+          description: data.error || "Unable to connect to RingCentral",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection test failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Save RingCentral credentials mutation
+  const saveRcCredentialsMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile?.organization_id) throw new Error("No organization");
+      
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          rc_client_id: rcClientId || null,
+          rc_client_secret: rcClientSecret || null
+        })
+        .eq('id', profile.organization_id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setHasRcChanges(false);
+      queryClient.invalidateQueries({ queryKey: ['organization-integration'] });
+      toast({
+        title: "Settings saved",
+        description: "RingCentral credentials have been updated",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to save",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Fetch call log counts for RingCentral
+  const { data: callLogCount } = useQuery({
+    queryKey: ['rc-call-count', profile?.organization_id],
+    queryFn: async () => {
+      if (!profile?.organization_id) return 0;
+      
+      const { count } = await supabase
+        .from('call_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', profile.organization_id);
+      
+      return count || 0;
+    },
+    enabled: !!profile?.organization_id
+  });
+
+  // Fetch last call sync timestamp
+  const { data: lastCallSync } = useQuery({
+    queryKey: ['rc-last-sync', profile?.organization_id],
+    queryFn: async () => {
+      if (!profile?.organization_id) return null;
+      
+      const { data } = await supabase
+        .from('call_log')
+        .select('synced_at')
+        .eq('organization_id', profile.organization_id)
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      return data?.synced_at;
+    },
+    enabled: !!profile?.organization_id
+  });
+
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
     setHasChanges(value !== (organization?.hcp_api_key || "") || companyId !== (organization?.hcp_company_id || ""));
@@ -345,8 +483,20 @@ export default function IntegrationSettings() {
     return zone.color || DEFAULT_ZONE_COLORS[index % DEFAULT_ZONE_COLORS.length];
   };
 
+  // RingCentral handlers
+  const handleRcClientIdChange = (value: string) => {
+    setRcClientId(value);
+    setHasRcChanges(value !== (organization?.rc_client_id || "") || rcClientSecret !== (organization?.rc_client_secret || ""));
+  };
+
+  const handleRcClientSecretChange = (value: string) => {
+    setRcClientSecret(value);
+    setHasRcChanges(rcClientId !== (organization?.rc_client_id || "") || value !== (organization?.rc_client_secret || ""));
+  };
+
   const isConnected = !!(organization?.hcp_api_key);
   const isSyncing = syncDataMutation.isPending;
+  const isRcConnected = !!(organization?.rc_refresh_token);
 
   const formatLastSync = (timestamp: string | null | undefined) => {
     if (!timestamp) return "Never";
@@ -634,6 +784,196 @@ export default function IntegrationSettings() {
 
                 {/* Employee Linking */}
                 <EmployeeLinking />
+              </CardContent>
+            </Card>
+
+            {/* RingCentral Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Phone className="h-5 w-5" />
+                      RingCentral
+                    </CardTitle>
+                    <CardDescription>
+                      Connect to RingCentral to sync call logs and recordings
+                    </CardDescription>
+                  </div>
+                  <Badge 
+                    variant={isRcConnected ? "default" : "secondary"}
+                    className={isRcConnected ? "bg-green-600 hover:bg-green-600" : ""}
+                  >
+                    {isRcConnected ? (
+                      <>
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Connected
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Not Connected
+                      </>
+                    )}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* API Credentials */}
+                <div className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="rc-client-id">Client ID</Label>
+                    <Input
+                      id="rc-client-id"
+                      type="text"
+                      placeholder="Enter your RingCentral Client ID"
+                      value={rcClientId}
+                      onChange={(e) => handleRcClientIdChange(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Found in your RingCentral Developer Console app settings
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="rc-client-secret">Client Secret</Label>
+                    <div className="relative">
+                      <Input
+                        id="rc-client-secret"
+                        type={showRcSecret ? "text" : "password"}
+                        placeholder="Enter your RingCentral Client Secret"
+                        value={rcClientSecret}
+                        onChange={(e) => handleRcClientSecretChange(e.target.value)}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowRcSecret(!showRcSecret)}
+                      >
+                        {showRcSecret ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="rc-jwt-token">JWT Token (for Server-to-Server Auth)</Label>
+                    <div className="relative">
+                      <Input
+                        id="rc-jwt-token"
+                        type={showRcJwt ? "text" : "password"}
+                        placeholder="Enter your RingCentral JWT token"
+                        value={rcJwtToken}
+                        onChange={(e) => setRcJwtToken(e.target.value)}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowRcJwt(!showRcJwt)}
+                      >
+                        {showRcJwt ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Generate a JWT token in your RingCentral Developer Console for server-to-server authentication
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => saveRcCredentialsMutation.mutate()}
+                    disabled={!hasRcChanges || saveRcCredentialsMutation.isPending}
+                  >
+                    {saveRcCredentialsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => testRcConnectionMutation.mutate()}
+                    disabled={!rcClientId || !rcClientSecret || !rcJwtToken || testRcConnectionMutation.isPending}
+                  >
+                    {testRcConnectionMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 mr-2" />
+                    )}
+                    Test Connection
+                  </Button>
+                </div>
+
+                <Separator />
+
+                {/* Sync Status */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Sync Status</h4>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      disabled={!isRcConnected}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Sync Calls
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">Last Sync</p>
+                      <p className="text-sm font-medium truncate">
+                        {formatLastSync(lastCallSync)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">Calls Synced</p>
+                      <p className="text-2xl font-semibold">{callLogCount ?? 0}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Call sync functionality will be enabled after successful connection. Manual sync available for now.
+                  </p>
+
+                  {!isRcConnected && (
+                    <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-yellow-600">Setup Required</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Enter your RingCentral credentials and test the connection to enable call synchronization.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {isRcConnected && organization?.rc_account_id && (
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">Account ID</p>
+                      <p className="text-sm font-medium font-mono">{organization.rc_account_id}</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

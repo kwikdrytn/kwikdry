@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.sync-hcp-data]
 verify_jwt = false
+
+[functions.test-rc-connection]
+verify_jwt = false
