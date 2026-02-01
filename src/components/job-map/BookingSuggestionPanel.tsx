@@ -172,7 +172,13 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
   if (!searchedLocation) return null;
 
   return (
-    <Card className="absolute bottom-4 left-4 z-10 w-96 shadow-lg max-h-[70vh] flex flex-col">
+    <Card
+      className="absolute bottom-4 left-4 z-10 w-96 shadow-lg h-[70dvh] max-h-[70dvh] flex flex-col"
+      onWheelCapture={(e) => e.stopPropagation()}
+      onTouchStartCapture={(e) => e.stopPropagation()}
+      onTouchMoveCapture={(e) => e.stopPropagation()}
+      onPointerDownCapture={(e) => e.stopPropagation()}
+    >
       <CardHeader className="p-4 pb-2 shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
@@ -189,7 +195,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
         </div>
       </CardHeader>
 
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="flex-1 min-h-0 h-full">
         <CardContent className="p-4 pt-2">
           {!suggestions ? (
             <div className="space-y-4">
