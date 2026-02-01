@@ -12,8 +12,10 @@ import {
   useJobsForDateRange, 
   useServiceZones, 
   useFirstLocation,
+  useTechnicianLocations,
   HCPJob, 
   ServiceZone,
+  TechnicianLocation,
   MapFilters as MapFiltersType,
   DEFAULT_FILTERS,
   DAY_COLORS,
@@ -266,6 +268,7 @@ export function JobMapView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const techMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const popupsRef = useRef<mapboxgl.Popup[]>([]);
   const zonePopupRef = useRef<mapboxgl.Popup | null>(null);
   const hoveredZoneRef = useRef<string | null>(null);
@@ -301,6 +304,7 @@ export function JobMapView() {
   const { data: jobs, isLoading: jobsLoading } = useJobsForDateRange(filters);
   const { data: zones } = useServiceZones();
   const { data: firstLocation } = useFirstLocation();
+  const { data: technicianLocations } = useTechnicianLocations();
 
   // Initialize map
   useEffect(() => {
@@ -680,6 +684,61 @@ export function JobMapView() {
       popupsRef.current.push(hoverPopup);
     });
   }, [jobs, mapLoaded, filters.weekView, filters.startDate]);
+
+  // Add technician home location markers
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (!map.current.isStyleLoaded()) return;
+
+    // Clear existing tech markers
+    techMarkersRef.current.forEach(marker => marker.remove());
+    techMarkersRef.current = [];
+
+    // Don't show if toggle is off
+    if (!filters.showTechLocations) return;
+    if (!technicianLocations) return;
+
+    // Add markers for technician home locations
+    technicianLocations.forEach((tech) => {
+      const el = document.createElement("div");
+      el.innerHTML = `
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="14" cy="14" r="12" fill="#059669" stroke="white" stroke-width="2"/>
+          <path d="M14 8L8 13V19H11V15H17V19H20V13L14 8Z" fill="white"/>
+        </svg>
+      `;
+      el.style.cssText = "cursor: pointer; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));";
+
+      const popup = new mapboxgl.Popup({
+        offset: 15,
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: "250px",
+      }).setHTML(`
+        <div style="font-family: system-ui, sans-serif; padding: 4px;">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <div style="width: 8px; height: 8px; background: #059669; border-radius: 50%;"></div>
+            <span style="font-weight: 600; font-size: 13px; color: #0f172a;">Tech Home</span>
+          </div>
+          <div style="font-weight: 500; font-size: 13px; color: #1e293b; margin-bottom: 2px;">${tech.name}</div>
+          <div style="font-size: 11px; color: #64748b;">${tech.address || 'Address not available'}</div>
+        </div>
+      `);
+
+      el.addEventListener("mouseenter", () => {
+        popup.setLngLat([tech.lng, tech.lat]).addTo(map.current!);
+      });
+      el.addEventListener("mouseleave", () => {
+        popup.remove();
+      });
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([tech.lng, tech.lat])
+        .addTo(map.current!);
+
+      techMarkersRef.current.push(marker);
+    });
+  }, [technicianLocations, mapLoaded, filters.showTechLocations]);
 
   // Handle address search location
   const handleLocationSelect = useCallback((coords: [number, number], placeName: string) => {
