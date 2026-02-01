@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { format, parseISO, startOfDay } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { MapFilters } from "./MapFilters";
 import { MapLegend } from "./MapLegend";
+import { AddressSearch } from "./AddressSearch";
 import { 
   useJobsForDateRange, 
   useServiceZones, 
-  useFirstLocation, 
+  useFirstLocation,
   HCPJob, 
   ServiceZone,
   MapFilters as MapFiltersType,
@@ -57,45 +58,46 @@ function formatTime(time: string | null): string {
   return `${hour12}:${minutes} ${ampm}`;
 }
 
-function createPopupContent(job: HCPJob, isWeekView: boolean): string {
-  const services = job.services as { name?: string }[] | null;
-  const serviceList = services?.map(s => s.name).filter(Boolean).join(', ') || 'N/A';
+function formatTimeRange(startTime: string | null, endTime: string | null): string {
+  const start = formatTime(startTime);
+  const end = formatTime(endTime);
+  if (start && end) return `${start} - ${end}`;
+  if (start) return start;
+  return 'TBD';
+}
+
+function createHoverContent(job: HCPJob, isWeekView: boolean): string {
   const dateStr = job.scheduled_date ? format(parseISO(job.scheduled_date), 'EEE, MMM d') : '';
+  const timeRange = formatTimeRange(job.scheduled_time, job.scheduled_end);
   
   return `
-    <div style="min-width: 200px; font-family: system-ui, sans-serif;">
-      <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px;">
+    <div style="min-width: 220px; font-family: system-ui, sans-serif; padding: 4px;">
+      <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #0f172a;">
         ${job.customer_name || 'Unknown Customer'}
       </div>
-      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">
-        ${[job.address, job.city, job.state].filter(Boolean).join(', ')}
+      <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">
+        ${[job.address, job.city, job.state, job.zip].filter(Boolean).join(', ')}
       </div>
-      <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 12px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
         ${isWeekView ? `
           <div>
-            <div style="color: #64748b;">Date</div>
-            <div style="font-weight: 500;">${dateStr}</div>
+            <div style="color: #94a3b8; font-size: 11px;">Date</div>
+            <div style="font-weight: 500; color: #1e293b;">${dateStr}</div>
           </div>
         ` : ''}
         <div>
-          <div style="color: #64748b;">Time</div>
-          <div style="font-weight: 500;">${formatTime(job.scheduled_time) || 'TBD'}</div>
+          <div style="color: #94a3b8; font-size: 11px;">Time</div>
+          <div style="font-weight: 500; color: #1e293b;">${timeRange}</div>
         </div>
         <div>
-          <div style="color: #64748b;">Status</div>
-          <div style="font-weight: 500; text-transform: capitalize;">${job.status || 'Scheduled'}</div>
+          <div style="color: #94a3b8; font-size: 11px;">Technician</div>
+          <div style="font-weight: 500; color: #1e293b;">${job.technician_name || 'Unassigned'}</div>
+        </div>
+        <div>
+          <div style="color: #94a3b8; font-size: 11px;">Status</div>
+          <div style="font-weight: 500; color: #1e293b; text-transform: capitalize;">${job.status || 'Scheduled'}</div>
         </div>
       </div>
-      <div style="margin-top: 8px; font-size: 12px;">
-        <div style="color: #64748b;">Services</div>
-        <div style="font-weight: 500;">${serviceList}</div>
-      </div>
-      ${job.technician_name ? `
-        <div style="margin-top: 8px; font-size: 12px;">
-          <div style="color: #64748b;">Technician</div>
-          <div style="font-weight: 500;">${job.technician_name}</div>
-        </div>
-      ` : ''}
     </div>
   `;
 }
@@ -163,6 +165,7 @@ export function JobMapView() {
   const popupsRef = useRef<mapboxgl.Popup[]>([]);
   const zonePopupRef = useRef<mapboxgl.Popup | null>(null);
   const hoveredZoneRef = useRef<string | null>(null);
+  const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const initialFiltersApplied = useRef(false);
 
   // Initialize filters from URL params
@@ -172,6 +175,7 @@ export function JobMapView() {
   });
   
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [searchedLocation, setSearchedLocation] = useState<{ coords: [number, number]; name: string } | null>(null);
 
   // Update URL when filters change
   useEffect(() => {
@@ -409,7 +413,7 @@ export function JobMapView() {
     });
   }, [filters.showZones, zones, mapLoaded]);
 
-  // Add job markers
+  // Add job markers with hover popups
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
@@ -440,19 +444,24 @@ export function JobMapView() {
         transition: transform 0.15s ease;
       `;
 
-      el.addEventListener("mouseenter", () => {
-        el.style.transform = "scale(1.2)";
-      });
-      el.addEventListener("mouseleave", () => {
-        el.style.transform = "scale(1)";
-      });
-
+      // Create popup for hover
       const popup = new mapboxgl.Popup({
         offset: 15,
-        closeButton: true,
+        closeButton: false,
         closeOnClick: false,
-        maxWidth: "280px",
-      }).setHTML(createPopupContent(job, filters.weekView));
+        maxWidth: "300px",
+        className: "job-hover-popup",
+      }).setHTML(createHoverContent(job, filters.weekView));
+
+      el.addEventListener("mouseenter", () => {
+        el.style.transform = "scale(1.2)";
+        popup.addTo(map.current!);
+      });
+      
+      el.addEventListener("mouseleave", () => {
+        el.style.transform = "scale(1)";
+        popup.remove();
+      });
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([job.lng, job.lat])
@@ -463,6 +472,59 @@ export function JobMapView() {
       popupsRef.current.push(popup);
     });
   }, [jobs, mapLoaded, filters.weekView, filters.startDate]);
+
+  // Handle address search location
+  const handleLocationSelect = useCallback((coords: [number, number], placeName: string) => {
+    if (!map.current) return;
+
+    // Remove existing search marker
+    searchMarkerRef.current?.remove();
+
+    // Create a custom pin marker for the searched location
+    const el = document.createElement("div");
+    el.innerHTML = `
+      <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 0C7.164 0 0 7.164 0 16c0 10.487 14.4 23.1 15.025 23.663a1.5 1.5 0 0 0 1.95 0C17.6 39.1 32 26.487 32 16c0-8.836-7.164-16-16-16z" fill="#dc2626"/>
+        <circle cx="16" cy="16" r="8" fill="white"/>
+      </svg>
+    `;
+    el.style.cssText = "cursor: pointer; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));";
+
+    const popup = new mapboxgl.Popup({
+      offset: 25,
+      closeButton: false,
+      closeOnClick: false,
+    }).setHTML(`
+      <div style="font-family: system-ui, sans-serif; padding: 4px;">
+        <div style="font-weight: 600; font-size: 12px; color: #dc2626; margin-bottom: 2px;">Searched Location</div>
+        <div style="font-size: 12px; color: #374151;">${placeName}</div>
+      </div>
+    `);
+
+    const marker = new mapboxgl.Marker({ element: el })
+      .setLngLat(coords)
+      .addTo(map.current);
+
+    // Show popup on hover
+    el.addEventListener("mouseenter", () => popup.setLngLat(coords).addTo(map.current!));
+    el.addEventListener("mouseleave", () => popup.remove());
+
+    searchMarkerRef.current = marker;
+    setSearchedLocation({ coords, name: placeName });
+
+    // Fly to location
+    map.current.flyTo({
+      center: coords,
+      zoom: 14,
+      duration: 1500,
+    });
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    searchMarkerRef.current?.remove();
+    searchMarkerRef.current = null;
+    setSearchedLocation(null);
+  }, []);
 
   // Handle zone click from legend
   const handleZoneClick = useCallback((zone: ServiceZone) => {
@@ -492,6 +554,14 @@ export function JobMapView() {
   return (
     <div className="relative h-full w-full">
       <div ref={mapContainer} className="h-full w-full" />
+      
+      {/* Address Search */}
+      <div className="absolute top-4 left-4 w-80 z-10">
+        <AddressSearch 
+          onLocationSelect={handleLocationSelect}
+          onClear={handleClearSearch}
+        />
+      </div>
       
       <MapFilters
         filters={filters}
