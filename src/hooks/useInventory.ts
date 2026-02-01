@@ -283,6 +283,38 @@ export function useCreateInventoryItem() {
   });
 }
 
+export function useBulkCreateInventoryItems() {
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (items: InventoryItemFormData[]) => {
+      if (!profile?.organization_id) throw new Error('No organization');
+
+      const itemsWithOrg = items.map(item => ({
+        ...item,
+        organization_id: profile.organization_id,
+        is_active: true,
+      }));
+
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert(itemsWithOrg)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      toast.success(`Successfully imported ${data.length} item(s)`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to import items: ${error.message}`);
+    },
+  });
+}
+
 export function useUpdateInventoryItem() {
   const queryClient = useQueryClient();
 
