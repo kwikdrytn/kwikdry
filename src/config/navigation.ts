@@ -57,30 +57,6 @@ export const navItems: NavItem[] = [
     icon: Map,
     allowedRoles: ['admin', 'call_staff']
   },
-  { 
-    title: "Users", 
-    url: "/users", 
-    icon: Users,
-    allowedRoles: ['admin']
-  },
-  { 
-    title: "Locations", 
-    url: "/locations", 
-    icon: MapPin,
-    allowedRoles: ['admin']
-  },
-  { 
-    title: "Settings", 
-    url: "/settings", 
-    icon: Settings,
-    allowedRoles: ['admin']
-  },
-  { 
-    title: "Integrations", 
-    url: "/settings/integrations", 
-    icon: Plug,
-    allowedRoles: ['admin']
-  },
 ];
 
 export function getNavItemsForRole(role: UserRole | null): NavItem[] {

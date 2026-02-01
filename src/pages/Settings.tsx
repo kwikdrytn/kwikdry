@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Link } from "react-router-dom";
+import { Users, MapPin, Plug, ChevronRight } from "lucide-react";
 
 export default function Settings() {
   const { profile, signOut } = useAuth();
@@ -19,6 +21,14 @@ export default function Settings() {
   const getFullName = (firstName?: string | null, lastName?: string | null) => {
     return [firstName, lastName].filter(Boolean).join(' ') || 'User';
   };
+
+  const adminLinks = [
+    { title: "Users", description: "Manage team members and permissions", icon: Users, url: "/users" },
+    { title: "Locations", description: "Manage business locations", icon: MapPin, url: "/locations" },
+    { title: "Integrations", description: "Connect external services", icon: Plug, url: "/settings/integrations" },
+  ];
+
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <DashboardLayout title="Settings">
@@ -63,6 +73,37 @@ export default function Settings() {
             </p>
           </CardContent>
         </Card>
+
+        {isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Administration</CardTitle>
+              <CardDescription>Manage your organization settings</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {adminLinks.map((link) => (
+                  <Link
+                    key={link.url}
+                    to={link.url}
+                    className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                        <link.icon className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{link.title}</p>
+                        <p className="text-sm text-muted-foreground">{link.description}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
