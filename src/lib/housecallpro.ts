@@ -65,6 +65,17 @@ export interface HCPServiceZone {
   id: string;
   name: string;
   color?: string;
+  polygon?: {
+    type?: string;
+    coordinates?: number[][][];
+  };
+  boundary?: Array<{ lat: number; lng: number }>;
+  vertices?: Array<{ lat: number; lng: number }>;
+}
+
+export interface GeoJSONPolygon {
+  type: 'Polygon';
+  coordinates: number[][][];
 }
 
 export interface HCPEmployee {
