@@ -36,7 +36,13 @@ export const navItems: NavItem[] = [
     title: "Checklists", 
     url: "/checklists", 
     icon: ClipboardCheck,
-    allowedRoles: ['admin', 'technician']
+    allowedRoles: ['technician']
+  },
+  { 
+    title: "Checklist Review", 
+    url: "/admin/checklists", 
+    icon: ClipboardCheck,
+    allowedRoles: ['admin']
   },
   { 
     title: "Equipment", 

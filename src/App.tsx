@@ -17,6 +17,9 @@ import JobMap from "./pages/JobMap";
 import UserManagement from "./pages/admin/UserManagement";
 import InventoryManagement from "./pages/admin/InventoryManagement";
 import InventoryDetail from "./pages/admin/InventoryDetail";
+import ChecklistReview from "./pages/admin/ChecklistReview";
+import ChecklistSubmissionDetail from "./pages/admin/ChecklistSubmissionDetail";
+import WeeklyChecklist from "./pages/technician/WeeklyChecklist";
 import LocationsPage from "./pages/Locations";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
@@ -79,6 +82,38 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleGuard allowedRoles={['admin', 'technician']}>
                     <Checklists />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/technician/checklist/weekly"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                    <WeeklyChecklist />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Admin Checklist Review */}
+            <Route
+              path="/admin/checklists"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <ChecklistReview />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/checklists/:submissionId"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <ChecklistSubmissionDetail />
                   </RoleGuard>
                 </ProtectedRoute>
               }
