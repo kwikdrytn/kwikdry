@@ -17,7 +17,6 @@ import UserManagement from "./pages/admin/UserManagement";
 import InventoryManagement from "./pages/admin/InventoryManagement";
 import InventoryDetail from "./pages/admin/InventoryDetail";
 import ChecklistSubmissionDetail from "./pages/admin/ChecklistSubmissionDetail";
-import WeeklyChecklist from "./pages/technician/WeeklyChecklist";
 import LocationManagement from "./pages/admin/LocationManagement";
 import IntegrationSettings from "./pages/admin/IntegrationSettings";
 import CallLog from "./pages/admin/CallLog";
@@ -98,20 +97,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/checklists/weekly"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin', 'technician']}>
-                    <WeeklyChecklist />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
             {/* Legacy route redirects */}
             <Route path="/admin/checklists" element={<Navigate to="/checklists" replace />} />
             <Route path="/admin/checklists/:submissionId" element={<Navigate to="/checklists/:submissionId" replace />} />
-            <Route path="/technician/checklist/weekly" element={<Navigate to="/checklists/weekly" replace />} />
             
             {/* Equipment - Admin only */}
             <Route
