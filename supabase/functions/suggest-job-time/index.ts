@@ -267,15 +267,43 @@ ${techsWithDistance.slice(0, 5).map((tech) => {
 Consider these technicians for optimal routing - technicians living closer can start the day with this job or end their day here with less travel time.`
       : "No technician home locations available.";
 
-    const systemPrompt = `You are a job scheduling assistant for a service company. Analyze the existing job schedule and suggest optimal times for a new job.
+    // Find the closest existing booked job
+    let closestJob: { date: string; time: string; distance: number; city: string; techName: string } | null = null;
+    for (const job of existingJobs || []) {
+      if (job.lat && job.lng) {
+        const distance = haversineDistance(coordinates.lat, coordinates.lng, job.lat, job.lng);
+        if (!closestJob || distance < closestJob.distance) {
+          closestJob = {
+            date: job.scheduled_date || "Unknown",
+            time: job.scheduled_time || "TBD",
+            distance,
+            city: job.city || "Unknown",
+            techName: job.technician_name || "Unassigned",
+          };
+        }
+      }
+    }
 
-Consider these factors:
-1. Minimize drive time by clustering jobs in similar areas
-2. IMPORTANT: Consider technician home locations when suggesting times - jobs closer to a tech's home are ideal for first or last appointments of the day
-3. Avoid scheduling conflicts
-4. Balance workload across days
+    const closestJobContext = closestJob
+      ? `CLOSEST EXISTING JOB TO NEW LOCATION:
+- Date: ${closestJob.date}
+- Time: ${closestJob.time}
+- Distance from new job: ${closestJob.distance.toFixed(1)} miles
+- Location: ${closestJob.city}
+- Assigned technician: ${closestJob.techName}
+
+IMPORTANT: Prioritize scheduling the new job on the SAME DAY and NEAR THE SAME TIME as this closest job to minimize travel. Suggest times immediately before or after this job as the top recommendation.`
+      : "No nearby existing jobs found - schedule based on technician availability and home locations.";
+
+const systemPrompt = `You are a job scheduling assistant for a service company. Analyze the existing job schedule and suggest optimal times for a new job.
+
+PRIORITY FACTORS (in order of importance):
+1. **CLOSEST EXISTING JOB**: Schedule near the closest booked job to minimize travel time. This is the #1 priority.
+2. Cluster jobs geographically - suggest times adjacent to nearby existing appointments
+3. Consider technician home locations for first/last appointments of the day
+4. Avoid scheduling conflicts
 5. Honor time preferences and restrictions
-6. Consider typical service windows (morning, midday, afternoon)
+6. Balance workload across days
 
 Respond with a JSON object containing:
 {
@@ -284,17 +312,18 @@ Respond with a JSON object containing:
       "date": "YYYY-MM-DD",
       "dayName": "Monday",
       "timeSlot": "09:00-11:00",
-      "reason": "Brief explanation including which technician might be best suited based on home location",
+      "reason": "Brief explanation - mention the nearby job this clusters with",
       "confidence": "high" | "medium" | "low",
       "nearbyJobsCount": 3,
-      "suggestedTechnician": "Tech name if applicable"
+      "suggestedTechnician": "Tech name if applicable",
+      "nearestExistingJob": "Description of the closest job this would cluster with"
     }
   ],
-  "analysis": "Brief overall analysis of the scheduling situation including technician routing efficiency",
+  "analysis": "Brief overall analysis emphasizing routing efficiency and job clustering",
   "warnings": ["Any potential issues or conflicts"]
 }
 
-Provide 3-5 suggestions, ranked by suitability.`;
+Provide 3-5 suggestions, ranked by proximity to existing jobs first.`;
 
     const userPrompt = `Please suggest the best times to schedule a new job with these details:
 
@@ -307,6 +336,8 @@ ${preferredDays?.length ? `- Preferred Days: ${preferredDays.join(", ")}` : ""}
 ${preferredTimeStart ? `- Preferred Time Window: ${preferredTimeStart} to ${preferredTimeEnd || "17:00"}` : ""}
 ${restrictions ? `- Restrictions/Notes: ${restrictions}` : ""}
 
+${closestJobContext}
+
 ${techLocationContext}
 
 EXISTING SCHEDULE OVERVIEW (Next 14 Days):
@@ -317,7 +348,7 @@ ${nearbyJobDetails || "No nearby jobs found"}
 
 Today's date is ${today.toISOString().split("T")[0]}.
 
-Analyze this data and suggest the optimal times to book this job. When making suggestions, factor in technician home locations for routing efficiency - suggest techs who live nearby for first or last appointments of the day.`;
+IMPORTANT: Your TOP suggestion should be on the same day as the closest existing job, scheduled immediately before or after it. Prioritize job clustering to minimize drive time between appointments.`;
 
     console.log("Calling Lovable AI for scheduling suggestions...");
 
