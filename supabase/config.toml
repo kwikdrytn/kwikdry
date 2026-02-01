@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.sync-rc-calls]
 verify_jwt = false
+
+[functions.rc-oauth-callback]
+verify_jwt = false
