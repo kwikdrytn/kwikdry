@@ -246,13 +246,26 @@ Deno.serve(async (req) => {
     const { 
       organization_id, 
       location_id,
-      client_id, 
-      client_secret, 
       refresh_token,
       hours_back = 24
     } = await req.json();
 
-    if (!organization_id || !client_id || !client_secret || !refresh_token) {
+    // Use environment variables for client credentials (same as OAuth callback)
+    const clientId = Deno.env.get('RC_CLIENT_ID');
+    const clientSecret = Deno.env.get('RC_CLIENT_SECRET');
+
+    if (!clientId || !clientSecret) {
+      console.error('Missing RC_CLIENT_ID or RC_CLIENT_SECRET environment variables');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'RingCentral not configured on server' 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!organization_id || !refresh_token) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -275,7 +288,7 @@ Deno.serve(async (req) => {
     console.log(`Starting RC call sync for organization: ${organization_id}`);
 
     // Get access token
-    const accessToken = await getAccessToken(client_id, client_secret, refresh_token);
+    const accessToken = await getAccessToken(clientId, clientSecret, refresh_token);
     if (!accessToken) {
       return new Response(
         JSON.stringify({ 
