@@ -99,7 +99,7 @@ export default function ChecklistSubmissionDetail() {
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Submission Detail" description="Loading...">
+      <DashboardLayout title="Submission Detail">
         <div className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-64 w-full" />
@@ -110,7 +110,7 @@ export default function ChecklistSubmissionDetail() {
 
   if (!submission) {
     return (
-      <DashboardLayout title="Submission Not Found" description="The requested submission could not be found">
+      <DashboardLayout title="Submission Not Found">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-muted-foreground">Submission not found</p>
@@ -128,10 +128,7 @@ export default function ChecklistSubmissionDetail() {
     : [];
 
   return (
-    <DashboardLayout 
-      title={`${submission.template_name} - ${submission.first_name} ${submission.last_name}`}
-      description="Submission details"
-    >
+    <DashboardLayout title={`${submission.template_name} - ${submission.first_name} ${submission.last_name}`}>
       <div className="space-y-6 print:space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between print:hidden">

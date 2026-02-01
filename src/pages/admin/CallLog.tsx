@@ -274,7 +274,7 @@ export default function CallLog() {
   };
 
   return (
-    <DashboardLayout title="Call Log" description="View and manage call history">
+    <DashboardLayout title="Call Log">
       <div className="space-y-4">
         {/* Header with date picker and sync */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

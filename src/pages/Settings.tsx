@@ -21,7 +21,7 @@ export default function Settings() {
   };
 
   return (
-    <DashboardLayout title="Settings" description="Manage your account and preferences">
+    <DashboardLayout title="Settings">
       <div className="max-w-2xl space-y-6">
         <Card>
           <CardHeader>

@@ -80,7 +80,7 @@ export default function InventoryDetail() {
 
   if (itemLoading) {
     return (
-      <DashboardLayout title="Loading..." description="">
+      <DashboardLayout title="Loading...">
         <div className="space-y-6">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-[200px] w-full" />
@@ -91,7 +91,7 @@ export default function InventoryDetail() {
 
   if (!item) {
     return (
-      <DashboardLayout title="Item Not Found" description="">
+      <DashboardLayout title="Item Not Found">
         <div className="flex flex-col items-center justify-center py-12">
           <p className="text-muted-foreground mb-4">This inventory item doesn't exist.</p>
           <Button onClick={() => navigate('/admin/inventory')}>
@@ -104,7 +104,7 @@ export default function InventoryDetail() {
   }
 
   return (
-    <DashboardLayout title={item.name} description={categoryLabels[item.category]}>
+    <DashboardLayout title={item.name}>
       <div className="space-y-6">
         {/* Back Button & Actions */}
         <div className="flex items-center justify-between">

@@ -74,7 +74,7 @@ export default function UserManagement() {
   };
 
   return (
-    <DashboardLayout title="User Management" description="Manage team members, roles, and access">
+    <DashboardLayout title="User Management">
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>

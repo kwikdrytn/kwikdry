@@ -618,10 +618,7 @@ export default function Checklists() {
   const isAdmin = profile?.role === 'admin';
 
   return (
-    <DashboardLayout 
-      title="Checklists" 
-      description={isAdmin ? "Review and manage checklist submissions" : "Complete your daily and weekly inspections"}
-    >
+    <DashboardLayout title="Checklists">
       {isAdmin ? <AdminChecklists /> : <TechnicianChecklists />}
     </DashboardLayout>
   );
