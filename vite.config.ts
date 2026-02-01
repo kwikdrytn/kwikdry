@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
@@ -64,7 +67,9 @@ export default defineConfig(({ mode }) => ({
             },
           },
         ],
-        navigateFallback: "/offline.html",
+        // SPA shell. Using offline.html here breaks OAuth redirects (and any navigation)
+        // because Workbox serves the fallback for navigation requests even when online.
+        navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api/, /^\/auth/],
       },
       devOptions: {
