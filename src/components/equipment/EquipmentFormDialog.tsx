@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Trash2, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -27,8 +38,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLocations } from "@/hooks/useLocations";
-import { useTechnicians, Equipment, EquipmentFormData, EquipmentStatus } from "@/hooks/useEquipment";
+import { 
+  useTechniciansByLocation, 
+  useCheckSerialNumber,
+  Equipment, 
+  EquipmentFormData, 
+  EquipmentStatus 
+} from "@/hooks/useEquipment";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -51,7 +69,9 @@ interface EquipmentFormDialogProps {
   onOpenChange: (open: boolean) => void;
   equipment?: Equipment | null;
   onSubmit: (data: EquipmentFormData) => void;
+  onDelete?: (id: string) => void;
   isLoading: boolean;
+  isDeleting?: boolean;
 }
 
 const EQUIPMENT_TYPES = [
@@ -73,11 +93,13 @@ export function EquipmentFormDialog({
   onOpenChange,
   equipment,
   onSubmit,
+  onDelete,
   isLoading,
+  isDeleting = false,
 }: EquipmentFormDialogProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { data: locations = [] } = useLocations();
-  const { data: technicians = [] } = useTechnicians();
-
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -96,6 +118,20 @@ export function EquipmentFormDialog({
       notes: '',
     },
   });
+
+  const selectedLocationId = form.watch("location_id");
+  const serialNumber = form.watch("serial_number");
+  
+  // Get technicians filtered by selected location
+  const { data: technicians = [] } = useTechniciansByLocation(
+    selectedLocationId === "none" ? null : selectedLocationId
+  );
+  
+  // Check for duplicate serial number
+  const { data: serialNumberCheck } = useCheckSerialNumber(
+    serialNumber || null,
+    equipment?.id || null
+  );
 
   useEffect(() => {
     if (equipment) {
@@ -133,6 +169,17 @@ export function EquipmentFormDialog({
     }
   }, [equipment, form]);
 
+  // Clear assigned_to when location changes
+  useEffect(() => {
+    const currentAssignedTo = form.getValues("assigned_to");
+    if (currentAssignedTo && currentAssignedTo !== "none") {
+      const techExists = technicians.some(t => t.id === currentAssignedTo);
+      if (!techExists) {
+        form.setValue("assigned_to", null);
+      }
+    }
+  }, [selectedLocationId, technicians, form]);
+
   const handleSubmit = (values: z.infer<typeof formSchema>) => {
     onSubmit({
       ...values,
@@ -141,193 +188,264 @@ export function EquipmentFormDialog({
     } as EquipmentFormData);
   };
 
+  const handleDelete = () => {
+    if (equipment && onDelete) {
+      onDelete(equipment.id);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{equipment ? 'Edit Equipment' : 'Add Equipment'}</DialogTitle>
-          <DialogDescription>
-            {equipment ? 'Update the equipment details below.' : 'Enter the details for the new equipment.'}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{equipment ? 'Edit Equipment' : 'Add Equipment'}</DialogTitle>
+            <DialogDescription>
+              {equipment ? 'Update the equipment details below.' : 'Enter the details for the new equipment.'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter equipment name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name *</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
+                        <Input placeholder="Enter equipment name" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {EQUIPMENT_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="serial_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Serial Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter serial number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {EQUIPMENT_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="serial_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Serial Number</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
+                        <Input placeholder="Enter serial number" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      {serialNumberCheck?.isDuplicate && (
+                        <Alert variant="destructive" className="py-2 mt-1">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription className="text-xs">
+                            This serial number already exists for "{serialNumberCheck.existingName}"
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="manufacturer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Manufacturer</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter manufacturer" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="model"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Model</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter model" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="location_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="manufacturer"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Manufacturer</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
+                        <Input placeholder="Enter manufacturer" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No Location</SelectItem>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="assigned_to"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assigned To</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Model</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select technician" />
-                        </SelectTrigger>
+                        <Input placeholder="Enter model" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Unassigned</SelectItem>
-                        {technicians.map((tech) => (
-                          <SelectItem key={tech.id} value={tech.id}>
-                            {tech.first_name} {tech.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="location_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "none"}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select location" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Location</SelectItem>
+                          {locations.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="assigned_to"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assigned To</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "none"}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select technician" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Unassigned</SelectItem>
+                          {technicians.length === 0 && selectedLocationId && selectedLocationId !== "none" ? (
+                            <SelectItem value="no-techs" disabled>
+                              No technicians at this location
+                            </SelectItem>
+                          ) : (
+                            technicians.map((tech) => (
+                              <SelectItem key={tech.id} value={tech.id}>
+                                {tech.first_name} {tech.last_name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="purchase_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="purchase_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Price</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          {...field} 
+                          value={field.value ?? ''} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="warranty_expiry"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Warranty Expiry</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
-                name="purchase_date"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Purchase Date</FormLabel>
+                    <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
+                      <Textarea placeholder="Enter description" rows={2} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -336,78 +454,65 @@ export function EquipmentFormDialog({
 
               <FormField
                 control={form.control}
-                name="purchase_price"
+                name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Purchase Price</FormLabel>
+                    <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                        value={field.value ?? ''} 
-                      />
+                      <Textarea placeholder="Enter any additional notes" rows={2} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="warranty_expiry"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Warranty Expiry</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+              <div className="flex justify-between pt-4">
+                <div>
+                  {equipment && onDelete && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? 'Saving...' : equipment ? 'Update Equipment' : 'Add Equipment'}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter description" rows={2} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter any additional notes" rows={2} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Saving...' : equipment ? 'Update Equipment' : 'Add Equipment'}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Equipment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{equipment?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

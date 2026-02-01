@@ -13,6 +13,7 @@ import {
   useEquipmentList,
   useCreateEquipment,
   useUpdateEquipment,
+  useDeleteEquipment,
   Equipment,
   EquipmentFormData,
   EquipmentStatus,
@@ -49,6 +50,7 @@ export default function EquipmentPage() {
 
   const createEquipment = useCreateEquipment();
   const updateEquipment = useUpdateEquipment();
+  const deleteEquipment = useDeleteEquipment();
 
   const handleView = (item: Equipment) => {
     setSelectedEquipment(item);
@@ -76,6 +78,12 @@ export default function EquipmentPage() {
         onSuccess: () => setIsFormOpen(false),
       });
     }
+  };
+
+  const handleDelete = (id: string) => {
+    deleteEquipment.mutate(id, {
+      onSuccess: () => setIsFormOpen(false),
+    });
   };
 
   // Calculate stats
@@ -183,7 +191,9 @@ export default function EquipmentPage() {
         onOpenChange={setIsFormOpen}
         equipment={selectedEquipment}
         onSubmit={handleSubmit}
+        onDelete={handleDelete}
         isLoading={createEquipment.isPending || updateEquipment.isPending}
+        isDeleting={deleteEquipment.isPending}
       />
 
       <EquipmentDetailDialog
