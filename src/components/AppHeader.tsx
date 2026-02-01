@@ -20,7 +20,7 @@ export function AppHeader({
             <Separator orientation="vertical" className="h-6 hidden sm:block" />
             <div className="hidden lg:block">
               <h1 className="text-lg font-semibold">{title}</h1>
-              {description && <p className="text-sm text-muted-foreground">{description}</p>}
+              {description}
             </div>
           </>}
       </div>
