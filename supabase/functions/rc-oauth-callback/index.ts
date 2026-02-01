@@ -6,7 +6,7 @@ const corsHeaders = {
 }
 
 const RC_API_BASE = 'https://platform.ringcentral.com';
-const REDIRECT_URI = 'https://kwikdry.lovable.app/oauth-callback.html';
+const REDIRECT_URI = 'https://kwikdry.lovable.app';
 
 interface TokenResponse {
   access_token: string;
