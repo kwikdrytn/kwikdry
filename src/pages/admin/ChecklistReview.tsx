@@ -5,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,18 +15,23 @@ import {
   useTechnicians, 
   useMissingTodaySubmissions,
   useComplianceData,
-  ChecklistSubmissionWithDetails 
+  useAllChecklistTemplates,
+  useDeleteTemplate,
+  ChecklistSubmissionWithDetails,
+  ChecklistTemplate
 } from "@/hooks/useChecklists";
+import { TemplateFormDialog } from "@/components/checklists/TemplateFormDialog";
 import { useNavigate } from "react-router-dom";
 import { 
   CalendarIcon, 
-  Search, 
   AlertTriangle, 
-  CheckCircle2, 
-  Clock,
-  Users,
-  TrendingUp,
-  Bell
+  Bell,
+  Plus,
+  Pencil,
+  Trash2,
+  FileText,
+  ToggleLeft,
+  ToggleRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -43,6 +47,10 @@ export default function ChecklistReview() {
   const [frequencyFilter, setFrequencyFilter] = useState<FrequencyFilter>("all");
   const [showMissingOnly, setShowMissingOnly] = useState(false);
 
+  // Template management state
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ChecklistTemplate | null>(null);
+
   const { data: submissions, isLoading: submissionsLoading } = useChecklistSubmissions({
     dateFrom,
     dateTo,
@@ -53,6 +61,8 @@ export default function ChecklistReview() {
   const { data: technicians } = useTechnicians();
   const { data: missingToday, isLoading: missingLoading } = useMissingTodaySubmissions();
   const { data: complianceData, isLoading: complianceLoading } = useComplianceData(30);
+  const { data: templates, isLoading: templatesLoading } = useAllChecklistTemplates();
+  const deleteTemplate = useDeleteTemplate();
 
   const handleRowClick = (submission: ChecklistSubmissionWithDetails) => {
     navigate(`/admin/checklists/${submission.id}`);
@@ -60,6 +70,22 @@ export default function ChecklistReview() {
 
   const handleSendReminder = (technicianName: string) => {
     toast.success(`Reminder would be sent to ${technicianName}`);
+  };
+
+  const handleEditTemplate = (template: ChecklistTemplate) => {
+    setEditingTemplate(template);
+    setTemplateDialogOpen(true);
+  };
+
+  const handleDeleteTemplate = async (template: ChecklistTemplate) => {
+    if (confirm(`Are you sure you want to delete "${template.name}"?`)) {
+      await deleteTemplate.mutateAsync(template.id);
+    }
+  };
+
+  const handleCreateTemplate = () => {
+    setEditingTemplate(null);
+    setTemplateDialogOpen(true);
   };
 
   const getStatusBadge = (status: string | null) => {
@@ -352,18 +378,99 @@ export default function ChecklistReview() {
           </TabsContent>
 
           <TabsContent value="templates" className="space-y-6">
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-muted-foreground">
-                  Template management coming soon.
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">Checklist Templates</h3>
+                <p className="text-sm text-muted-foreground">
+                  Create and manage checklist templates for technicians.
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  View and edit checklist templates.
-                </p>
-              </CardContent>
-            </Card>
+              </div>
+              <Button onClick={handleCreateTemplate}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Template
+              </Button>
+            </div>
+
+            {templatesLoading ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-40" />
+                ))}
+              </div>
+            ) : templates?.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No templates yet.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Create your first checklist template to get started.
+                  </p>
+                  <Button className="mt-4" onClick={handleCreateTemplate}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Template
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {templates?.map((template) => (
+                  <Card key={template.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            {template.name}
+                            {template.is_active ? (
+                              <Badge variant="default" className="text-xs">Active</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription>
+                            {template.description || "No description"}
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline">
+                          {template.frequency === "daily" ? "Daily" : "Weekly"}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-sm text-muted-foreground">
+                        {template.items_json.length} checklist item{template.items_json.length !== 1 ? "s" : ""}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditTemplate(template)}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTemplate(template)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
+
+        <TemplateFormDialog
+          open={templateDialogOpen}
+          onOpenChange={setTemplateDialogOpen}
+          template={editingTemplate}
+        />
       </div>
     </DashboardLayout>
   );

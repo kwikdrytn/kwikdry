@@ -517,3 +517,128 @@ export function useComplianceData(days: number = 30) {
     enabled: !!profile?.organization_id,
   });
 }
+
+export function useAllChecklistTemplates() {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ["all-checklist-templates", profile?.organization_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("checklist_templates")
+        .select("*")
+        .is("deleted_at", null)
+        .order("name");
+
+      if (error) throw error;
+      
+      return (data || []).map(template => ({
+        ...template,
+        items_json: Array.isArray(template.items_json) 
+          ? (template.items_json as unknown as ChecklistItem[])
+          : []
+      })) as ChecklistTemplate[];
+    },
+    enabled: !!profile?.organization_id,
+  });
+}
+
+export interface TemplateFormData {
+  name: string;
+  description: string;
+  frequency: ChecklistFrequency;
+  items: ChecklistItem[];
+  is_active: boolean;
+}
+
+export function useCreateTemplate() {
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: TemplateFormData) => {
+      if (!profile?.organization_id) throw new Error("No organization");
+
+      const { data: template, error } = await supabase
+        .from("checklist_templates")
+        .insert({
+          name: data.name,
+          description: data.description || null,
+          frequency: data.frequency,
+          items_json: data.items as any,
+          is_active: data.is_active,
+          organization_id: profile.organization_id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return template;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-checklist-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["checklist-templates"] });
+      toast.success("Template created successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to create template: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateTemplate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<TemplateFormData> }) => {
+      const updateData: Record<string, any> = {};
+      
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.description !== undefined) updateData.description = data.description || null;
+      if (data.frequency !== undefined) updateData.frequency = data.frequency;
+      if (data.items !== undefined) updateData.items_json = data.items as any;
+      if (data.is_active !== undefined) updateData.is_active = data.is_active;
+
+      const { data: template, error } = await supabase
+        .from("checklist_templates")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return template;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-checklist-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["checklist-templates"] });
+      toast.success("Template updated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update template: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteTemplate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("checklist_templates")
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-checklist-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["checklist-templates"] });
+      toast.success("Template deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete template: ${error.message}`);
+    },
+  });
+}
