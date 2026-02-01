@@ -3,7 +3,7 @@ import { Phone } from "lucide-react";
 
 export default function Calls() {
   return (
-    <DashboardLayout title="Calls" description="Manage job calls and requests">
+    <DashboardLayout title="Calls">
       <div className="flex h-[60vh] flex-col items-center justify-center text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
           <Phone className="h-8 w-8 text-accent-foreground" />

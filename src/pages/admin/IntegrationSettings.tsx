@@ -596,7 +596,7 @@ export default function IntegrationSettings() {
 
   if (orgLoading) {
     return (
-      <DashboardLayout title="Integration Settings" description="Manage external service connections">
+      <DashboardLayout title="Integration Settings">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -605,7 +605,7 @@ export default function IntegrationSettings() {
   }
 
   return (
-    <DashboardLayout title="Integration Settings" description="Manage external service connections">
+    <DashboardLayout title="Integration Settings">
       <div className="max-w-3xl">
         <Tabs defaultValue="integrations" className="space-y-6">
           <TabsList>

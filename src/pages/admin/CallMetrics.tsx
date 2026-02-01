@@ -293,7 +293,7 @@ export default function CallMetrics() {
   };
 
   return (
-    <DashboardLayout title="Call Metrics" description="Analyze call performance and trends">
+    <DashboardLayout title="Call Metrics">
       <div className="space-y-6">
         {/* Header with filters */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

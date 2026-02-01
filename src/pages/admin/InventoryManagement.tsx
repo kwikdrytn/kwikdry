@@ -39,7 +39,7 @@ export default function InventoryManagement() {
   );
 
   return (
-    <DashboardLayout title="Inventory" description="Manage inventory items and stock levels">
+    <DashboardLayout title="Inventory">
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">

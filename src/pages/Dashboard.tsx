@@ -19,19 +19,8 @@ export default function Dashboard() {
     }
   };
 
-  const getDescription = () => {
-    switch (profile?.role) {
-      case 'technician':
-        return "Your daily tasks and assignments";
-      case 'call_staff':
-        return "Call handling and bookings overview";
-      default:
-        return "Organization overview";
-    }
-  };
-
   return (
-    <DashboardLayout title="Dashboard" description={getDescription()}>
+    <DashboardLayout title="Dashboard">
       {renderDashboard()}
     </DashboardLayout>
   );
