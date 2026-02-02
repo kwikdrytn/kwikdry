@@ -603,3 +603,25 @@ export function parseDurationInput(value: string): number | null {
   }
   return null;
 }
+
+// Playlist import mutation
+export function useImportPlaylist() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ playlistUrl, categoryId }: { playlistUrl: string; categoryId?: string }) => {
+      const { data, error } = await supabase.functions.invoke("import-youtube-playlist", {
+        body: { playlistUrl, categoryId },
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Failed to import playlist");
+      
+      return data as { success: boolean; imported: number; skipped: number; total: number; message: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-training-videos"] });
+      queryClient.invalidateQueries({ queryKey: ["training-videos"] });
+    },
+  });
+}

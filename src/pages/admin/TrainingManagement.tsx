@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, ListVideo } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { VideosTable } from "@/components/training/admin/VideosTable";
 import { CategoryFormDialog } from "@/components/training/admin/CategoryFormDialog";
 import { CategoriesList } from "@/components/training/admin/CategoriesList";
 import { TeamProgressTab } from "@/components/training/admin/TeamProgressTab";
+import { PlaylistImportDialog } from "@/components/training/admin/PlaylistImportDialog";
 import {
   useAdminVideos,
   useAdminCategories,
@@ -39,6 +40,9 @@ export default function TrainingManagement() {
   // Category dialog state
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<TrainingCategoryAdmin | null>(null);
+  
+  // Playlist import dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -80,10 +84,16 @@ export default function TrainingManagement() {
             </TabsList>
 
             {activeTab === "videos" && (
-              <Button onClick={handleAddVideo}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Video
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                  <ListVideo className="mr-2 h-4 w-4" />
+                  Import Playlist
+                </Button>
+                <Button onClick={handleAddVideo}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Video
+                </Button>
+              </div>
             )}
             {activeTab === "categories" && (
               <Button onClick={handleAddCategory}>
@@ -159,6 +169,13 @@ export default function TrainingManagement() {
         open={categoryDialogOpen}
         onOpenChange={setCategoryDialogOpen}
         category={editingCategory}
+      />
+
+      {/* Playlist Import Dialog */}
+      <PlaylistImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        categories={categories || []}
       />
     </DashboardLayout>
   );
