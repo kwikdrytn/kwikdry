@@ -182,7 +182,6 @@ export default function Training() {
                 <TrainingCategorySection
                   key={category.id}
                   name={category.name}
-                  icon={category.icon}
                   videos={category.videos}
                   completedCount={category.completedCount}
                   onPlayVideo={handlePlayVideo}
