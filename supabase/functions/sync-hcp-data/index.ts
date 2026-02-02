@@ -428,43 +428,89 @@ interface HCPService {
   is_active?: boolean;
 }
 
-// Fetch products/services catalog from HCP
+// Fetch products/services catalog from HCP Pricebook API
 async function fetchServices(apiKey: string): Promise<HCPService[]> {
   const allServices: HCPService[] = [];
-  let page = 1;
   const pageSize = 100;
   
-  // Try different endpoint names that HCP might use
-  const endpoints = ['products', 'services', 'price_book', 'price_book_items', 'line_items'];
+  // Try the pricebook endpoints - HCP uses /pricebook/services and /pricebook/materials
+  const pricebookEndpoints = [
+    { path: 'pricebook/services', key: 'services' },
+    { path: 'pricebook/materials', key: 'materials' },
+    { path: 'pricebook', key: 'items' },
+  ];
   
-  for (const endpoint of endpoints) {
+  for (const endpoint of pricebookEndpoints) {
+    let page = 1;
     try {
-      const url = `${HCP_BASE_URL}/${endpoint}?page=1&page_size=${pageSize}`;
-      console.log(`Trying ${endpoint} endpoint...`);
+      const url = `${HCP_BASE_URL}/${endpoint.path}?page=1&page_size=${pageSize}`;
+      console.log(`Trying ${endpoint.path} endpoint...`);
       
       const response = await fetchWithRetry(url, apiKey);
       const data = await response.json();
       
-      const items = data[endpoint] || data.data || data.items || [];
+      // Try different response shapes
+      const items = data[endpoint.key] || data.data || data.items || data.services || data.materials || [];
       if (items.length > 0) {
-        console.log(`Found ${items.length} items from ${endpoint} endpoint`);
+        console.log(`Found ${items.length} items from ${endpoint.path} endpoint`);
         allServices.push(...items);
         
         // Paginate if needed
-        while (items.length === pageSize && page < 20) {
+        let currentItems = items;
+        while (currentItems.length === pageSize && page < 20) {
           page++;
-          const nextUrl = `${HCP_BASE_URL}/${endpoint}?page=${page}&page_size=${pageSize}`;
+          const nextUrl = `${HCP_BASE_URL}/${endpoint.path}?page=${page}&page_size=${pageSize}`;
+          console.log(`Fetching ${endpoint.path} page ${page}...`);
           const nextResponse = await fetchWithRetry(nextUrl, apiKey);
           const nextData = await nextResponse.json();
-          const nextItems = nextData[endpoint] || nextData.data || nextData.items || [];
-          if (nextItems.length === 0) break;
-          allServices.push(...nextItems);
+          currentItems = nextData[endpoint.key] || nextData.data || nextData.items || nextData.services || nextData.materials || [];
+          if (currentItems.length === 0) break;
+          allServices.push(...currentItems);
         }
         
-        break; // Found working endpoint, stop trying others
+        console.log(`Total items from ${endpoint.path}: ${allServices.length}`);
       }
     } catch (error) {
-      console.log(`${endpoint} endpoint not available:`, error);
+      console.log(`${endpoint.path} endpoint not available:`, error);
+    }
+  }
+  
+  // Fallback to legacy endpoints if pricebook didn't work
+  if (allServices.length === 0) {
+    console.log('Pricebook endpoints failed, trying legacy endpoints...');
+    const legacyEndpoints = ['products', 'services', 'price_book', 'price_book_items', 'line_items'];
+    
+    for (const endpoint of legacyEndpoints) {
+      let page = 1;
+      try {
+        const url = `${HCP_BASE_URL}/${endpoint}?page=1&page_size=${pageSize}`;
+        console.log(`Trying legacy ${endpoint} endpoint...`);
+        
+        const response = await fetchWithRetry(url, apiKey);
+        const data = await response.json();
+        
+        const items = data[endpoint] || data.data || data.items || [];
+        if (items.length > 0) {
+          console.log(`Found ${items.length} items from ${endpoint} endpoint`);
+          allServices.push(...items);
+          
+          // Paginate if needed
+          let currentItems = items;
+          while (currentItems.length === pageSize && page < 20) {
+            page++;
+            const nextUrl = `${HCP_BASE_URL}/${endpoint}?page=${page}&page_size=${pageSize}`;
+            const nextResponse = await fetchWithRetry(nextUrl, apiKey);
+            const nextData = await nextResponse.json();
+            currentItems = nextData[endpoint] || nextData.data || nextData.items || [];
+            if (currentItems.length === 0) break;
+            allServices.push(...currentItems);
+          }
+          
+          break; // Found working endpoint
+        }
+      } catch (error) {
+        console.log(`${endpoint} endpoint not available:`, error);
+      }
     }
   }
   
