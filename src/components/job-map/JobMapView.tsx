@@ -362,6 +362,7 @@ export function JobMapView() {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [searchedLocation, setSearchedLocation] = useState<{ coords: [number, number]; name: string } | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [legendExpanded, setLegendExpanded] = useState(true);
   
   // Keep ref in sync with state for use in event handlers
   useEffect(() => {
@@ -913,6 +914,8 @@ export function JobMapView() {
         jobs={jobs || []}
         filters={filters}
         onZoneClick={handleZoneClick}
+        isExpanded={legendExpanded}
+        onExpandedChange={setLegendExpanded}
       />
 
       {/* AI Booking Suggestions Panel */}
@@ -920,7 +923,10 @@ export function JobMapView() {
         <BookingSuggestionPanel
           searchedLocation={searchedLocation}
           onClose={handleClearSearch}
-          onCollapseFilters={() => setFiltersExpanded(false)}
+          onCollapseFilters={() => {
+            setFiltersExpanded(false);
+            setLegendExpanded(false);
+          }}
         />
       )}
 

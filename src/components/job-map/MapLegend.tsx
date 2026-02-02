@@ -12,6 +12,8 @@ interface MapLegendProps {
   jobs: HCPJob[];
   filters: MapFiltersType;
   onZoneClick: (zone: ServiceZone) => void;
+  isExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 const STATUS_COLORS: Record<string, { color: string; label: string }> = {
@@ -46,8 +48,18 @@ function isPointInPolygon(point: [number, number], polygon: number[][]): boolean
   return inside;
 }
 
-export function MapLegend({ zones, jobs, filters, onZoneClick }: MapLegendProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+export function MapLegend({ zones, jobs, filters, onZoneClick, isExpanded: controlledExpanded, onExpandedChange }: MapLegendProps) {
+  const [internalExpanded, setInternalExpanded] = useState(true);
+  
+  // Use controlled state if provided, otherwise use internal state
+  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  const setIsExpanded = (value: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(value);
+    } else {
+      setInternalExpanded(value);
+    }
+  };
 
   const zonesWithBoundaries = zones.filter(z => z.polygon_geojson);
 
