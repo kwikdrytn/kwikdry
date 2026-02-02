@@ -45,10 +45,22 @@ interface MapFiltersProps {
   onFiltersChange: (filters: MapFiltersType) => void;
   onLocationSelect?: (coords: [number, number], placeName: string) => void;
   onClearSearch?: () => void;
+  isExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
-export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClearSearch }: MapFiltersProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClearSearch, isExpanded: controlledExpanded, onExpandedChange }: MapFiltersProps) {
+  const [internalExpanded, setInternalExpanded] = useState(true);
+  
+  // Use controlled state if provided, otherwise use internal state
+  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  const setIsExpanded = (value: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(value);
+    } else {
+      setInternalExpanded(value);
+    }
+  };
   const [techOpen, setTechOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
 

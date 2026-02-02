@@ -57,6 +57,7 @@ import type {
 interface BookingSuggestionPanelProps {
   searchedLocation: { coords: [number, number]; name: string } | null;
   onClose: () => void;
+  onCollapseFilters?: () => void;
 }
 
 const DAYS_OF_WEEK = [
@@ -122,7 +123,7 @@ function parseTimeSlot(timeSlot: string): string {
   return "09:00";
 }
 
-export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSuggestionPanelProps) {
+export function BookingSuggestionPanel({ searchedLocation, onClose, onCollapseFilters }: BookingSuggestionPanelProps) {
   const { profile } = useAuth();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false);
@@ -448,7 +449,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
       <Card
         className={cn(
           "absolute bottom-4 left-4 right-4 z-10 shadow-lg !flex !flex-col overflow-hidden transition-all duration-200",
-          hasResults ? "max-h-[50vh]" : showAdvanced ? "max-h-72" : "max-h-44"
+          hasResults ? "" : showAdvanced ? "max-h-72" : "max-h-44"
         )}
         onWheelCapture={(e) => e.stopPropagation()}
         onTouchStartCapture={(e) => e.stopPropagation()}
@@ -596,7 +597,10 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
 
                 {/* Submit Button */}
                 <Button
-                  onClick={() => suggestMutation.mutate()}
+                  onClick={() => {
+                    onCollapseFilters?.();
+                    suggestMutation.mutate();
+                  }}
                   disabled={suggestMutation.isPending}
                   className="h-8 text-xs px-4"
                   size="sm"
