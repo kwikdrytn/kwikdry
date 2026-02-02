@@ -269,6 +269,121 @@ export function useReorderVideos() {
   });
 }
 
+// Category CRUD operations
+export interface CategoryFormData {
+  name: string;
+  description: string | null;
+  icon: string;
+}
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (data: CategoryFormData) => {
+      if (!profile?.organization_id) throw new Error("No organization");
+
+      // Get max sort_order
+      const { data: existing } = await supabase
+        .from("training_categories")
+        .select("sort_order")
+        .eq("organization_id", profile.organization_id)
+        .order("sort_order", { ascending: false })
+        .limit(1);
+
+      const nextOrder = (existing?.[0]?.sort_order || 0) + 1;
+
+      const { error } = await supabase
+        .from("training_categories")
+        .insert({
+          organization_id: profile.organization_id,
+          name: data.name,
+          description: data.description,
+          icon: data.icon,
+          sort_order: nextOrder,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-training-categories"] });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CategoryFormData> }) => {
+      const { error } = await supabase
+        .from("training_categories")
+        .update({
+          name: data.name,
+          description: data.description,
+          icon: data.icon,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-training-categories"] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // First, unassign videos from this category
+      await supabase
+        .from("training_videos")
+        .update({ category_id: null })
+        .eq("category_id", id);
+
+      // Then delete the category
+      const { error } = await supabase
+        .from("training_categories")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-training-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-training-videos"] });
+      queryClient.invalidateQueries({ queryKey: ["training-videos"] });
+    },
+  });
+}
+
+export function useReorderCategories() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (categories: { id: string; sort_order: number }[]) => {
+      const updates = categories.map(c =>
+        supabase
+          .from("training_categories")
+          .update({ sort_order: c.sort_order })
+          .eq("id", c.id)
+      );
+
+      const results = await Promise.all(updates);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-training-categories"] });
+    },
+  });
+}
+
 // YouTube URL parsing utilities
 export function extractYouTubeVideoId(url: string): string | null {
   const patterns = [

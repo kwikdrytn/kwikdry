@@ -13,10 +13,13 @@ import {
 } from "@/components/ui/select";
 import { VideoFormDialog } from "@/components/training/admin/VideoFormDialog";
 import { VideosTable } from "@/components/training/admin/VideosTable";
+import { CategoryFormDialog } from "@/components/training/admin/CategoryFormDialog";
+import { CategoriesList } from "@/components/training/admin/CategoriesList";
 import {
   useAdminVideos,
   useAdminCategories,
   AdminTrainingVideo,
+  TrainingCategoryAdmin,
 } from "@/hooks/useAdminTraining";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -24,8 +27,14 @@ export default function TrainingManagement() {
   const [activeTab, setActiveTab] = useState("videos");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  
+  // Video dialog state
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<AdminTrainingVideo | null>(null);
+  
+  // Category dialog state
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<TrainingCategoryAdmin | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -33,7 +42,7 @@ export default function TrainingManagement() {
     categoryFilter || null,
     debouncedSearch
   );
-  const { data: categories } = useAdminCategories();
+  const { data: categories, isLoading: categoriesLoading } = useAdminCategories();
 
   const handleAddVideo = () => {
     setEditingVideo(null);
@@ -45,74 +54,91 @@ export default function TrainingManagement() {
     setVideoDialogOpen(true);
   };
 
+  const handleAddCategory = () => {
+    setEditingCategory(null);
+    setCategoryDialogOpen(true);
+  };
+
+  const handleEditCategory = (category: TrainingCategoryAdmin) => {
+    setEditingCategory(category);
+    setCategoryDialogOpen(true);
+  };
+
   return (
     <DashboardLayout title="Training Management">
       <div className="space-y-6">
-        {/* Header with Add button */}
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex flex-col sm:flex-row justify-between gap-4">
-              <TabsList>
-                <TabsTrigger value="videos">Videos</TabsTrigger>
-                <TabsTrigger value="categories">Categories</TabsTrigger>
-                <TabsTrigger value="progress">Team Progress</TabsTrigger>
-              </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex flex-col sm:flex-row justify-between gap-4">
+            <TabsList>
+              <TabsTrigger value="videos">Videos</TabsTrigger>
+              <TabsTrigger value="categories">Categories</TabsTrigger>
+              <TabsTrigger value="progress">Team Progress</TabsTrigger>
+            </TabsList>
 
+            {activeTab === "videos" && (
               <Button onClick={handleAddVideo}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Video
               </Button>
+            )}
+            {activeTab === "categories" && (
+              <Button onClick={handleAddCategory}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Category
+              </Button>
+            )}
+          </div>
+
+          <TabsContent value="videos" className="mt-6 space-y-4">
+            {/* Filter bar */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search videos..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Categories</SelectItem>
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <TabsContent value="videos" className="mt-6 space-y-4">
-              {/* Filter bar */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search videos..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+            {/* Videos table */}
+            <VideosTable
+              videos={videos || []}
+              onEdit={handleEditVideo}
+              isLoading={videosLoading}
+            />
+          </TabsContent>
 
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
-                    {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <TabsContent value="categories" className="mt-6">
+            <CategoriesList
+              categories={categories || []}
+              onEdit={handleEditCategory}
+              isLoading={categoriesLoading}
+            />
+          </TabsContent>
 
-              {/* Videos table */}
-              <VideosTable
-                videos={videos || []}
-                onEdit={handleEditVideo}
-                isLoading={videosLoading}
-              />
-            </TabsContent>
-
-            <TabsContent value="categories" className="mt-6">
-              <div className="border rounded-lg p-12 text-center text-muted-foreground">
-                Categories management coming soon...
-              </div>
-            </TabsContent>
-
-            <TabsContent value="progress" className="mt-6">
-              <div className="border rounded-lg p-12 text-center text-muted-foreground">
-                Team progress tracking coming soon...
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
+          <TabsContent value="progress" className="mt-6">
+            <div className="border rounded-lg p-12 text-center text-muted-foreground">
+              Team progress tracking coming soon...
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Video Form Dialog */}
@@ -121,6 +147,13 @@ export default function TrainingManagement() {
         onOpenChange={setVideoDialogOpen}
         video={editingVideo}
         categories={categories || []}
+      />
+
+      {/* Category Form Dialog */}
+      <CategoryFormDialog
+        open={categoryDialogOpen}
+        onOpenChange={setCategoryDialogOpen}
+        category={editingCategory}
       />
     </DashboardLayout>
   );
