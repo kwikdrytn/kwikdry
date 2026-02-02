@@ -3,6 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format, addDays, startOfDay } from "date-fns";
 
+export interface HCPJobService {
+  name?: string;
+  description?: string;
+  price?: number;
+  quantity?: number;
+}
+
+export interface HCPJobNote {
+  id?: string;
+  content?: string;
+}
+
 export interface HCPJob {
   id: string;
   hcp_job_id: string;
@@ -17,12 +29,13 @@ export interface HCPJob {
   scheduled_time: string | null;
   scheduled_end: string | null;
   status: string | null;
-  services: { name?: string; description?: string; price?: number; quantity?: number }[] | null;
+  services: HCPJobService[] | null;
+  total_items?: HCPJobService[] | null;
+  notes: string | HCPJobNote[] | null;
   technician_name: string | null;
   technician_hcp_id: string | null;
   location_id: string | null;
   total_amount: number | null;
-  notes: string | null;
 }
 
 export interface ServiceZone {

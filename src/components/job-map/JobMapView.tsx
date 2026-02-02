@@ -113,7 +113,9 @@ function createClickContent(
 ): string {
   const dateStr = job.scheduled_date ? format(parseISO(job.scheduled_date), 'EEE, MMM d') : '';
   const timeRange = formatTimeRange(job.scheduled_time, job.scheduled_end);
-  const services = job.services as { name?: string; description?: string; price?: number; quantity?: number }[] | null;
+  
+  // Prefer total_items, fall back to services
+  const services = (job.total_items || job.services) as { name?: string; description?: string; price?: number; quantity?: number }[] | null;
   
   // Build services list with details
   let servicesHtml = '';
@@ -145,18 +147,33 @@ function createClickContent(
     `;
   }
   
-  // Build notes section
+  // Build notes section - handle both string and array formats
   let notesHtml = '';
   if (job.notes) {
-    const truncatedNotes = job.notes.length > 150 ? job.notes.substring(0, 150) + '...' : job.notes;
-    notesHtml = `
-      <div style="margin-top: 10px; font-size: 12px;">
-        <div style="color: #94a3b8; font-size: 11px; margin-bottom: 4px;">Notes</div>
-        <div style="background: #fffbeb; border-left: 3px solid #f59e0b; padding: 8px 10px; border-radius: 0 6px 6px 0; color: #78350f; font-size: 11px; line-height: 1.4;">
-          ${truncatedNotes.replace(/\n/g, '<br>')}
+    let notesContent = '';
+    if (Array.isArray(job.notes)) {
+      // Notes is an array of {id, content} objects
+      const noteContents = job.notes
+        .filter((n: { id?: string; content?: string }) => n.content)
+        .map((n: { id?: string; content?: string }) => n.content)
+        .join('\n');
+      notesContent = noteContents;
+    } else {
+      // Notes is a string
+      notesContent = job.notes;
+    }
+    
+    if (notesContent) {
+      const truncatedNotes = notesContent.length > 200 ? notesContent.substring(0, 200) + '...' : notesContent;
+      notesHtml = `
+        <div style="margin-top: 10px; font-size: 12px;">
+          <div style="color: #94a3b8; font-size: 11px; margin-bottom: 4px;">Notes</div>
+          <div style="background: #fffbeb; border-left: 3px solid #f59e0b; padding: 8px 10px; border-radius: 0 6px 6px 0; color: #78350f; font-size: 11px; line-height: 1.4;">
+            ${truncatedNotes.replace(/\n/g, '<br>')}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
   }
   
   return `
