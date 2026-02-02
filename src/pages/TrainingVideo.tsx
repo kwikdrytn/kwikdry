@@ -370,16 +370,16 @@ export default function TrainingVideo() {
         <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
           <Button variant="outline" asChild className="flex-1 sm:flex-none">
             <Link to="/training">
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4 flex-shrink-0" />
               Back to Training
             </Link>
           </Button>
 
           {nextVideo && (
-            <Button asChild className="flex-1 sm:flex-none sm:ml-auto">
-              <Link to={`/training/video/${nextVideo.id}`}>
-                Next: {nextVideo.title}
-                <ChevronRight className="ml-2 h-4 w-4" />
+            <Button asChild className="flex-1 sm:flex-none sm:ml-auto max-w-full overflow-hidden">
+              <Link to={`/training/video/${nextVideo.id}`} className="flex items-center min-w-0">
+                <span className="truncate">Next: {nextVideo.title}</span>
+                <ChevronRight className="ml-2 h-4 w-4 flex-shrink-0" />
               </Link>
             </Button>
           )}
