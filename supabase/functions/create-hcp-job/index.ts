@@ -479,39 +479,38 @@ serve(async (req) => {
         }
 
         if (lineItemsToAdd.length > 0) {
-          console.log("Adding line items:", JSON.stringify({ line_items: lineItemsToAdd }, null, 2));
+          console.log("Line items to add:", JSON.stringify(lineItemsToAdd, null, 2));
 
-          // HCP API seems to prefer items added one at a time with slight delay
-          // This avoids rate limiting and "name is missing" batch errors
+          // HCP API requires line items to be added one at a time
+          // The endpoint expects the item fields at the ROOT level, NOT wrapped in an array
           let addedCount = 0;
           const addedItems: string[] = [];
+          const failedItems: string[] = [];
           
           for (const item of lineItemsToAdd) {
-            // Build the payload - HCP expects specific structure
+            // Build the payload - HCP expects fields at ROOT level, not in an array
+            // Only include service_item_id if we have one - this links to the price book
             const itemPayload: Record<string, any> = {
               name: item.name,
               quantity: item.quantity || 1,
             };
             
             // If we have a service_item_id, include it to link to price book
+            // This is what populates the price automatically
             if (item.service_item_id) {
               itemPayload.service_item_id = item.service_item_id;
             }
             
-            // Add description if not already from name
-            if (item.description) {
-              itemPayload.description = item.description;
-            }
+            console.log(`Adding line item: ${item.name}`, JSON.stringify(itemPayload));
             
-            console.log(`Adding single line item: ${item.name}`, JSON.stringify(itemPayload));
-            
+            // Try POST with the item at root level (not wrapped in array)
             const lineItemResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
               method: "POST",
               headers: {
                 Authorization: `Token ${hcpApiKey}`,
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ line_items: [itemPayload] }),
+              body: JSON.stringify(itemPayload),
             });
 
             if (lineItemResponse.ok) {
@@ -520,43 +519,71 @@ serve(async (req) => {
               console.log(`Successfully added line item: ${item.name}`);
             } else {
               const errorText = await lineItemResponse.text();
-              console.warn(`Failed to add line item "${item.name}":`, errorText);
+              console.warn(`Failed to add line item "${item.name}" with root-level payload:`, errorText);
               
-              // If service_item_id failed, try without it (name-only)
-              if (item.service_item_id) {
-                console.log(`Retrying "${item.name}" without service_item_id...`);
-                const fallbackPayload = {
-                  name: item.name,
-                  quantity: 1,
-                  description: item.name,
-                };
+              // Fallback: Try with array wrapper (some HCP API versions may expect this)
+              console.log(`Retrying "${item.name}" with array wrapper...`);
+              const arrayPayload = { line_items: [itemPayload] };
+              
+              const retryResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Token ${hcpApiKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(arrayPayload),
+              });
+              
+              if (retryResponse.ok) {
+                addedCount++;
+                addedItems.push(item.name + " (array format)");
+                console.log(`Added "${item.name}" via array format fallback`);
+              } else {
+                const retryError = await retryResponse.text();
+                console.warn(`Array format also failed for "${item.name}":`, retryError);
                 
-                const retryResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Token ${hcpApiKey}`,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ line_items: [fallbackPayload] }),
-                });
-                
-                if (retryResponse.ok) {
-                  addedCount++;
-                  addedItems.push(item.name + " (name-only)");
-                  console.log(`Added "${item.name}" via name-only fallback`);
+                // Final fallback: Try without service_item_id (custom line item)
+                if (item.service_item_id) {
+                  console.log(`Final fallback for "${item.name}" - custom line item without service_item_id...`);
+                  const customPayload = {
+                    name: item.name,
+                    quantity: 1,
+                    description: item.name,
+                  };
+                  
+                  const finalResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Token ${hcpApiKey}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(customPayload),
+                  });
+                  
+                  if (finalResponse.ok) {
+                    addedCount++;
+                    addedItems.push(item.name + " (custom)");
+                    console.log(`Added "${item.name}" as custom line item`);
+                  } else {
+                    const finalError = await finalResponse.text();
+                    console.error(`All attempts failed for "${item.name}":`, finalError);
+                    failedItems.push(item.name);
+                  }
                 } else {
-                  const retryError = await retryResponse.text();
-                  console.warn(`Name-only fallback also failed for "${item.name}":`, retryError);
+                  failedItems.push(item.name);
                 }
               }
             }
             
-            // Small delay between requests to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // Longer delay between requests to avoid rate limiting (500ms)
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
           
           console.log(`Line items result: ${addedCount}/${lineItemsToAdd.length} added successfully`);
           console.log("Added items:", addedItems);
+          if (failedItems.length > 0) {
+            console.error("Failed items:", failedItems);
+          }
         } else {
           console.warn("No line items to add - no matching services found in HCP");
         }
