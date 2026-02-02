@@ -1,10 +1,9 @@
 import { useState, useMemo } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { format, parseISO, addDays } from "date-fns";
+import { useMutation } from "@tanstack/react-query";
+import { format, parseISO } from "date-fns";
 import { 
   Sparkles, 
   Clock, 
-  Calendar, 
   MapPin, 
   ChevronDown, 
   ChevronUp,
@@ -14,19 +13,16 @@ import {
   X,
   Car,
   User,
-  Check,
-  ExternalLink,
   Target,
-  Lightbulb,
-  Edit2,
-  RotateCcw
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Collapsible,
   CollapsibleContent,
@@ -44,13 +40,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useServiceTypes, useTechnicians } from "@/hooks/useJobMap";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ModifySuggestionDialog } from "./ModifySuggestionDialog";
+import { SchedulingSuggestionCard } from "./SchedulingSuggestionCard";
 import type { 
   SchedulingSuggestion, 
   TechnicianDistance, 
@@ -405,19 +401,6 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
     );
   };
 
-  const getConfidenceBadge = (confidence: string) => {
-    switch (confidence) {
-      case "high":
-        return <Badge className="bg-success/20 text-success hover:bg-success/20 text-[10px] px-1.5 py-0">●●●</Badge>;
-      case "medium":
-        return <Badge className="bg-warning/20 text-warning hover:bg-warning/20 text-[10px] px-1.5 py-0">●●○</Badge>;
-      case "low":
-        return <Badge className="bg-destructive/20 text-destructive hover:bg-destructive/20 text-[10px] px-1.5 py-0">●○○</Badge>;
-      default:
-        return null;
-    }
-  };
-
   const formatDrivingDistance = (tech: TechnicianDistance) => {
     if (tech.drivingDistanceMiles !== undefined && tech.drivingDurationMinutes !== undefined) {
       return `${tech.drivingDistanceMiles.toFixed(1)} mi • ${Math.round(tech.drivingDurationMinutes)} min`;
@@ -756,150 +739,21 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                 )}
 
                 {/* Actionable Suggestion Cards */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-xs font-medium flex items-center gap-1.5">
                     <Target className="h-3.5 w-3.5" />
-                    Recommended Assignments
+                    Recommended Assignments ({structuredSuggestions.length})
                   </Label>
                   
-                  {structuredSuggestions.map((suggestion, idx) => (
-                    <div
+                  {structuredSuggestions.map((suggestion) => (
+                    <SchedulingSuggestionCard
                       key={suggestion.id}
-                      className={cn(
-                        "border rounded-lg p-2.5 transition-colors",
-                        suggestion.status === 'created' && "border-success bg-success/5",
-                        suggestion.status === 'error' && "border-destructive bg-destructive/5",
-                        suggestion.status === 'creating' && "opacity-70"
-                      )}
-                    >
-                      {/* Header */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {suggestion.status === 'created' ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-success flex-shrink-0" />
-                          ) : (
-                            <Target className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                          )}
-                          <span className="text-xs font-medium truncate">
-                            {suggestion.status === 'created' ? 'Created' : 'Recommended'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-muted-foreground">Confidence:</span>
-                          {getConfidenceBadge(suggestion.confidence)}
-                        </div>
-                      </div>
-
-                      {/* Service Type */}
-                      <div className="text-sm font-medium truncate">{suggestion.serviceType}</div>
-                      
-                      {/* Customer */}
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Customer: {suggestion.customerName}
-                      </div>
-                      
-                      {/* Address */}
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                        <MapPin className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">
-                          {suggestion.address}, {suggestion.city}, {suggestion.state}
-                        </span>
-                      </div>
-                      
-                      {/* Date/Time */}
-                      <div className="flex items-center gap-1.5 text-xs mt-1.5">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        <span>
-                          {format(parseISO(suggestion.scheduledDate), "MMM d, yyyy")} at{" "}
-                          {format(parseISO(`2000-01-01T${suggestion.scheduledTime}:00`), "h:mm a")}
-                        </span>
-                      </div>
-                      
-                      {/* Assigned Technician */}
-                      <div className="flex items-center gap-1 text-xs text-primary mt-1">
-                        <User className="h-3 w-3" />
-                        <span>→ Assign to: {suggestion.technicianName}</span>
-                      </div>
-                      
-                      {/* AI Reasoning */}
-                      <div className="flex items-start gap-1 text-[10px] text-muted-foreground mt-2 bg-muted/50 rounded p-1.5">
-                        <Lightbulb className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        <span className="line-clamp-2">{suggestion.reasoning}</span>
-                      </div>
-
-                      {/* Error Message */}
-                      {suggestion.status === 'error' && suggestion.error && (
-                        <div className="flex items-start gap-1 text-[10px] text-destructive mt-2 bg-destructive/10 rounded p-1.5">
-                          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                          <span>{suggestion.error}</span>
-                        </div>
-                      )}
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-2 mt-3">
-                        {suggestion.status === 'pending' && (
-                          <>
-                            <Button
-                              size="sm"
-                              className="flex-1 h-7 text-xs"
-                              onClick={() => handleCreateJob(suggestion)}
-                              disabled={creatingJobId !== null || creatingAllProgress !== null}
-                            >
-                              {creatingJobId === suggestion.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <>
-                                  <Check className="h-3.5 w-3.5 mr-1" />
-                                  Create Job
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs px-2"
-                              onClick={() => handleModify(suggestion)}
-                              disabled={creatingJobId !== null || creatingAllProgress !== null}
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </>
-                        )}
-                        
-                        {suggestion.status === 'creating' && (
-                          <div className="flex-1 flex items-center justify-center h-7 text-xs text-muted-foreground">
-                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                            Creating...
-                          </div>
-                        )}
-                        
-                        {suggestion.status === 'created' && suggestion.hcpJobUrl && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 h-7 text-xs"
-                            asChild
-                          >
-                            <a href={suggestion.hcpJobUrl} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                              View in HouseCall Pro
-                            </a>
-                          </Button>
-                        )}
-                        
-                        {suggestion.status === 'error' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 h-7 text-xs"
-                            onClick={() => handleRetry(suggestion)}
-                          >
-                            <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                            Retry
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                      suggestion={suggestion}
+                      onCreateJob={handleCreateJob}
+                      onModify={handleModify}
+                      onRetry={handleRetry}
+                      isDisabled={creatingJobId !== null || creatingAllProgress !== null}
+                    />
                   ))}
                 </div>
 
