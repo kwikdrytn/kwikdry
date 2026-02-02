@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.suggest-job-time]
 verify_jwt = false
+
+[functions.invite-user]
+verify_jwt = false
+
+[functions.import-youtube-playlist]
+verify_jwt = false
