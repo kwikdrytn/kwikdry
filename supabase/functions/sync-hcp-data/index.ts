@@ -418,6 +418,59 @@ async function fetchEmployees(apiKey: string): Promise<HCPEmployee[]> {
   }
 }
 
+interface HCPService {
+  id: string;
+  name?: string;
+  description?: string;
+  price?: number;
+  unit_price?: number;
+  active?: boolean;
+  is_active?: boolean;
+}
+
+// Fetch products/services catalog from HCP
+async function fetchServices(apiKey: string): Promise<HCPService[]> {
+  const allServices: HCPService[] = [];
+  let page = 1;
+  const pageSize = 100;
+  
+  // Try different endpoint names that HCP might use
+  const endpoints = ['products', 'services', 'price_book', 'price_book_items', 'line_items'];
+  
+  for (const endpoint of endpoints) {
+    try {
+      const url = `${HCP_BASE_URL}/${endpoint}?page=1&page_size=${pageSize}`;
+      console.log(`Trying ${endpoint} endpoint...`);
+      
+      const response = await fetchWithRetry(url, apiKey);
+      const data = await response.json();
+      
+      const items = data[endpoint] || data.data || data.items || [];
+      if (items.length > 0) {
+        console.log(`Found ${items.length} items from ${endpoint} endpoint`);
+        allServices.push(...items);
+        
+        // Paginate if needed
+        while (items.length === pageSize && page < 20) {
+          page++;
+          const nextUrl = `${HCP_BASE_URL}/${endpoint}?page=${page}&page_size=${pageSize}`;
+          const nextResponse = await fetchWithRetry(nextUrl, apiKey);
+          const nextData = await nextResponse.json();
+          const nextItems = nextData[endpoint] || nextData.data || nextData.items || [];
+          if (nextItems.length === 0) break;
+          allServices.push(...nextItems);
+        }
+        
+        break; // Found working endpoint, stop trying others
+      }
+    } catch (error) {
+      console.log(`${endpoint} endpoint not available:`, error);
+    }
+  }
+  
+  return allServices;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -460,6 +513,10 @@ Deno.serve(async (req) => {
     const employees = await fetchEmployees(api_key);
     console.log(`Fetched ${employees.length} employees`);
 
+    console.log('Fetching services/products from HCP...');
+    const services = await fetchServices(api_key);
+    console.log(`Fetched ${services.length} services/products`);
+
     console.log('Fetching service zones from HCP...');
     const serviceZones = await fetchServiceZones(api_key);
     console.log(`Fetched ${serviceZones.length} service zones`);
@@ -468,7 +525,30 @@ Deno.serve(async (req) => {
     let jobsSynced = 0;
     let customersSynced = 0;
     let employeesSynced = 0;
+    let servicesSynced = 0;
     let zonesSynced = 0;
+
+    // Upsert services/products
+    if (services.length > 0) {
+      for (const service of services) {
+        const record = {
+          organization_id,
+          hcp_service_id: service.id,
+          name: service.name || 'Unknown Service',
+          description: service.description || null,
+          price: service.price || service.unit_price || null,
+          is_active: service.active ?? service.is_active ?? true,
+          synced_at: now,
+        };
+        
+        const { error } = await supabase
+          .from('hcp_services')
+          .upsert(record, { onConflict: 'organization_id,hcp_service_id' });
+        
+        if (!error) servicesSynced++;
+      }
+      console.log(`Synced ${servicesSynced} services`);
+    }
 
     // Upsert employees
     if (employees.length > 0) {
@@ -657,7 +737,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Sync complete: ${jobsSynced} jobs, ${customersSynced} customers, ${employeesSynced} employees, ${zonesSynced} zones`);
+    console.log(`Sync complete: ${jobsSynced} jobs, ${customersSynced} customers, ${employeesSynced} employees, ${servicesSynced} services, ${zonesSynced} zones`);
 
     return new Response(
       JSON.stringify({
@@ -666,12 +746,14 @@ Deno.serve(async (req) => {
           jobs: jobsSynced,
           customers: customersSynced,
           employees: employeesSynced,
+          services: servicesSynced,
           serviceZones: zonesSynced,
         },
         fetched: {
           jobs: jobs.length,
           customers: customers.length,
           employees: employees.length,
+          services: services.length,
           serviceZones: serviceZones.length,
         },
       }),

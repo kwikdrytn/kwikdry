@@ -975,6 +975,47 @@ export type Database = {
           },
         ]
       }
+      hcp_services: {
+        Row: {
+          description: string | null
+          hcp_service_id: string
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          price: number | null
+          synced_at: string | null
+        }
+        Insert: {
+          description?: string | null
+          hcp_service_id: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          price?: number | null
+          synced_at?: string | null
+        }
+        Update: {
+          description?: string | null
+          hcp_service_id?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          price?: number | null
+          synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hcp_services_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_items: {
         Row: {
           category: Database["public"]["Enums"]["inventory_category"]
