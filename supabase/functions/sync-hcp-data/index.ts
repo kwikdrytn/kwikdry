@@ -509,24 +509,30 @@ async function fetchServices(apiKey: string): Promise<HCPService[]> {
         
         // Log first item structure for debugging ID extraction
         if (page === 1 && items.length > 0) {
-          console.log('Full first service item structure:', JSON.stringify(items[0], null, 2));
+          // Log ALL keys to find the correct ID field
+          console.log('First service item KEYS:', Object.keys(items[0]));
+          console.log('First service item VALUES:', JSON.stringify(items[0], null, 2));
           console.log('Service ID fields available:', {
             id: items[0].id,
             service_id: items[0].service_id,
             item_id: items[0].item_id,
             pricebook_item_id: items[0].pricebook_item_id,
+            uuid: items[0].uuid,
+            key: items[0].key,
+            service_item_id: items[0].service_item_id,
           });
         }
         
-        // Map each item - HCP service object has: id, name, price (in cents or dollars)
-        // According to HCP API docs, the service ID is in the 'id' field
+        // Map each item - HCP service object may use various ID field names
+        // Based on HCP API exploration, the ID field could be: id, uuid, key, service_id, service_item_id
         for (const item of items) {
-          // Try multiple possible ID field names from HCP API
-          const serviceId = item.id || item.service_id || item.item_id || item.pricebook_item_id;
+          // Try ALL possible ID field names from HCP API
+          const serviceId = item.id || item.uuid || item.key || item.service_id || 
+                            item.item_id || item.pricebook_item_id || item.service_item_id;
           
           // Skip items without a valid ID - we can't use them for line items without an ID
           if (!serviceId) {
-            console.log('Skipping service without ID:', item.name || 'Unknown');
+            console.log('Skipping service without ID:', item.name || 'Unknown', '- Keys:', Object.keys(item).join(', '));
             continue;
           }
           
