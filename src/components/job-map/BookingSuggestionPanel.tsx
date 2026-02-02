@@ -505,7 +505,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                         <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-0 z-50" align="start" onPointerDownOutside={() => setServiceDropdownOpen(false)} onInteractOutside={() => setServiceDropdownOpen(false)}>
+                    <PopoverContent className="w-auto min-w-64 max-w-md p-0 z-50" align="start" onPointerDownOutside={() => setServiceDropdownOpen(false)} onInteractOutside={() => setServiceDropdownOpen(false)}>
                       <div className="p-2 border-b">
                         <p className="text-xs text-muted-foreground">
                           Select one or more services
@@ -541,7 +541,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                                     <Check className="h-2.5 w-2.5" />
                                   )}
                                 </div>
-                                <span className="text-xs truncate">{service}</span>
+                                <span className="text-xs whitespace-nowrap">{service}</span>
                               </div>
                             ))
                           )}
