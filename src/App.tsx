@@ -24,6 +24,7 @@ import CallLog from "./pages/admin/CallLog";
 import CallMetrics from "./pages/admin/CallMetrics";
 import Training from "./pages/Training";
 import TrainingVideo from "./pages/TrainingVideo";
+import TrainingManagement from "./pages/admin/TrainingManagement";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -175,6 +176,18 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <TrainingVideo />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Training Management - Admin only */}
+            <Route
+              path="/admin/training"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={['admin']}>
+                    <TrainingManagement />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
