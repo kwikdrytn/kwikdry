@@ -282,12 +282,15 @@ export function VideoFormDialog({
           {/* Category */}
           <div className="space-y-2">
             <Label>Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
+            <Select 
+              value={categoryId || "none"} 
+              onValueChange={(value) => setCategoryId(value === "none" ? "" : value)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select category (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No category</SelectItem>
+                <SelectItem value="none">No category</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {cat.name}
