@@ -23,6 +23,7 @@ export default function UserManagement() {
   const [activeTab, setActiveTab] = useState("users");
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const [skillPreferencesFilter, setSkillPreferencesFilter] = useState(false);
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeactivateOpen, setIsDeactivateOpen] = useState(false);
@@ -31,6 +32,7 @@ export default function UserManagement() {
   const { data: users = [], isLoading } = useUsers({
     locationId: locationFilter,
     role: roleFilter,
+    hasSkillPreferences: skillPreferencesFilter,
   });
 
   const createUser = useCreateUser();
@@ -110,8 +112,10 @@ export default function UserManagement() {
                 <UserFilters
                   locationId={locationFilter}
                   role={roleFilter}
+                  hasSkillPreferences={skillPreferencesFilter}
                   onLocationChange={setLocationFilter}
                   onRoleChange={setRoleFilter}
+                  onSkillPreferencesChange={setSkillPreferencesFilter}
                 />
                 
                 <UserTable

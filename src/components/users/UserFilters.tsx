@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Select,
   SelectContent,
@@ -7,28 +6,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { X, Sliders } from "lucide-react";
 import { useLocations } from "@/hooks/useUsers";
 
 interface UserFiltersProps {
   locationId: string | null;
   role: string | null;
+  hasSkillPreferences: boolean;
   onLocationChange: (locationId: string | null) => void;
   onRoleChange: (role: string | null) => void;
+  onSkillPreferencesChange: (hasSkillPreferences: boolean) => void;
 }
 
 export function UserFilters({
   locationId,
   role,
+  hasSkillPreferences,
   onLocationChange,
   onRoleChange,
+  onSkillPreferencesChange,
 }: UserFiltersProps) {
   const { data: locations = [] } = useLocations();
-  const hasFilters = locationId || role;
+  const hasFilters = locationId || role || hasSkillPreferences;
 
   const clearFilters = () => {
     onLocationChange(null);
     onRoleChange(null);
+    onSkillPreferencesChange(false);
   };
 
   return (
@@ -64,6 +70,21 @@ export function UserFilters({
           <SelectItem value="technician">Technician</SelectItem>
         </SelectContent>
       </Select>
+
+      <div className="flex items-center space-x-2 px-2 py-1.5 rounded-md border bg-background">
+        <Checkbox 
+          id="skill-preferences" 
+          checked={hasSkillPreferences}
+          onCheckedChange={(checked) => onSkillPreferencesChange(checked === true)}
+        />
+        <Label 
+          htmlFor="skill-preferences" 
+          className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
+        >
+          <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
+          Has Skill Preferences
+        </Label>
+      </div>
 
       {hasFilters && (
         <Button

@@ -18,6 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, Pencil, UserX } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SkillsIndicator } from "./SkillsIndicator";
 
 interface UserTableProps {
   users: UserProfile[];
@@ -36,6 +37,9 @@ export function UserTable({ users, isLoading, onEdit, onDeactivate }: UserTableP
   const getFullName = (firstName?: string | null, lastName?: string | null) => {
     return [firstName, lastName].filter(Boolean).join(' ') || 'Unknown';
   };
+
+  // Check if any users are technicians to show skills column
+  const hasTechnicians = users.some(u => u.role === 'technician');
 
   if (isLoading) {
     return (
@@ -72,6 +76,7 @@ export function UserTable({ users, isLoading, onEdit, onDeactivate }: UserTableP
             <TableHead className="w-[300px]">User</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Location</TableHead>
+            {hasTechnicians && <TableHead>Skills</TableHead>}
             <TableHead>Status</TableHead>
             <TableHead className="w-[70px]"></TableHead>
           </TableRow>
@@ -109,6 +114,15 @@ export function UserTable({ users, isLoading, onEdit, onDeactivate }: UserTableP
                   {user.location?.name ?? '—'}
                 </span>
               </TableCell>
+              {hasTechnicians && (
+                <TableCell>
+                  {user.role === 'technician' ? (
+                    <SkillsIndicator skills={user.technician_skills} />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell>
                 <Badge
                   variant={user.is_active ? 'default' : 'secondary'}
