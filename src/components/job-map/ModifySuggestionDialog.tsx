@@ -56,10 +56,11 @@ export function ModifySuggestionDialog({
     if (open && suggestion) {
       // Find the technician in the list to get the proper name for the select
       // The suggestion may have a technicianId but the select uses technicianName
-      const matchingTech = technicians.find(t => 
-        t.hcpEmployeeId === suggestion.technicianId || 
-        t.name === suggestion.technicianName
-      );
+      // Note: technicians from useTechnicians have 'id' property, TechnicianDistance has 'hcpEmployeeId'
+      const matchingTech = technicians.find(t => {
+        const techHcpId = t.hcpEmployeeId || (t as unknown as { id?: string }).id;
+        return techHcpId === suggestion.technicianId || t.name === suggestion.technicianName;
+      });
       setTechnicianName(matchingTech?.name || suggestion.technicianName || "");
       setScheduledDate(suggestion.scheduledDate || "");
       setScheduledTime(suggestion.scheduledTime || "");
