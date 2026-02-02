@@ -8,7 +8,6 @@ import {
   X, 
   CalendarDays,
   User,
-  Wrench,
   CircleDot,
   Home
 } from "lucide-react";
@@ -38,7 +37,6 @@ import {
   DEFAULT_FILTERS, 
   JOB_STATUSES,
   useTechnicians, 
-  useServiceTypes,
   countActiveFilters
 } from "@/hooks/useJobMap";
 
@@ -52,11 +50,9 @@ interface MapFiltersProps {
 export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClearSearch }: MapFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [techOpen, setTechOpen] = useState(false);
-  const [serviceOpen, setServiceOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
 
   const { data: technicians } = useTechnicians();
-  const { data: serviceTypes } = useServiceTypes();
 
   const activeFilterCount = countActiveFilters(filters);
 
@@ -96,23 +92,6 @@ export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClear
     onFiltersChange({ ...filters, technicians: newTechs });
   };
 
-  const toggleServiceType = (type: string) => {
-    let newTypes: string[];
-    
-    if (type === 'all') {
-      newTypes = ['all'];
-    } else {
-      const current = filters.serviceTypes.filter(t => t !== 'all');
-      if (current.includes(type)) {
-        newTypes = current.filter(t => t !== type);
-        if (newTypes.length === 0) newTypes = ['all'];
-      } else {
-        newTypes = [...current, type];
-      }
-    }
-    
-    onFiltersChange({ ...filters, serviceTypes: newTypes });
-  };
 
   const toggleStatus = (status: string) => {
     let newStatuses: string[];
@@ -292,49 +271,6 @@ export function MapFilters({ filters, onFiltersChange, onLocationSelect, onClear
                         {tech.isLinked && (
                           <span className="text-[10px] text-muted-foreground">(linked)</span>
                         )}
-                      </Label>
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-
-              <Separator />
-
-              {/* Service Type Filter */}
-              <Collapsible open={serviceOpen} onOpenChange={setServiceOpen}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full">
-                  <Label className="text-xs flex items-center gap-1.5 cursor-pointer">
-                    <Wrench className="h-3.5 w-3.5" />
-                    Service Types
-                    {!filters.serviceTypes.includes('all') && (
-                      <Badge variant="outline" className="h-4 px-1 text-[10px]">
-                        {filters.serviceTypes.length}
-                      </Badge>
-                    )}
-                  </Label>
-                  <ChevronDown className={cn(
-                    "h-4 w-4 transition-transform",
-                    serviceOpen && "rotate-180"
-                  )} />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="service-all"
-                      checked={filters.serviceTypes.includes('all')}
-                      onCheckedChange={() => toggleServiceType('all')}
-                    />
-                    <Label htmlFor="service-all" className="text-xs cursor-pointer">All Services</Label>
-                  </div>
-                  {serviceTypes?.map((service) => (
-                    <div key={service} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`service-${service}`}
-                        checked={filters.serviceTypes.includes(service)}
-                        onCheckedChange={() => toggleServiceType(service)}
-                      />
-                      <Label htmlFor={`service-${service}`} className="text-xs cursor-pointer truncate">
-                        {service}
                       </Label>
                     </div>
                   ))}
