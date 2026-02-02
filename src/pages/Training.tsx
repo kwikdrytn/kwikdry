@@ -1,20 +1,19 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Video, CheckCircle } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { TrainingProgressSummary } from "@/components/training/TrainingProgressSummary";
 import { ContinueWatchingCard } from "@/components/training/ContinueWatchingCard";
 import { TrainingVideoCard } from "@/components/training/TrainingVideoCard";
 import { TrainingCategorySection } from "@/components/training/TrainingCategorySection";
-import { VideoPlayerDialog } from "@/components/training/VideoPlayerDialog";
 import { useTrainingVideos, TrainingVideo, TrainingCategory } from "@/hooks/useTraining";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Training() {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const { data: videos, isLoading } = useTrainingVideos();
-  const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
-  const [playerOpen, setPlayerOpen] = useState(false);
 
   // Get required videos for user's role
   const requiredVideos = useMemo(() => {
@@ -106,8 +105,7 @@ export default function Training() {
   const allRequiredComplete = requiredCompleted === requiredVideos.length && requiredVideos.length > 0;
 
   const handlePlayVideo = (video: TrainingVideo) => {
-    setSelectedVideo(video);
-    setPlayerOpen(true);
+    navigate(`/training/video/${video.id}`);
   };
 
   if (isLoading) {
@@ -205,13 +203,6 @@ export default function Training() {
           </div>
         )}
       </div>
-
-      {/* Video Player Dialog */}
-      <VideoPlayerDialog
-        video={selectedVideo}
-        open={playerOpen}
-        onOpenChange={setPlayerOpen}
-      />
     </DashboardLayout>
   );
 }

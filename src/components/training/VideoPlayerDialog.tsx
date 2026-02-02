@@ -4,53 +4,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { TrainingVideo, useUpdateProgress } from "@/hooks/useTraining";
 import { useToast } from "@/hooks/use-toast";
+import type { YTPlayer, YTPlayerEvent } from "@/types/youtube.d";
 
 interface VideoPlayerDialogProps {
   video: TrainingVideo | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-// YouTube IFrame API types
-interface YTPlayer {
-  destroy: () => void;
-  getCurrentTime: () => number;
-  getDuration: () => number;
-}
-
-interface YTPlayerEvent {
-  data: number;
-}
-
-interface YTPlayerOptions {
-  videoId: string;
-  playerVars?: {
-    autoplay?: number;
-    start?: number;
-    rel?: number;
-    modestbranding?: number;
-  };
-  events?: {
-    onStateChange?: (event: YTPlayerEvent) => void;
-  };
-}
-
-interface YTNamespace {
-  Player: new (element: string | HTMLElement, options: YTPlayerOptions) => YTPlayer;
-  PlayerState: {
-    ENDED: number;
-    PLAYING: number;
-    PAUSED: number;
-    BUFFERING: number;
-    CUED: number;
-  };
-}
-
-declare global {
-  interface Window {
-    YT?: YTNamespace;
-    onYouTubeIframeAPIReady?: () => void;
-  }
 }
 
 export function VideoPlayerDialog({ video, open, onOpenChange }: VideoPlayerDialogProps) {

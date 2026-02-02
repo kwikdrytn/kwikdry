@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Play, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -20,7 +21,10 @@ export function ContinueWatchingCard({ video, onContinue }: ContinueWatchingCard
       <CardContent className="p-0">
         <div className="flex flex-col sm:flex-row">
           {/* Thumbnail */}
-          <div className="relative sm:w-64 shrink-0">
+          <Link 
+            to={`/training/video/${video.id}`}
+            className="relative sm:w-64 shrink-0 group"
+          >
             <div className="aspect-video sm:aspect-auto sm:h-full">
               <img
                 src={thumbnail}
@@ -28,7 +32,7 @@ export function ContinueWatchingCard({ video, onContinue }: ContinueWatchingCard
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
               <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
                 <Play className="h-5 w-5 text-primary fill-primary ml-0.5" />
               </div>
@@ -38,12 +42,16 @@ export function ContinueWatchingCard({ video, onContinue }: ContinueWatchingCard
                 {formatDuration(video.duration_seconds)}
               </div>
             )}
-          </div>
+          </Link>
 
           {/* Content */}
           <div className="flex-1 p-4 flex flex-col justify-between gap-4">
             <div>
-              <h3 className="font-semibold text-lg line-clamp-2">{video.title}</h3>
+              <Link to={`/training/video/${video.id}`}>
+                <h3 className="font-semibold text-lg line-clamp-2 hover:text-primary transition-colors">
+                  {video.title}
+                </h3>
+              </Link>
               {video.description && (
                 <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
                   {video.description}
