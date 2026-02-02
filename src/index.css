@@ -132,3 +132,14 @@ All colors MUST be HSL.
     @apply bg-gradient-to-r from-primary to-[hsl(var(--gradient-end))] bg-clip-text text-transparent;
   }
 }
+
+/* Mapbox popup styling to match Card components */
+.mapboxgl-popup-content {
+  border-radius: 0.75rem !important;
+  padding: 12px !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: white !important;
+}
