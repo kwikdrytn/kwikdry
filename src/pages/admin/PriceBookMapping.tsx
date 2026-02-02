@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircle, Check, Loader2, RefreshCw, Save, Link2 } from "lucide-react";
+import { AlertCircle, Check, Loader2, RefreshCw, Save, Link2, DollarSign } from "lucide-react";
 import { SERVICE_TYPES, type PriceBookMapping } from "@/types/scheduling";
 
 const DURATION_OPTIONS = [
@@ -42,7 +42,7 @@ export default function PriceBookMappingPage() {
   const queryClient = useQueryClient();
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [hcpServices, setHcpServices] = useState<HCPService[]>([]);
-  const [isLoadingHCP, setIsLoadingHCP] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Fetch existing mappings
   const { data: existingMappings, isLoading } = useQuery({
@@ -102,6 +102,47 @@ export default function PriceBookMappingPage() {
       setHcpServices(localServices);
     }
   }, [localServices]);
+
+  // Sync HCP PriceBook
+  const handleSyncHCP = async () => {
+    if (!profile?.organization_id) return;
+    
+    setIsSyncing(true);
+    try {
+      // Get HCP API key from organization
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("hcp_api_key")
+        .eq("id", profile.organization_id)
+        .single();
+
+      if (!org?.hcp_api_key) {
+        toast.error("HouseCall Pro not configured", {
+          description: "Please configure your HCP API key in Integration Settings first.",
+        });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke("sync-hcp-data", {
+        body: {
+          organization_id: profile.organization_id,
+          api_key: org.hcp_api_key,
+        },
+      });
+
+      if (error) throw error;
+
+      // Refetch the local services
+      await queryClient.invalidateQueries({ queryKey: ["hcp-services"] });
+      toast.success("HCP PriceBook synced successfully");
+    } catch (error) {
+      toast.error("Failed to sync HCP data", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Save mutation
   const saveMutation = useMutation({
@@ -194,6 +235,14 @@ export default function PriceBookMappingPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleSyncHCP} disabled={isSyncing}>
+              {isSyncing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Sync HCP PriceBook
+            </Button>
             {dirtyCount > 0 && (
               <Button onClick={handleSaveAll} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? (
@@ -220,11 +269,16 @@ export default function PriceBookMappingPage() {
           <div className="flex items-center gap-2 p-3 bg-muted border rounded-lg text-sm">
             <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span>
-              No HCP PriceBook items found. Run a sync from{" "}
-              <a href="/admin/integrations" className="text-primary hover:underline">
-                Integration Settings
-              </a>{" "}
-              to load your PriceBook.
+              No HCP PriceBook items found. Click <strong>"Sync HCP PriceBook"</strong> above to load your services and prices from HouseCall Pro.
+            </span>
+          </div>
+        )}
+
+        {hcpServices.length > 0 && (
+          <div className="flex items-center gap-2 p-3 bg-success/10 border border-success/30 rounded-lg text-sm">
+            <DollarSign className="h-4 w-4 text-success flex-shrink-0" />
+            <span>
+              <strong>{hcpServices.length}</strong> PriceBook items loaded from HouseCall Pro. Select an item for each service type below.
             </span>
           </div>
         )}
