@@ -39,7 +39,7 @@ export function BottomNav() {
 
       {/* Expanded more menu */}
       {isMoreOpen && (
-        <div className="fixed bottom-16 left-0 right-0 z-50 border-t border-sidebar-border bg-sidebar px-4 py-3 safe-area-bottom animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-16 left-0 right-0 z-50 border-t border-border bg-white px-4 py-3 safe-area-bottom animate-in slide-in-from-bottom-4 duration-200">
           <div className="grid grid-cols-4 gap-2">
             {overflowItems.map((item) => (
               <Link
@@ -49,11 +49,11 @@ export function BottomNav() {
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg text-xs transition-colors",
                   isActive(item.url)
-                    ? "text-sidebar-primary bg-sidebar-accent"
-                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-primary"
                 )}
               >
-                <item.icon className={cn("h-5 w-5", isActive(item.url) && "text-sidebar-primary")} />
+                <item.icon className={cn("h-5 w-5", isActive(item.url) && "text-primary")} />
                 <span className="truncate max-w-[64px]">{item.title}</span>
               </Link>
             ))}
@@ -63,11 +63,11 @@ export function BottomNav() {
               className={cn(
                 "flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg text-xs transition-colors",
                 isActive('/settings')
-                  ? "text-sidebar-primary bg-sidebar-accent"
-                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-primary"
               )}
             >
-              <Settings className={cn("h-5 w-5", isActive('/settings') && "text-sidebar-primary")} />
+              <Settings className={cn("h-5 w-5", isActive('/settings') && "text-primary")} />
               <span>Settings</span>
             </Link>
           </div>
@@ -75,7 +75,7 @@ export function BottomNav() {
       )}
 
       {/* Main bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-sidebar-border bg-sidebar safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-white safe-area-bottom">
         <div className="flex h-16 items-center justify-around px-2">
           {mainNavItems.map((item) => (
             <Link
@@ -85,11 +85,11 @@ export function BottomNav() {
               className={cn(
                 "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
                 isActive(item.url)
-                  ? "text-sidebar-primary"
-                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-primary"
               )}
             >
-              <item.icon className={cn("h-5 w-5", isActive(item.url) && "text-sidebar-primary")} />
+              <item.icon className={cn("h-5 w-5", isActive(item.url) && "text-primary")} />
               <span className="truncate max-w-[64px]">{item.title}</span>
             </Link>
           ))}
@@ -100,14 +100,14 @@ export function BottomNav() {
             className={cn(
               "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
               isMoreOpen || isOverflowActive
-                ? "text-sidebar-primary"
-                : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-primary"
             )}
           >
             {isMoreOpen ? (
               <X className="h-5 w-5" />
             ) : (
-              <MoreHorizontal className={cn("h-5 w-5", isOverflowActive && "text-sidebar-primary")} />
+              <MoreHorizontal className={cn("h-5 w-5", isOverflowActive && "text-primary")} />
             )}
             <span>More</span>
           </button>
