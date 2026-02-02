@@ -9,6 +9,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OAuthCallbackHandler } from "@/components/OAuthCallbackHandler";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Checklists from "./pages/Checklists";
 import Equipment from "./pages/Equipment";
@@ -43,6 +44,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             
             {/* Dashboard - All roles */}
