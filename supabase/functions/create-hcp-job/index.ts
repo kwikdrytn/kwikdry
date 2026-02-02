@@ -395,9 +395,10 @@ serve(async (req) => {
       const serviceNames = serviceType.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0);
       console.log("Parsed service names:", serviceNames);
 
+      // Line items must always include 'name' - HCP API requires it even with service_item_id
       const lineItemsToAdd: Array<{
         service_item_id?: string;
-        name?: string;
+        name: string;  // Required by HCP API
         description?: string;
         quantity: number;
         unit_price?: number;
@@ -416,6 +417,7 @@ serve(async (req) => {
         if (mapping?.hcp_pricebook_item_id) {
           lineItemsToAdd.push({
             service_item_id: mapping.hcp_pricebook_item_id,
+            name: mapping.hcp_pricebook_item_name || serviceName,  // Always include name
             quantity: 1,
           });
           console.log(`Found PriceBook mapping for "${serviceName}":`, mapping.hcp_pricebook_item_id);
@@ -433,9 +435,10 @@ serve(async (req) => {
         if (serviceData?.hcp_service_id) {
           lineItemsToAdd.push({
             service_item_id: serviceData.hcp_service_id,
+            name: serviceData.name,  // Always include name
             quantity: 1,
           });
-          console.log(`Found hcp_service for "${serviceName}":`, serviceData.hcp_service_id);
+          console.log(`Found hcp_service for "${serviceName}":`, serviceData.hcp_service_id, serviceData.name);
           continue;
         }
 
@@ -451,14 +454,20 @@ serve(async (req) => {
         if (partialMatch?.hcp_service_id) {
           lineItemsToAdd.push({
             service_item_id: partialMatch.hcp_service_id,
+            name: partialMatch.name,  // Always include name
             quantity: 1,
           });
           console.log(`Found partial match for "${serviceName}":`, partialMatch.hcp_service_id, partialMatch.name);
           continue;
         }
 
-        // Fallback: Add as custom line item (this may fail if HCP requires service_item_id)
-        console.warn(`No HCP service found for "${serviceName}", skipping...`);
+        // Ultimate fallback: Add as custom line item by name only
+        console.warn(`No HCP service ID found for "${serviceName}", adding by name only`);
+        lineItemsToAdd.push({
+          name: serviceName,
+          description: serviceName,
+          quantity: 1,
+        });
       }
 
       if (lineItemsToAdd.length > 0) {
