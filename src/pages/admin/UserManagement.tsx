@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Users as UsersIcon } from "lucide-react";
+import { Plus, Users as UsersIcon, ArrowLeft } from "lucide-react";
 import { UserTable } from "@/components/users/UserTable";
 import { UserFormDialog } from "@/components/users/UserFormDialog";
 import { DeactivateUserDialog } from "@/components/users/DeactivateUserDialog";
@@ -76,6 +77,12 @@ export default function UserManagement() {
   return (
     <DashboardLayout title="User Management">
       <div className="space-y-6">
+        <Button variant="ghost" size="sm" asChild className="-ml-2">
+          <Link to="/settings">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Settings
+          </Link>
+        </Button>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="users">Users</TabsTrigger>

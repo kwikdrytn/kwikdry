@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -27,8 +27,10 @@ import {
   Zap,
   AlertCircle,
   MapPin,
-  Phone
+  Phone,
+  ArrowLeft
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface HCPConnectionResult {
   success: boolean;
@@ -606,7 +608,13 @@ export default function IntegrationSettings() {
 
   return (
     <DashboardLayout title="Integration Settings">
-      <div className="max-w-3xl">
+      <div className="max-w-3xl space-y-6">
+        <Button variant="ghost" size="sm" asChild className="-ml-2">
+          <Link to="/settings">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Settings
+          </Link>
+        </Button>
         <Tabs defaultValue="integrations" className="space-y-6">
           <TabsList>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>

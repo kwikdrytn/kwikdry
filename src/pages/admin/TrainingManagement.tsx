@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Plus, Search, ListVideo } from "lucide-react";
+import { useSearchParams, Link } from "react-router-dom";
+import { Plus, Search, ListVideo, ArrowLeft } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +75,12 @@ export default function TrainingManagement() {
   return (
     <DashboardLayout title="Training Management">
       <div className="space-y-6">
+        <Button variant="ghost" size="sm" asChild className="-ml-2">
+          <Link to="/settings">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Settings
+          </Link>
+        </Button>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex flex-col sm:flex-row justify-between gap-4">
             <TabsList>
