@@ -102,7 +102,7 @@ All colors MUST be HSL.
     --ring: 230 50% 50%;
 
     /* Sidebar tokens */
-    --sidebar-background: 228 66% 61%;
+    --sidebar-background: 232 0% 100%;
     --sidebar-foreground: 220 14% 96%;
     --sidebar-primary: 116 44% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
