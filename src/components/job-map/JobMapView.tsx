@@ -147,20 +147,31 @@ function createClickContent(
     `;
   }
   
-  // Build notes section - handle both string and array formats
+  // Build notes section - handle both string and array formats (may be JSON string)
   let notesHtml = '';
   if (job.notes) {
     let notesContent = '';
-    if (Array.isArray(job.notes)) {
+    let notesData = job.notes;
+    
+    // Try to parse if it's a JSON string
+    if (typeof notesData === 'string' && notesData.trim().startsWith('[')) {
+      try {
+        notesData = JSON.parse(notesData);
+      } catch {
+        // Keep as string if parsing fails
+      }
+    }
+    
+    if (Array.isArray(notesData)) {
       // Notes is an array of {id, content} objects
-      const noteContents = job.notes
+      const noteContents = notesData
         .filter((n: { id?: string; content?: string }) => n.content)
         .map((n: { id?: string; content?: string }) => n.content)
         .join('\n');
       notesContent = noteContents;
-    } else {
-      // Notes is a string
-      notesContent = job.notes;
+    } else if (typeof notesData === 'string') {
+      // Notes is a plain string
+      notesContent = notesData;
     }
     
     if (notesContent) {

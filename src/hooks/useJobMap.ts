@@ -287,6 +287,7 @@ export function useServiceTypes() {
 
       // Final fallback: extract service types from notes field
       // HCP often embeds service info in notes like "Carpet Cleaning - First 2 Rooms - $88"
+      // Notes may be a JSON array string: [{"id":"...", "content":"..."}] or a plain string
       const { data: jobsWithNotes, error: notesError } = await supabase
         .from('hcp_jobs')
         .select('notes')
@@ -311,20 +312,41 @@ export function useServiceTypes() {
         'Area Rug Cleaning',
         'Mattress Cleaning',
         'Commercial Cleaning',
+        'Single Room',
       ];
 
       (jobsWithNotes || []).forEach(job => {
-        if (job.notes) {
+        if (!job.notes) return;
+        
+        // Extract the actual note content - handle JSON array string or plain string
+        let noteText = '';
+        const notesRaw = job.notes as string;
+        
+        if (notesRaw.trim().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(notesRaw) as { id?: string; content?: string }[];
+            noteText = parsed
+              .filter(n => n.content)
+              .map(n => n.content)
+              .join('\n');
+          } catch {
+            noteText = notesRaw;
+          }
+        } else {
+          noteText = notesRaw;
+        }
+        
+        if (noteText) {
           // Try to extract service type from beginning of notes
           // Pattern: "Service Type - Details - Price"
-          const firstPart = job.notes.split(' - ')[0]?.trim();
+          const firstPart = noteText.split(' - ')[0]?.trim();
           if (firstPart && firstPart.length > 2 && firstPart.length < 50) {
             serviceSet.add(firstPart);
           }
           
           // Also check for known service patterns anywhere in notes
           servicePatterns.forEach(pattern => {
-            if (job.notes.toLowerCase().includes(pattern.toLowerCase())) {
+            if (noteText.toLowerCase().includes(pattern.toLowerCase())) {
               serviceSet.add(pattern);
             }
           });
