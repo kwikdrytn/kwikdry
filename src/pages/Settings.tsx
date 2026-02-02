@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
-import { Users, MapPin, Plug, ChevronRight, Camera, Loader2, GraduationCap } from "lucide-react";
+import { Users, MapPin, Plug, ChevronRight, Camera, Loader2, GraduationCap, Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvatarCropDialog } from "@/components/settings/AvatarCropDialog";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function Settings() {
   const { profile, signOut, refreshProfile } = useAuth();
@@ -19,6 +21,15 @@ export default function Settings() {
   const [isUploading, setIsUploading] = useState(false);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [selectedImageSrc, setSelectedImageSrc] = useState<string>("");
+  const { isSupported, isSubscribed, isLoading: isPushLoading, subscribe, unsubscribe } = usePushNotifications();
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      await subscribe();
+    } else {
+      await unsubscribe();
+    }
+  };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.[0] ?? '';
@@ -223,6 +234,40 @@ export default function Settings() {
                   </Link>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Notifications Card - Show for technicians */}
+        {profile?.role === 'technician' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notifications
+              </CardTitle>
+              <CardDescription>Manage your notification preferences</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="push-notifications">Push Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive reminders for daily and weekly checklists at 5 PM
+                  </p>
+                </div>
+                <Switch
+                  id="push-notifications"
+                  checked={isSubscribed}
+                  onCheckedChange={handlePushToggle}
+                  disabled={!isSupported || isPushLoading}
+                />
+              </div>
+              {!isSupported && (
+                <p className="text-sm text-destructive">
+                  Push notifications are not supported in this browser.
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

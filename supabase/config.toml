@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.import-youtube-playlist]
 verify_jwt = false
+
+[functions.send-checklist-notifications]
+verify_jwt = false
