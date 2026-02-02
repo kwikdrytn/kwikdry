@@ -191,29 +191,31 @@ export function UserFormDialog({
             </TabsContent>
           </Tabs>
         ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1">
-              <ScrollArea className="flex-1 min-h-0">
-                <div className="space-y-4 pr-4">
-                  <ProfileFormFields form={form} isEditing={isEditing} locations={locations} customRoles={customRoles} />
-                </div>
-              </ScrollArea>
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1">
+                <ScrollArea className="flex-1 min-h-0">
+                  <div className="space-y-4 pr-4 pb-2">
+                    <ProfileFormFields form={form} isEditing={isEditing} locations={locations} customRoles={customRoles} />
+                  </div>
+                </ScrollArea>
 
-              <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleOpenChange(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isEditing ? 'Save Changes' : 'Create User'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+                <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleOpenChange(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isEditing ? 'Save Changes' : 'Create User'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
         )}
       </DialogContent>
     </Dialog>
