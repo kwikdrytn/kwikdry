@@ -7,6 +7,43 @@ const corsHeaders = {
 
 const HCP_BASE_URL = 'https://api.housecallpro.com';
 
+// Convert UTC time to a specific timezone
+// Returns the local time string in HH:MM:SS format
+function convertUtcToTimezone(utcIsoString: string, timezone: string): { date: string; time: string } {
+  try {
+    // Parse the ISO string
+    const utcDate = new Date(utcIsoString);
+    
+    // Format in the target timezone
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    
+    const parts = formatter.formatToParts(utcDate);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '00';
+    
+    const date = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+    const time = `${getPart('hour')}:${getPart('minute')}:${getPart('second')}`;
+    
+    return { date, time };
+  } catch (error) {
+    console.log(`Timezone conversion failed for ${utcIsoString} to ${timezone}:`, error);
+    // Fallback: extract from ISO string directly (assumes UTC = local)
+    const match = utcIsoString.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+    if (match) {
+      return { date: match[1], time: match[2] };
+    }
+    return { date: '', time: '' };
+  }
+}
+
 const MAPBOX_GEOCODE_BASE_URL = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
 const CENSUS_API_BASE = 'https://api.censusreporter.org/1.0/geo/tiger2023';
 
@@ -765,6 +802,21 @@ Deno.serve(async (req) => {
       let geocodedCount = 0;
       const GEOCODE_LIMIT = 75; // safety cap per sync
 
+      // Fetch location timezone for converting UTC times to local
+      let locationTimezone = 'America/New_York'; // Default
+      if (location_id) {
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('timezone')
+          .eq('id', location_id)
+          .single();
+        
+        if (locationData?.timezone) {
+          locationTimezone = locationData.timezone;
+        }
+      }
+      console.log(`Using timezone for job times: ${locationTimezone}`);
+
       for (const job of jobs) {
         const scheduledStart = job.schedule?.scheduled_start;
         const scheduledEnd = job.schedule?.scheduled_end;
@@ -774,60 +826,56 @@ Deno.serve(async (req) => {
         let scheduledEndTime: string | null = null;
 
         if (scheduledStart) {
-          // HCP returns times in ISO format with timezone (e.g., "2026-02-02T13:00:00-05:00")
-          // We need to extract the LOCAL time as shown in HCP, not convert to UTC
-          // Parse the ISO string and extract the date/time components before timezone conversion
+          // HCP returns times in UTC (ending with Z)
+          // We need to convert to the location's local timezone
           
-          // Match ISO format: YYYY-MM-DDTHH:MM:SS with optional milliseconds and timezone
-          const isoMatch = scheduledStart.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
-          if (isoMatch) {
-            scheduledDate = isoMatch[1]; // YYYY-MM-DD
-            scheduledTime = isoMatch[2]; // HH:MM:SS (local time from HCP)
-            console.log(`Parsed start time: ${scheduledStart} -> date: ${scheduledDate}, time: ${scheduledTime}`);
+          // Check if it's a UTC time (ends with Z)
+          if (scheduledStart.endsWith('Z') || scheduledStart.includes('+00:00')) {
+            // Convert UTC to local timezone
+            const local = convertUtcToTimezone(scheduledStart, locationTimezone);
+            scheduledDate = local.date;
+            scheduledTime = local.time;
+            console.log(`Converted UTC start: ${scheduledStart} -> ${locationTimezone}: date=${scheduledDate}, time=${scheduledTime}`);
+          } else if (scheduledStart.match(/[+-]\d{2}:\d{2}$/)) {
+            // Has a timezone offset (e.g., -05:00) - extract local time directly
+            const isoMatch = scheduledStart.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+            if (isoMatch) {
+              scheduledDate = isoMatch[1];
+              scheduledTime = isoMatch[2];
+              console.log(`Extracted local time from offset: ${scheduledStart} -> date=${scheduledDate}, time=${scheduledTime}`);
+            }
           } else {
-            // Fallback: try to extract time from other formats
-            // IMPORTANT: Do NOT use new Date().toISOString() as it converts to UTC
-            // Instead, try to parse the string directly
-            console.log(`Non-standard start format, attempting fallback: ${scheduledStart}`);
-            
-            // Try MM/DD/YYYY HH:MM format
-            const usMatch = scheduledStart.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
-            if (usMatch) {
-              const [, month, day, year, hours, minutes] = usMatch;
-              scheduledDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-              scheduledTime = `${hours.padStart(2, '0')}:${minutes}:00`;
+            // No timezone info - assume it's already local time
+            const isoMatch = scheduledStart.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+            if (isoMatch) {
+              scheduledDate = isoMatch[1];
+              scheduledTime = isoMatch[2];
+              console.log(`No timezone in start, using as-is: ${scheduledStart} -> date=${scheduledDate}, time=${scheduledTime}`);
             } else {
-              // Last resort: just store the raw value
               console.log(`Could not parse start time format: ${scheduledStart}`);
-              scheduledDate = null;
-              scheduledTime = null;
             }
           }
         }
 
         if (scheduledEnd) {
-          // Same approach - extract local time from ISO string without UTC conversion
-          const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
-          if (isoMatch) {
-            scheduledEndTime = isoMatch[2]; // HH:MM:SS (local time from HCP)
-            console.log(`Parsed end time: ${scheduledEnd} -> time: ${scheduledEndTime}`);
+          // Same timezone handling for end time
+          if (scheduledEnd.endsWith('Z') || scheduledEnd.includes('+00:00')) {
+            const local = convertUtcToTimezone(scheduledEnd, locationTimezone);
+            scheduledEndTime = local.time;
+            console.log(`Converted UTC end: ${scheduledEnd} -> ${locationTimezone}: time=${scheduledEndTime}`);
+          } else if (scheduledEnd.match(/[+-]\d{2}:\d{2}$/)) {
+            const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+            if (isoMatch) {
+              scheduledEndTime = isoMatch[2];
+              console.log(`Extracted local end time from offset: ${scheduledEnd} -> time=${scheduledEndTime}`);
+            }
           } else {
-            // Fallback for other formats
-            console.log(`Non-standard end format: ${scheduledEnd}`);
-            
-            const usMatch = scheduledEnd.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
-            if (usMatch) {
-              const [, , , , hours, minutes] = usMatch;
-              scheduledEndTime = `${hours.padStart(2, '0')}:${minutes}:00`;
+            const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+            if (isoMatch) {
+              scheduledEndTime = isoMatch[2];
+              console.log(`No timezone in end, using as-is: ${scheduledEnd} -> time=${scheduledEndTime}`);
             } else {
-              // Try to extract just time portion if present
-              const timeOnlyMatch = scheduledEnd.match(/(\d{1,2}):(\d{2})/);
-              if (timeOnlyMatch) {
-                scheduledEndTime = `${timeOnlyMatch[1].padStart(2, '0')}:${timeOnlyMatch[2]}:00`;
-              } else {
-                console.log(`Could not parse end time format: ${scheduledEnd}`);
-                scheduledEndTime = null;
-              }
+              console.log(`Could not parse end time format: ${scheduledEnd}`);
             }
           }
         }
