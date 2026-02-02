@@ -384,6 +384,175 @@ export function useReorderCategories() {
   });
 }
 
+// Team Progress types and hooks
+export interface TeamMemberProgress {
+  profile_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string;
+  required_count: number;
+  completed_count: number;
+  progress_percent: number;
+  last_activity: string | null;
+  required_videos: VideoProgress[];
+}
+
+export interface VideoProgress {
+  video_id: string;
+  title: string;
+  is_completed: boolean;
+  progress_percent: number;
+  last_watched_at: string | null;
+}
+
+export interface TeamProgressSummary {
+  total_videos: number;
+  required_videos: number;
+  team_completion_rate: number;
+  members: TeamMemberProgress[];
+}
+
+export function useTeamProgress() {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ["admin-team-progress", profile?.organization_id],
+    queryFn: async (): Promise<TeamProgressSummary> => {
+      if (!profile?.organization_id) {
+        return { total_videos: 0, required_videos: 0, team_completion_rate: 0, members: [] };
+      }
+
+      // Get all active videos
+      const { data: videos, error: videosError } = await supabase
+        .from("training_videos")
+        .select("id, title, is_required, required_for_roles")
+        .eq("organization_id", profile.organization_id)
+        .eq("is_active", true)
+        .is("deleted_at", null);
+
+      if (videosError) throw videosError;
+
+      const totalVideos = videos?.length || 0;
+      const requiredVideos = videos?.filter(v => v.is_required).length || 0;
+
+      // Get all team members (technicians and call_staff)
+      const { data: members, error: membersError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, role")
+        .eq("organization_id", profile.organization_id)
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .in("role", ["technician", "call_staff"]);
+
+      if (membersError) throw membersError;
+
+      // Get all progress records
+      const { data: progressRecords, error: progressError } = await supabase
+        .from("training_progress")
+        .select("user_id, video_id, is_completed, progress_percent, last_watched_at, completed_at")
+        .in("user_id", members?.map(m => m.id) || []);
+
+      if (progressError) throw progressError;
+
+      // Build progress map: user_id -> video_id -> progress
+      const progressMap = new Map<string, Map<string, {
+        is_completed: boolean;
+        progress_percent: number;
+        last_watched_at: string | null;
+        completed_at: string | null;
+      }>>();
+
+      progressRecords?.forEach(p => {
+        if (!progressMap.has(p.user_id)) {
+          progressMap.set(p.user_id, new Map());
+        }
+        progressMap.get(p.user_id)!.set(p.video_id, {
+          is_completed: p.is_completed,
+          progress_percent: p.progress_percent,
+          last_watched_at: p.last_watched_at,
+          completed_at: p.completed_at,
+        });
+      });
+
+      // Calculate stats for each member
+      let totalRequired = 0;
+      let totalCompleted = 0;
+
+      const teamMembers: TeamMemberProgress[] = (members || []).map(member => {
+        const userProgress = progressMap.get(member.id) || new Map();
+        
+        // Find required videos for this user's role
+        const requiredForUser = (videos || []).filter(v => 
+          v.is_required && 
+          (v.required_for_roles || []).includes(member.role)
+        );
+
+        const requiredCount = requiredForUser.length;
+        let completedCount = 0;
+        let lastActivity: string | null = null;
+
+        const requiredVideoProgress: VideoProgress[] = requiredForUser.map(video => {
+          const progress = userProgress.get(video.id);
+          const isCompleted = progress?.is_completed || false;
+          if (isCompleted) completedCount++;
+
+          const activity = progress?.completed_at || progress?.last_watched_at;
+          if (activity && (!lastActivity || activity > lastActivity)) {
+            lastActivity = activity;
+          }
+
+          return {
+            video_id: video.id,
+            title: video.title,
+            is_completed: isCompleted,
+            progress_percent: progress?.progress_percent || 0,
+            last_watched_at: activity || null,
+          };
+        });
+
+        totalRequired += requiredCount;
+        totalCompleted += completedCount;
+
+        const progressPercent = requiredCount > 0 
+          ? Math.round((completedCount / requiredCount) * 100)
+          : 100;
+
+        return {
+          profile_id: member.id,
+          first_name: member.first_name,
+          last_name: member.last_name,
+          role: member.role,
+          required_count: requiredCount,
+          completed_count: completedCount,
+          progress_percent: progressPercent,
+          last_activity: lastActivity,
+          required_videos: requiredVideoProgress,
+        };
+      });
+
+      // Sort by progress ascending (who needs attention first)
+      teamMembers.sort((a, b) => {
+        if (a.progress_percent !== b.progress_percent) {
+          return a.progress_percent - b.progress_percent;
+        }
+        return (a.last_name || "").localeCompare(b.last_name || "");
+      });
+
+      const teamCompletionRate = totalRequired > 0 
+        ? Math.round((totalCompleted / totalRequired) * 100)
+        : 100;
+
+      return {
+        total_videos: totalVideos,
+        required_videos: requiredVideos,
+        team_completion_rate: teamCompletionRate,
+        members: teamMembers,
+      };
+    },
+    enabled: !!profile?.organization_id,
+  });
+}
+
 // YouTube URL parsing utilities
 export function extractYouTubeVideoId(url: string): string | null {
   const patterns = [
