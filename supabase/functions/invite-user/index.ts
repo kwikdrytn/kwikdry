@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
       
       try {
         const { error: emailError } = await resend.emails.send({
-          from: 'KwikDry <noreply@kwikdry.com>', // Update this to your verified domain
+          from: 'KwikDry <onboarding@resend.dev>',
           to: [email],
           subject: `You've been invited to join ${organizationName}`,
           html: `
