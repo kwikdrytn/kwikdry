@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, User, Sliders } from "lucide-react";
 import { UserProfile, UserFormData, useLocations } from "@/hooks/useUsers";
 import { useCustomRoles } from "@/hooks/useRoles";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// ScrollArea was previously used here, but native overflow scrolling is more reliable inside flex dialogs.
 import { SkillsPreferencesTab } from "./SkillsPreferencesTab";
 
 const userFormSchema = z.object({
@@ -150,11 +150,11 @@ export function UserFormDialog({
             <TabsContent value="profile" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden data-[state=active]:flex">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1 overflow-hidden">
-                  <ScrollArea className="flex-1 min-h-0 max-h-[calc(90vh-280px)]">
-                    <div className="space-y-4 pr-4">
+                  <div className="flex-1 min-h-0 overflow-y-auto pr-4">
+                    <div className="space-y-4">
                       <ProfileFormFields form={form} isEditing={isEditing} locations={locations} customRoles={customRoles} />
                     </div>
-                  </ScrollArea>
+                  </div>
 
                   <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
                     <Button
@@ -174,11 +174,9 @@ export function UserFormDialog({
             </TabsContent>
 
             <TabsContent value="skills" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden data-[state=active]:flex">
-              <ScrollArea className="flex-1 min-h-0 max-h-[calc(90vh-280px)]">
-                <div className="pr-4">
-                  <SkillsPreferencesTab profileId={user.id} />
-                </div>
-              </ScrollArea>
+              <div className="flex-1 min-h-0 overflow-y-auto pr-4">
+                <SkillsPreferencesTab profileId={user.id} />
+              </div>
               <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
                 <Button
                   type="button"
