@@ -22,6 +22,7 @@ import LocationManagement from "./pages/admin/LocationManagement";
 import IntegrationSettings from "./pages/admin/IntegrationSettings";
 import CallLog from "./pages/admin/CallLog";
 import CallMetrics from "./pages/admin/CallMetrics";
+import Training from "./pages/Training";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -155,6 +156,16 @@ const App = () => (
                   <RoleGuard allowedRoles={['admin', 'call_staff']}>
                     <JobMap />
                   </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Training - All roles */}
+            <Route
+              path="/training"
+              element={
+                <ProtectedRoute>
+                  <Training />
                 </ProtectedRoute>
               }
             />

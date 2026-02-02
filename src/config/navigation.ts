@@ -9,6 +9,7 @@ import {
   MapPin, 
   Settings,
   Plug,
+  GraduationCap,
   LucideIcon
 } from "lucide-react";
 import { UserRole } from "@/stores/useAuthStore";
@@ -56,6 +57,12 @@ export const navItems: NavItem[] = [
     url: "/job-map", 
     icon: Map,
     allowedRoles: ['admin', 'call_staff']
+  },
+  { 
+    title: "Training", 
+    url: "/training", 
+    icon: GraduationCap,
+    allowedRoles: ['admin', 'call_staff', 'technician']
   },
 ];
 
