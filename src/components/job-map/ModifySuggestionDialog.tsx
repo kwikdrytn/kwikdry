@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { format, parseISO, addDays } from "date-fns";
-import { Loader2, Calendar, Clock, User } from "lucide-react";
+import { Loader2, Calendar, Clock, User, MapPin, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -92,39 +94,34 @@ export function ModifySuggestionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md !max-h-[90vh] !overflow-y-auto flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Modify Suggestion
-          </DialogTitle>
+          <DialogTitle>Modify Assignment</DialogTitle>
+          <DialogDescription>
+            Adjust the AI suggestion before creating the job
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Service Type - Read Only */}
-          <div className="space-y-2">
-            <Label className="text-sm">Service Type</Label>
-            <div className="p-2 bg-muted rounded-md text-sm">
-              {suggestion.serviceType}
-            </div>
+        <div className="space-y-4 py-4 flex-1 min-h-0 overflow-y-auto">
+          {/* Service & Customer Info - Read Only */}
+          <div className="space-y-1">
+            <Label className="text-sm font-medium text-muted-foreground">Service</Label>
+            <p className="font-medium">{suggestion.serviceType}</p>
           </div>
 
-          {/* Customer Name */}
-          <div className="space-y-2">
-            <Label htmlFor="customerName" className="text-sm">Customer Name</Label>
+          <div className="space-y-1">
+            <Label className="text-sm font-medium text-muted-foreground">Customer</Label>
             <Input
-              id="customerName"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Enter customer name"
+              className="font-medium"
             />
           </div>
 
-          {/* Customer Phone */}
-          <div className="space-y-2">
-            <Label htmlFor="customerPhone" className="text-sm">Customer Phone (optional)</Label>
+          <div className="space-y-1">
+            <Label className="text-sm font-medium text-muted-foreground">Phone (optional)</Label>
             <Input
-              id="customerPhone"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
               placeholder="(555) 123-4567"
@@ -132,32 +129,40 @@ export function ModifySuggestionDialog({
             />
           </div>
 
-          {/* Address - Read Only */}
-          <div className="space-y-2">
-            <Label className="text-sm">Address</Label>
-            <div className="p-2 bg-muted rounded-md text-sm">
-              {suggestion.address}, {suggestion.city}, {suggestion.state} {suggestion.zip}
-            </div>
+          <div className="space-y-1">
+            <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5" />
+              Address
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              {suggestion.address}, {suggestion.city}, {suggestion.state}
+              {suggestion.zip && ` ${suggestion.zip}`}
+            </p>
           </div>
 
-          {/* Technician */}
+          <Separator />
+
+          {/* Editable Fields */}
           <div className="space-y-2">
-            <Label className="text-sm flex items-center gap-1.5">
+            <Label htmlFor="technician" className="flex items-center gap-1.5">
               <User className="h-4 w-4" />
               Assign To
             </Label>
-            <Select value={technicianName} onValueChange={setTechnicianName}>
+            <Select value={technicianName || "unassigned"} onValueChange={(value) => setTechnicianName(value === "unassigned" ? "" : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select technician" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="unassigned">
+                  <span className="text-muted-foreground">Unassigned</span>
+                </SelectItem>
                 {technicians.map((tech) => (
                   <SelectItem key={tech.name} value={tech.name}>
-                    <div className="flex items-center justify-between w-full gap-2">
+                    <div className="flex items-center justify-between w-full gap-4">
                       <span>{tech.name}</span>
-                      {tech.drivingDistanceMiles && (
-                        <span className="text-xs text-muted-foreground">
-                          {tech.drivingDistanceMiles.toFixed(1)} mi
+                      {tech.drivingDistanceMiles !== undefined && (
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {tech.drivingDistanceMiles.toFixed(1)} mi • {Math.round(tech.drivingDurationMinutes || 0)} min
                         </span>
                       )}
                     </div>
@@ -167,56 +172,57 @@ export function ModifySuggestionDialog({
             </Select>
           </div>
 
-          {/* Date */}
-          <div className="space-y-2">
-            <Label className="text-sm flex items-center gap-1.5">
-              <Calendar className="h-4 w-4" />
-              Date
-            </Label>
-            <Select value={scheduledDate} onValueChange={setScheduledDate}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select date" />
-              </SelectTrigger>
-              <SelectContent>
-                {dateOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="date" className="flex items-center gap-1.5">
+                <Calendar className="h-4 w-4" />
+                Date
+              </Label>
+              <Select value={scheduledDate} onValueChange={setScheduledDate}>
+                <SelectTrigger id="date">
+                  <SelectValue placeholder="Select date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dateOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Time */}
-          <div className="space-y-2">
-            <Label className="text-sm flex items-center gap-1.5">
-              <Clock className="h-4 w-4" />
-              Start Time
-            </Label>
-            <Select value={scheduledTime} onValueChange={setScheduledTime}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select time" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_OPTIONS.map((time) => (
-                  <SelectItem key={time} value={time}>
-                    {format(parseISO(`2000-01-01T${time}:00`), "h:mm a")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label htmlFor="time" className="flex items-center gap-1.5">
+                <Clock className="h-4 w-4" />
+                Time
+              </Label>
+              <Select value={scheduledTime} onValueChange={setScheduledTime}>
+                <SelectTrigger id="time">
+                  <SelectValue placeholder="Select time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_OPTIONS.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {format(parseISO(`2000-01-01T${time}:00`), "h:mm a")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* AI Reasoning - Read Only */}
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">AI Reasoning</Label>
-            <div className="p-2 bg-muted/50 rounded-md text-xs text-muted-foreground">
-              {suggestion.reasoning}
+          <div className="bg-muted/50 rounded-lg p-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Lightbulb className="h-3.5 w-3.5" />
+              Original AI Reasoning
             </div>
+            <p className="text-sm">{suggestion.reasoning}</p>
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2 sm:gap-0 flex-shrink-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -234,7 +240,7 @@ export function ModifySuggestionDialog({
                 Creating...
               </>
             ) : (
-              "Create Job"
+              "Create Modified Job"
             )}
           </Button>
         </DialogFooter>
