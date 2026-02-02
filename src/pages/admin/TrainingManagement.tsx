@@ -106,12 +106,15 @@ export default function TrainingManagement() {
                 />
               </div>
 
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <Select 
+                value={categoryFilter || "all"} 
+                onValueChange={(value) => setCategoryFilter(value === "all" ? "" : value)}
+              >
                 <SelectTrigger className="w-full sm:w-[200px]">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   {categories?.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
