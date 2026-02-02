@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { 
@@ -13,10 +13,10 @@ import {
   CheckCircle2,
   X,
   Car,
-  User
+  User,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -34,10 +34,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useServiceTypes } from "@/hooks/useJobMap";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface BookingSuggestionPanelProps {
   searchedLocation: { coords: [number, number]; name: string } | null;
@@ -67,6 +74,7 @@ interface SuggestionResponse {
   analysis: string;
   warnings?: string[];
   technicians?: TechnicianDistance[];
+  estimatedDurationMinutes?: number;
 }
 
 const DAYS_OF_WEEK = [
@@ -84,20 +92,52 @@ const TIME_OPTIONS = [
   "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
 ];
 
+const DURATION_OPTIONS = [
+  { value: "30", label: "30 minutes" },
+  { value: "60", label: "1 hour" },
+  { value: "90", label: "1.5 hours" },
+  { value: "120", label: "2 hours" },
+  { value: "180", label: "3 hours" },
+  { value: "240", label: "4 hours" },
+  { value: "480", label: "Full day (8 hours)" },
+];
+
 export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSuggestionPanelProps) {
   const { profile } = useAuth();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false);
   
   // Form state
   const [jobDuration, setJobDuration] = useState("60");
+  const [isAutoEstimating, setIsAutoEstimating] = useState(false);
   const [preferredDays, setPreferredDays] = useState<string[]>([]);
   const [preferredTimeStart, setPreferredTimeStart] = useState("");
   const [preferredTimeEnd, setPreferredTimeEnd] = useState("");
   const [restrictions, setRestrictions] = useState("");
-  const [serviceName, setServiceName] = useState("");
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   
   // Results state
   const [suggestions, setSuggestions] = useState<SuggestionResponse | null>(null);
+
+  // Fetch service types from price book
+  const { data: serviceTypes = [], isLoading: servicesLoading } = useServiceTypes();
+
+  // Toggle service selection
+  const toggleService = (service: string) => {
+    setSelectedServices(prev => 
+      prev.includes(service) 
+        ? prev.filter(s => s !== service)
+        : [...prev, service]
+    );
+  };
+
+  // Get display text for selected services
+  const selectedServicesText = useMemo(() => {
+    if (selectedServices.length === 0) return "Select services...";
+    if (selectedServices.length === 1) return selectedServices[0];
+    if (selectedServices.length === 2) return selectedServices.join(", ");
+    return `${selectedServices.length} services selected`;
+  }, [selectedServices]);
 
   const suggestMutation = useMutation({
     mutationFn: async () => {
@@ -118,7 +158,8 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
           preferredTimeStart: preferredTimeStart || undefined,
           preferredTimeEnd: preferredTimeEnd || undefined,
           restrictions: restrictions || undefined,
-          serviceName: serviceName || undefined,
+          serviceNames: selectedServices.length > 0 ? selectedServices : undefined,
+          estimateDuration: true,
         },
       });
 
@@ -127,6 +168,15 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
     },
     onSuccess: (data) => {
       setSuggestions(data);
+      // Update duration if AI estimated it
+      if (data.estimatedDurationMinutes) {
+        const closest = DURATION_OPTIONS.reduce((prev, curr) => {
+          const prevDiff = Math.abs(parseInt(prev.value) - data.estimatedDurationMinutes!);
+          const currDiff = Math.abs(parseInt(curr.value) - data.estimatedDurationMinutes!);
+          return currDiff < prevDiff ? curr : prev;
+        });
+        setJobDuration(closest.value);
+      }
     },
     onError: (error: any) => {
       console.error("Suggestion error:", error);
@@ -199,38 +249,116 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
         <CardContent className="p-4 pt-2">
           {!suggestions ? (
             <div className="space-y-4">
+              {/* Service Types Multi-Select */}
+              <div className="space-y-2">
+                <Label className="text-sm">Service Type(s)</Label>
+                <Popover open={serviceDropdownOpen} onOpenChange={setServiceDropdownOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={serviceDropdownOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className="truncate">{selectedServicesText}</span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[350px] p-0" align="start">
+                    <div className="p-2 border-b">
+                      <p className="text-xs text-muted-foreground">
+                        Select one or more services
+                      </p>
+                    </div>
+                    <ScrollArea className="h-[200px]">
+                      <div className="p-2 space-y-1">
+                        {servicesLoading ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        ) : serviceTypes.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4 text-center">
+                            No services found. Run HCP sync to import services.
+                          </p>
+                        ) : (
+                          serviceTypes.map((service) => (
+                            <div
+                              key={service}
+                              className={cn(
+                                "flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent",
+                                selectedServices.includes(service) && "bg-accent"
+                              )}
+                              onClick={() => toggleService(service)}
+                            >
+                              <div className={cn(
+                                "flex h-4 w-4 items-center justify-center rounded border",
+                                selectedServices.includes(service) 
+                                  ? "bg-primary border-primary text-primary-foreground" 
+                                  : "border-input"
+                              )}>
+                                {selectedServices.includes(service) && (
+                                  <Check className="h-3 w-3" />
+                                )}
+                              </div>
+                              <span className="text-sm truncate">{service}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                    {selectedServices.length > 0 && (
+                      <div className="p-2 border-t">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={() => setSelectedServices([])}
+                        >
+                          Clear selection
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+                {selectedServices.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedServices.map((service) => (
+                      <Badge
+                        key={service}
+                        variant="secondary"
+                        className="text-xs cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => toggleService(service)}
+                      >
+                        {service}
+                        <X className="h-3 w-3 ml-1" />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Job Duration */}
               <div className="space-y-2">
-                <Label htmlFor="duration" className="text-sm">
-                  Estimated Job Duration
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="duration" className="text-sm">
+                    Estimated Job Duration
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    (auto-estimated from job history)
+                  </span>
+                </div>
                 <Select value={jobDuration} onValueChange={setJobDuration}>
                   <SelectTrigger id="duration">
                     <SelectValue placeholder="Select duration" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="90">1.5 hours</SelectItem>
-                    <SelectItem value="120">2 hours</SelectItem>
-                    <SelectItem value="180">3 hours</SelectItem>
-                    <SelectItem value="240">4 hours</SelectItem>
-                    <SelectItem value="480">Full day (8 hours)</SelectItem>
+                    {DURATION_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              {/* Service Name */}
-              <div className="space-y-2">
-                <Label htmlFor="service" className="text-sm">
-                  Service Type (optional)
-                </Label>
-                <Input
-                  id="service"
-                  placeholder="e.g., Carpet Cleaning, Deep Clean"
-                  value={serviceName}
-                  onChange={(e) => setServiceName(e.target.value)}
-                />
               </div>
 
               {/* Advanced Options */}
@@ -267,11 +395,12 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                   <div className="space-y-2">
                     <Label className="text-sm">Preferred Time Window</Label>
                     <div className="flex items-center gap-2">
-                      <Select value={preferredTimeStart} onValueChange={setPreferredTimeStart}>
+                      <Select value={preferredTimeStart || "none"} onValueChange={(v) => setPreferredTimeStart(v === "none" ? "" : v)}>
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="Start" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="none">Start</SelectItem>
                           {TIME_OPTIONS.map((time) => (
                             <SelectItem key={time} value={time}>
                               {time}
@@ -280,11 +409,12 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                         </SelectContent>
                       </Select>
                       <span className="text-sm text-muted-foreground">to</span>
-                      <Select value={preferredTimeEnd} onValueChange={setPreferredTimeEnd}>
+                      <Select value={preferredTimeEnd || "none"} onValueChange={(v) => setPreferredTimeEnd(v === "none" ? "" : v)}>
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="End" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="none">End</SelectItem>
                           {TIME_OPTIONS.map((time) => (
                             <SelectItem key={time} value={time}>
                               {time}
@@ -332,6 +462,19 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Estimated Duration from AI */}
+              {suggestions.estimatedDurationMinutes && (
+                <div className="bg-primary/10 rounded-lg p-3 text-sm">
+                  <div className="flex items-center gap-2 text-primary font-medium">
+                    <Clock className="h-4 w-4" />
+                    Estimated Duration: {Math.round(suggestions.estimatedDurationMinutes)} min
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Based on similar jobs in your history
+                  </p>
+                </div>
+              )}
+
               {/* Technician Driving Distances */}
               {suggestions.technicians && suggestions.technicians.length > 0 && (
                 <div className="space-y-2">

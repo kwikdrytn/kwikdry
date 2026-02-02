@@ -15,7 +15,9 @@ interface JobSuggestionRequest {
   preferredTimeStart?: string; // e.g., '09:00'
   preferredTimeEnd?: string; // e.g., '17:00'
   restrictions?: string; // free text restrictions
-  serviceName?: string;
+  serviceName?: string; // legacy single service
+  serviceNames?: string[]; // multiple services
+  estimateDuration?: boolean; // whether to estimate duration from history
 }
 
 interface TechnicianSkill {
@@ -152,9 +154,19 @@ serve(async (req) => {
       preferredTimeEnd,
       restrictions,
       serviceName,
+      serviceNames,
+      estimateDuration,
     } = requestData;
 
-    console.log("Analyzing job scheduling for:", address);
+    // Combine legacy serviceName with new serviceNames array
+    const allServices: string[] = [];
+    if (serviceNames && serviceNames.length > 0) {
+      allServices.push(...serviceNames);
+    } else if (serviceName) {
+      allServices.push(serviceName);
+    }
+
+    console.log("Analyzing job scheduling for:", address, "Services:", allServices);
 
     // Fetch existing jobs for the next 14 days
     const today = new Date();
@@ -173,6 +185,71 @@ serve(async (req) => {
     if (jobsError) {
       console.error("Error fetching jobs:", jobsError);
       throw new Error("Failed to fetch existing jobs");
+    }
+
+    // Estimate duration from historical job data if requested
+    let estimatedDurationMinutes: number | null = null;
+    if (estimateDuration && allServices.length > 0) {
+      console.log("Estimating duration from historical data for services:", allServices);
+      
+      // Fetch completed jobs with matching services to estimate duration
+      const { data: historicalJobs, error: histError } = await supabase
+        .from("hcp_jobs")
+        .select("services, scheduled_time, scheduled_end")
+        .eq("organization_id", organizationId)
+        .not("scheduled_time", "is", null)
+        .not("scheduled_end", "is", null)
+        .limit(500);
+      
+      if (!histError && historicalJobs) {
+        const matchingDurations: number[] = [];
+        
+        for (const job of historicalJobs) {
+          const jobServices = job.services as { name?: string }[] | null;
+          if (!jobServices || !job.scheduled_time || !job.scheduled_end) continue;
+          
+          // Check if any of the selected services match this job
+          const jobServiceNames = jobServices.map(s => s.name?.toLowerCase() || '');
+          const hasMatch = allServices.some(selectedService => 
+            jobServiceNames.some(jobService => 
+              jobService.includes(selectedService.toLowerCase()) ||
+              selectedService.toLowerCase().includes(jobService)
+            )
+          );
+          
+          if (hasMatch) {
+            // Calculate duration from start to end time
+            const startParts = job.scheduled_time.split(':');
+            const endParts = job.scheduled_end.split(':');
+            if (startParts.length >= 2 && endParts.length >= 2) {
+              const startMinutes = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+              const endMinutes = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+              const duration = endMinutes - startMinutes;
+              if (duration > 0 && duration < 720) { // Sanity check: < 12 hours
+                matchingDurations.push(duration);
+              }
+            }
+          }
+        }
+        
+        if (matchingDurations.length >= 3) {
+          // Calculate average, weighted towards median to avoid outliers
+          matchingDurations.sort((a, b) => a - b);
+          const median = matchingDurations[Math.floor(matchingDurations.length / 2)];
+          const avg = matchingDurations.reduce((a, b) => a + b, 0) / matchingDurations.length;
+          estimatedDurationMinutes = Math.round((median + avg) / 2);
+          
+          // Multiply by number of services if selecting multiple
+          if (allServices.length > 1) {
+            // Add 50% for each additional service (not full time, assuming some overlap)
+            estimatedDurationMinutes = Math.round(estimatedDurationMinutes * (1 + (allServices.length - 1) * 0.5));
+          }
+          
+          console.log(`Estimated duration from ${matchingDurations.length} matching jobs: ${estimatedDurationMinutes} min`);
+        } else {
+          console.log("Not enough matching historical jobs for duration estimation");
+        }
+      }
     }
 
     // Fetch service zones
@@ -401,13 +478,16 @@ Respond with a JSON object containing:
 
 Provide 3-5 suggestions, ranked by skill match and proximity to existing jobs.`;
 
+    const servicesDisplay = allServices.length > 0 ? allServices.join(", ") : "General service";
+    const durationDisplay = estimatedDurationMinutes || jobDurationMinutes;
+    
     const userPrompt = `Please suggest the best times to schedule a new job with these details:
 
 NEW JOB DETAILS:
 - Address: ${address}
 - Service Zone: ${matchingZone?.name || "Unknown zone"}
-- Estimated Duration: ${jobDurationMinutes} minutes
-- Service Type: ${serviceName || "General service"}
+- Estimated Duration: ${durationDisplay} minutes${estimatedDurationMinutes ? " (estimated from historical data)" : ""}
+- Service Type(s): ${servicesDisplay}
 ${preferredDays?.length ? `- Preferred Days: ${preferredDays.join(", ")}` : ""}
 ${preferredTimeStart ? `- Preferred Time Window: ${preferredTimeStart} to ${preferredTimeEnd || "17:00"}` : ""}
 ${restrictions ? `- Restrictions/Notes: ${restrictions}` : ""}
@@ -495,6 +575,11 @@ IMPORTANT: Your TOP suggestion should be on the same day as the closest existing
       drivingDurationMinutes: tech.drivingDurationMinutes,
       straightLineDistance: tech.distanceFromJob,
     }));
+
+    // Add estimated duration if calculated
+    if (estimatedDurationMinutes) {
+      suggestions.estimatedDurationMinutes = estimatedDurationMinutes;
+    }
 
     console.log("Generated suggestions:", suggestions);
 
