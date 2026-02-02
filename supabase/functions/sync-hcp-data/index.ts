@@ -452,17 +452,18 @@ interface HCPLineItem {
 }
 
 // Fetch products/services catalog from HCP Price Book API
-// HCP API: GET https://api.housecallpro.com/price_book/services
+// Primary endpoint: GET https://api.housecallpro.com/api/price_book/services
 async function fetchServices(apiKey: string): Promise<HCPService[]> {
   const allServices: HCPService[] = [];
   const pageSize = 200;
   
-  // HCP Price Book endpoints to try (in order of likelihood)
+  // HCP Price Book endpoints to try - the user confirmed the correct one:
+  // GET https://api.housecallpro.com/api/price_book/services
   const endpoints = [
-    '/price_book/services',     // Most common HCP endpoint
-    '/pricebook/services',       // Alternate
-    '/api/price_book/services',  // Full path
-    '/services',                 // Legacy
+    '/api/price_book/services',  // User-confirmed correct endpoint
+    '/price_book/services',      // Without /api prefix
+    '/pricebook/services',       // Alternate spelling
+    '/services',                 // Legacy fallback
   ];
   
   for (const endpoint of endpoints) {
@@ -488,20 +489,35 @@ async function fetchServices(apiKey: string): Promise<HCPService[]> {
         }
         
         const data = await response.json();
-        console.log(`Response from ${endpoint}:`, JSON.stringify(data).slice(0, 500));
+        console.log(`Response keys from ${endpoint}:`, Object.keys(data));
         
         // HCP may return services in different formats
+        // The structure is likely: { services: [...] } or { data: [...] }
         const items = data.services || data.price_book_services || data.data || data.items || [];
         
         if (!Array.isArray(items) || items.length === 0) {
           // If first page is empty, try next endpoint
-          if (page === 1) break;
+          if (page === 1) {
+            console.log(`No services array in response from ${endpoint}`);
+            break;
+          }
           // Otherwise we've exhausted pages
           break;
         }
         
-        console.log(`Found ${items.length} services on page ${page}`);
-        allServices.push(...items);
+        console.log(`Found ${items.length} services on page ${page}, sample:`, JSON.stringify(items[0]).slice(0, 300));
+        
+        // Map each item - HCP service object has: id, name, price (in cents or dollars)
+        for (const item of items) {
+          allServices.push({
+            id: item.id || item.service_id || `service-${allServices.length}`,
+            name: item.name || item.service_name || 'Unknown Service',
+            description: item.description || item.service_description || null,
+            // HCP prices are typically in cents, convert to dollars
+            price: typeof item.price === 'number' ? item.price / 100 : (item.unit_price ? item.unit_price / 100 : undefined),
+            active: item.active ?? item.is_active ?? true,
+          });
+        }
         foundServices = true;
         
         // Check for more pages
@@ -527,7 +543,8 @@ async function fetchServices(apiKey: string): Promise<HCPService[]> {
   
   // If still no services, log a clear message
   if (allServices.length === 0) {
-    console.log('WARNING: No Price Book services found. Check HCP API permissions or PriceBook configuration.');
+    console.log('WARNING: No Price Book services found. Ensure HCP API key has PriceBook permissions.');
+    console.log('You can also try syncing from the PriceBook Mapping page which will display available services.');
   }
   
   return allServices;
