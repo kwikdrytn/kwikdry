@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "react-router-dom";
-import { Users, MapPin, Plug, ChevronRight, Camera, Loader2 } from "lucide-react";
+import { Users, MapPin, Plug, ChevronRight, Camera, Loader2, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvatarCropDialog } from "@/components/settings/AvatarCropDialog";
@@ -123,6 +123,7 @@ export default function Settings() {
   const adminLinks = [
     { title: "Users", description: "Manage team members and permissions", icon: Users, url: "/users" },
     { title: "Locations", description: "Manage business locations", icon: MapPin, url: "/locations" },
+    { title: "Training", description: "Manage training videos and categories", icon: GraduationCap, url: "/admin/training" },
     { title: "Integrations", description: "Connect external services", icon: Plug, url: "/settings/integrations" },
   ];
 
