@@ -46,18 +46,12 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-3">
-          {isCollapsed ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
-              <span className="text-sm font-bold text-white">KD</span>
-            </div>
-          ) : (
-            <img 
-              src={kwikDryLogo} 
-              alt="KwikDry Total Cleaning" 
-              className="h-10 w-auto"
-            />
-          )}
+        <div className="flex items-center justify-center px-2 py-3">
+          <img 
+            src={kwikDryLogo} 
+            alt="KwikDry Total Cleaning" 
+            className={isCollapsed ? "h-8 w-auto" : "h-10 w-auto"}
+          />
         </div>
       </SidebarHeader>
 

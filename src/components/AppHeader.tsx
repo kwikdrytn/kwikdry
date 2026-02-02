@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
+import kwikDryLogo from "@/assets/KwikDryLogo.png";
 
 interface AppHeaderProps {
   title?: string;
@@ -12,6 +14,7 @@ interface AppHeaderProps {
 export function AppHeader({ title }: AppHeaderProps) {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.[0] ?? '';
@@ -27,6 +30,13 @@ export function AppHeader({ title }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center justify-between gap-2 md:gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6">
       <div className="flex items-center gap-2 md:gap-4 min-w-0">
+        {isMobile && (
+          <img 
+            src={kwikDryLogo} 
+            alt="KwikDry" 
+            className="h-7 w-auto"
+          />
+        )}
         {title && <h1 className="text-base md:text-lg font-semibold truncate">{title}</h1>}
       </div>
 
