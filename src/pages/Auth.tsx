@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import KwikDryLogo from "@/assets/KwikDryLogo.png";
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -61,13 +62,13 @@ export default function Auth() {
   return <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
-        <div className="flex flex-col items-center space-y-2">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl gradient-primary shadow-lg">
-            <span className="text-2xl font-bold text-white">KD</span>
-          </div>
-          <h1 className="text-2xl font-bold gradient-text">KwikDry</h1>
-          <p className="text-muted-foreground">Dealership Management
- </p>
+        <div className="flex flex-col items-center space-y-4">
+          <img 
+            src={KwikDryLogo} 
+            alt="KwikDry" 
+            className="h-20 w-auto"
+          />
+          <p className="text-muted-foreground">Dealership Management</p>
         </div>
 
         <Card className="border-0 shadow-xl">
