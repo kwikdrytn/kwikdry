@@ -248,22 +248,72 @@ export function useServiceTypes() {
         return catalogServices.map(s => s.name);
       }
 
-      // Fall back to extracting from job services if catalog is empty
-      const { data, error } = await supabase
+      // Fall back to extracting from job services array
+      const { data: jobsWithServices, error: servicesError } = await supabase
         .from('hcp_jobs')
         .select('services')
         .eq('organization_id', profile.organization_id)
         .not('services', 'is', null)
         .limit(500);
 
-      if (error) throw error;
+      if (!servicesError && jobsWithServices) {
+        const serviceSet = new Set<string>();
+        jobsWithServices.forEach(job => {
+          const services = job.services as { name?: string }[] | null;
+          if (services && services.length > 0) {
+            services.forEach(s => {
+              if (s.name) serviceSet.add(s.name);
+            });
+          }
+        });
+        
+        if (serviceSet.size > 0) {
+          return Array.from(serviceSet).sort();
+        }
+      }
+
+      // Final fallback: extract service types from notes field
+      // HCP often embeds service info in notes like "Carpet Cleaning - First 2 Rooms - $88"
+      const { data: jobsWithNotes, error: notesError } = await supabase
+        .from('hcp_jobs')
+        .select('notes')
+        .eq('organization_id', profile.organization_id)
+        .not('notes', 'is', null)
+        .limit(500);
+
+      if (notesError) throw notesError;
 
       const serviceSet = new Set<string>();
-      (data || []).forEach(job => {
-        const services = job.services as { name?: string }[] | null;
-        if (services) {
-          services.forEach(s => {
-            if (s.name) serviceSet.add(s.name);
+      const servicePatterns = [
+        'Carpet Cleaning',
+        'Duct Cleaning',
+        'Air Duct Cleaning',
+        'Upholstery Cleaning',
+        'Tile Cleaning',
+        'Hardwood Cleaning',
+        'Pet Odor Treatment',
+        'Stain Removal',
+        'Water Damage',
+        'Dryer Vent Cleaning',
+        'Area Rug Cleaning',
+        'Mattress Cleaning',
+        'Commercial Cleaning',
+      ];
+
+      (jobsWithNotes || []).forEach(job => {
+        if (job.notes) {
+          // Try to extract service type from beginning of notes
+          // Pattern: "Service Type - Details - Price"
+          const firstPart = job.notes.split(' - ')[0]?.trim();
+          if (firstPart && firstPart.length > 2 && firstPart.length < 50) {
+            serviceSet.add(firstPart);
+          }
+          
+          // Also check for known service patterns anywhere in notes
+          servicePatterns.forEach(pattern => {
+            if (job.notes.toLowerCase().includes(pattern.toLowerCase())) {
+              serviceSet.add(pattern);
+            }
           });
         }
       });
