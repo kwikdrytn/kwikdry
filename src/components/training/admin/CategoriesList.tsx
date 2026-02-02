@@ -20,7 +20,6 @@ import { GripVertical, Pencil, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TrainingCategoryAdmin, useReorderCategories } from "@/hooks/useAdminTraining";
-import { getIconComponent } from "./CategoryFormDialog";
 
 interface CategoriesListProps {
   categories: TrainingCategoryAdmin[];
@@ -49,8 +48,6 @@ function SortableItem({ category, onEdit }: SortableItemProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const Icon = getIconComponent(category.icon);
-
   return (
     <div
       ref={setNodeRef}
@@ -64,10 +61,6 @@ function SortableItem({ category, onEdit }: SortableItemProps) {
       >
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </button>
-
-      <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center shrink-0">
-        <Icon className="h-5 w-5 text-muted-foreground" />
-      </div>
 
       <div className="flex-1 min-w-0">
         <div className="font-medium">{category.name}</div>
