@@ -53,14 +53,14 @@ export function ModifySuggestionDialog({
   const [customerPhone, setCustomerPhone] = useState("");
 
   useEffect(() => {
-    if (suggestion) {
+    if (open && suggestion) {
       setTechnicianName(suggestion.technicianName || "");
       setScheduledDate(suggestion.scheduledDate || "");
       setScheduledTime(suggestion.scheduledTime || "");
       setCustomerName(suggestion.customerName || "");
       setCustomerPhone(suggestion.customerPhone || "");
     }
-  }, [suggestion]);
+  }, [open, suggestion]);
 
   const handleConfirm = () => {
     if (!suggestion) return;
