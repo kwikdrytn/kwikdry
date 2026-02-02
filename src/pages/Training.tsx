@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Video, CheckCircle } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -9,11 +9,19 @@ import { TrainingCategorySection } from "@/components/training/TrainingCategoryS
 import { useTrainingVideos, TrainingVideo, TrainingCategory } from "@/hooks/useTraining";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Training() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { data: videos, isLoading } = useTrainingVideos();
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   // Get required videos for user's role
   const requiredVideos = useMemo(() => {
@@ -100,6 +108,12 @@ export default function Training() {
     return result;
   }, [videos]);
 
+  // Filter categories based on selection
+  const filteredCategories = useMemo(() => {
+    if (selectedCategory === "all") return categories;
+    return categories.filter((cat) => cat.id === selectedCategory);
+  }, [categories, selectedCategory]);
+
   // Calculate required completion stats
   const requiredCompleted = requiredVideos.filter((v) => v.is_completed).length;
   const allRequiredComplete = requiredCompleted === requiredVideos.length && requiredVideos.length > 0;
@@ -155,7 +169,7 @@ export default function Training() {
             <h2 className="text-lg font-semibold mb-4">Required Videos</h2>
             
             {allRequiredComplete ? (
-              <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-950/20 p-4 rounded-lg">
+              <div className="flex items-center gap-2 text-success bg-success/10 p-4 rounded-lg">
                 <CheckCircle className="h-5 w-5" />
                 <span className="font-medium">All required training complete!</span>
               </div>
@@ -176,9 +190,24 @@ export default function Training() {
         {/* All Videos by Category */}
         {categories.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold mb-4">All Videos</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">All Videos</h2>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-4">
-              {categories.map((category) => (
+              {filteredCategories.map((category) => (
                 <TrainingCategorySection
                   key={category.id}
                   name={category.name}
