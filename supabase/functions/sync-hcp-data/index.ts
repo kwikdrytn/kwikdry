@@ -754,14 +754,30 @@ Deno.serve(async (req) => {
         let scheduledEndTime: string | null = null;
 
         if (scheduledStart) {
-          const startDate = new Date(scheduledStart);
-          scheduledDate = startDate.toISOString().split('T')[0];
-          scheduledTime = startDate.toTimeString().substring(0, 8);
+          // HCP returns times in ISO format with timezone (e.g., "2026-02-02T13:00:00-05:00")
+          // We need to extract the LOCAL time as shown in HCP, not convert to UTC
+          // Parse the ISO string and extract the date/time components before timezone conversion
+          const isoMatch = scheduledStart.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+          if (isoMatch) {
+            scheduledDate = isoMatch[1]; // YYYY-MM-DD
+            scheduledTime = isoMatch[2]; // HH:MM:SS
+          } else {
+            // Fallback for non-standard formats
+            const startDate = new Date(scheduledStart);
+            scheduledDate = startDate.toISOString().split('T')[0];
+            scheduledTime = startDate.toISOString().split('T')[1].substring(0, 8);
+          }
         }
 
         if (scheduledEnd) {
-          const endDate = new Date(scheduledEnd);
-          scheduledEndTime = endDate.toTimeString().substring(0, 8);
+          // Same approach - extract local time from ISO string
+          const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+          if (isoMatch) {
+            scheduledEndTime = isoMatch[2]; // HH:MM:SS
+          } else {
+            const endDate = new Date(scheduledEnd);
+            scheduledEndTime = endDate.toISOString().split('T')[1].substring(0, 8);
+          }
         }
 
         const assignedEmployee = job.assigned_employees?.[0];
