@@ -16,9 +16,9 @@ export function DashboardLayout({ children, title, fullHeight }: DashboardLayout
   // Mobile layout with bottom navigation
   if (isMobile) {
     return (
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col overflow-x-hidden">
         <AppHeader title={title} />
-        <main className={fullHeight ? "flex-1 pb-20" : "flex-1 p-4 pb-20"}>
+        <main className={fullHeight ? "flex-1 pb-20 overflow-x-hidden" : "flex-1 p-4 pb-20 overflow-x-hidden"}>
           {children}
         </main>
         <BottomNav />
@@ -31,9 +31,9 @@ export function DashboardLayout({ children, title, fullHeight }: DashboardLayout
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="overflow-x-hidden">
           <AppHeader title={title} />
-          <main className={fullHeight ? "flex-1" : "flex-1 p-6"}>
+          <main className={fullHeight ? "flex-1 overflow-x-hidden" : "flex-1 p-6 overflow-x-hidden"}>
             {children}
           </main>
         </SidebarInset>
