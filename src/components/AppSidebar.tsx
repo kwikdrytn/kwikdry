@@ -46,11 +46,11 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center justify-center px-2 py-3 w-full">
+        <div className="flex items-center justify-center px-2 py-4 w-full">
           <img 
             src={kwikDryLogo} 
             alt="KwikDry Total Cleaning" 
-            className="w-full h-auto max-h-10 object-contain"
+            className="w-full h-auto max-h-14 object-contain"
           />
         </div>
       </SidebarHeader>
