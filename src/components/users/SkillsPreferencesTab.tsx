@@ -1,14 +1,15 @@
-import { ServiceSkillsTable } from "./ServiceSkillsTable";
+import { TechnicianSkillsGrid } from "./TechnicianSkillsGrid";
 import { SchedulingNotesList } from "./SchedulingNotesList";
 
 interface SkillsPreferencesTabProps {
   profileId: string;
+  isEditable?: boolean;
 }
 
-export function SkillsPreferencesTab({ profileId }: SkillsPreferencesTabProps) {
+export function SkillsPreferencesTab({ profileId, isEditable = true }: SkillsPreferencesTabProps) {
   return (
     <div className="space-y-6">
-      <ServiceSkillsTable profileId={profileId} />
+      <TechnicianSkillsGrid profileId={profileId} isEditable={isEditable} />
       <SchedulingNotesList profileId={profileId} />
     </div>
   );

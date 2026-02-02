@@ -60,15 +60,15 @@ export interface ProfileWithSkills {
   technician_notes?: TechnicianNote[];
 }
 
-// Service type display configuration
-export const SERVICE_TYPES: { value: ServiceType; label: string }[] = [
-  { value: 'carpet_cleaning', label: 'Carpet Cleaning' },
-  { value: 'upholstery_cleaning', label: 'Upholstery Cleaning' },
-  { value: 'air_duct_cleaning', label: 'Air Duct Cleaning' },
-  { value: 'tile_grout_cleaning', label: 'Tile & Grout Cleaning' },
-  { value: 'dryer_vent_cleaning', label: 'Dryer Vent Cleaning' },
-  { value: 'mattress_cleaning', label: 'Mattress Cleaning' },
-  { value: 'wood_floor_cleaning', label: 'Wood Floor Cleaning' },
+// Service type display configuration with icons
+export const SERVICE_TYPES: { value: ServiceType; label: string; icon: string }[] = [
+  { value: 'carpet_cleaning', label: 'Carpet Cleaning', icon: 'Sofa' },
+  { value: 'upholstery_cleaning', label: 'Upholstery Cleaning', icon: 'Armchair' },
+  { value: 'air_duct_cleaning', label: 'Air Duct/HVAC Cleaning', icon: 'Wind' },
+  { value: 'tile_grout_cleaning', label: 'Tile & Grout Cleaning', icon: 'Grid3X3' },
+  { value: 'dryer_vent_cleaning', label: 'Dryer Vent Cleaning', icon: 'Fan' },
+  { value: 'mattress_cleaning', label: 'Mattress Cleaning', icon: 'Bed' },
+  { value: 'wood_floor_cleaning', label: 'Wood Floor Cleaning', icon: 'TreeDeciduous' },
 ];
 
 // Skill level display configuration
