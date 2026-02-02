@@ -505,7 +505,18 @@ async function fetchServices(apiKey: string): Promise<HCPService[]> {
           break;
         }
         
-        console.log(`Found ${items.length} services on page ${page}, sample:`, JSON.stringify(items[0]).slice(0, 500));
+        console.log(`Found ${items.length} services on page ${page}`);
+        
+        // Log first item structure for debugging ID extraction
+        if (page === 1 && items.length > 0) {
+          console.log('Full first service item structure:', JSON.stringify(items[0], null, 2));
+          console.log('Service ID fields available:', {
+            id: items[0].id,
+            service_id: items[0].service_id,
+            item_id: items[0].item_id,
+            pricebook_item_id: items[0].pricebook_item_id,
+          });
+        }
         
         // Map each item - HCP service object has: id, name, price (in cents or dollars)
         // According to HCP API docs, the service ID is in the 'id' field
@@ -518,6 +529,9 @@ async function fetchServices(apiKey: string): Promise<HCPService[]> {
             console.log('Skipping service without ID:', item.name || 'Unknown');
             continue;
           }
+          
+          // Log each service being synced for debugging
+          console.log(`Syncing service: ${item.name || 'Unknown'} -> ID: ${serviceId}`);
           
           allServices.push({
             id: serviceId,
