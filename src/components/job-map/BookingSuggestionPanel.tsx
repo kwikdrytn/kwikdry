@@ -446,34 +446,37 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
   return (
     <>
       <Card
-        className="absolute bottom-4 left-4 z-10 w-80 shadow-lg max-h-[50vh] !flex !flex-col overflow-hidden"
+        className="absolute bottom-4 left-4 right-4 z-10 shadow-lg max-h-44 !flex !flex-col overflow-hidden"
         onWheelCapture={(e) => e.stopPropagation()}
         onTouchStartCapture={(e) => e.stopPropagation()}
         onTouchMoveCapture={(e) => e.stopPropagation()}
         onPointerDownCapture={(e) => e.stopPropagation()}
       >
         <CardHeader className="p-3 pb-2 flex-shrink-0">
-          <div className="flex items-center justify-between gap-1">
-            <CardTitle className="text-sm flex items-center gap-1.5 min-w-0">
-              <Sparkles className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-              <span className="truncate">AI Suggestions</span>
-            </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <CardTitle className="text-sm flex items-center gap-1.5 flex-shrink-0">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span>AI Suggestions</span>
+              </CardTitle>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{searchedLocation.name}</span>
+              </div>
+            </div>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 flex-shrink-0" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-            <MapPin className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{searchedLocation.name}</span>
-          </div>
         </CardHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3">
-          <div>
-            {!hasResults ? (
-              <div className="space-y-3">
+          {!hasResults ? (
+            <div className="space-y-3">
+              {/* Horizontal form layout */}
+              <div className="flex flex-wrap items-end gap-3">
                 {/* Customer Name */}
-                <div className="space-y-1.5">
+                <div className="space-y-1 min-w-[140px] flex-1">
                   <Label className="text-xs">Customer Name</Label>
                   <input
                     type="text"
@@ -485,7 +488,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                 </div>
 
                 {/* Service Types Multi-Select */}
-                <div className="space-y-1.5">
+                <div className="space-y-1 min-w-[180px] flex-1">
                   <Label className="text-xs">Service Type(s)</Label>
                   <Popover open={serviceDropdownOpen} onOpenChange={setServiceDropdownOpen}>
                     <PopoverTrigger asChild>
@@ -555,25 +558,10 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                       )}
                     </PopoverContent>
                   </Popover>
-                  {selectedServices.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {selectedServices.map((service) => (
-                        <Badge
-                          key={service}
-                          variant="secondary"
-                          className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
-                          onClick={() => toggleService(service)}
-                        >
-                          <span className="truncate max-w-[80px]">{service}</span>
-                          <X className="h-2.5 w-2.5 ml-0.5 flex-shrink-0" />
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* Job Duration */}
-                <div className="space-y-1.5">
+                <div className="space-y-1 min-w-[120px]">
                   <Label htmlFor="duration" className="text-xs">Duration</Label>
                   <Select value={jobDuration} onValueChange={setJobDuration}>
                     <SelectTrigger id="duration" className="h-8 text-xs">
@@ -587,42 +575,84 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-muted-foreground">Auto-estimated from history</p>
                 </div>
 
-                {/* Advanced Options */}
+                {/* Advanced Options Toggle */}
                 <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground">
-                    <span>Advanced Options</span>
-                    {showAdvanced ? (
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    )}
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground px-2">
+                      Advanced
+                      {showAdvanced ? (
+                        <ChevronUp className="h-3.5 w-3.5 ml-1" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                      )}
+                    </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-3">
+                </Collapsible>
+
+                {/* Submit Button */}
+                <Button
+                  onClick={() => suggestMutation.mutate()}
+                  disabled={suggestMutation.isPending}
+                  className="h-8 text-xs px-4"
+                  size="sm"
+                >
+                  {suggestMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                      Get Suggestions
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Selected Services Badges */}
+              {selectedServices.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {selectedServices.map((service) => (
+                    <Badge
+                      key={service}
+                      variant="secondary"
+                      className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => toggleService(service)}
+                    >
+                      <span className="truncate max-w-[120px]">{service}</span>
+                      <X className="h-2.5 w-2.5 ml-0.5 flex-shrink-0" />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Advanced Options (Collapsible) */}
+              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                <CollapsibleContent>
+                  <div className="flex flex-wrap items-end gap-3 pt-2 border-t">
                     {/* Preferred Days */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <Label className="text-xs">Preferred Days</Label>
-                      <div className="grid grid-cols-2 gap-1">
+                      <div className="flex flex-wrap gap-1">
                         {DAYS_OF_WEEK.map((day) => (
-                          <div key={day.value} className="flex items-center space-x-1.5">
-                            <Checkbox
-                              id={day.value}
-                              checked={preferredDays.includes(day.value)}
-                              onCheckedChange={() => toggleDay(day.value)}
-                              className="h-3.5 w-3.5"
-                            />
-                            <Label htmlFor={day.value} className="text-[10px] cursor-pointer">
-                              {day.label}
-                            </Label>
-                          </div>
+                          <Button
+                            key={day.value}
+                            variant={preferredDays.includes(day.value) ? "default" : "outline"}
+                            size="sm"
+                            className="h-6 text-[10px] px-2"
+                            onClick={() => toggleDay(day.value)}
+                          >
+                            {day.label.slice(0, 3)}
+                          </Button>
                         ))}
                       </div>
                     </div>
 
                     {/* Time Window */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1 min-w-[160px]">
                       <Label className="text-xs">Time Window</Label>
                       <div className="flex items-center gap-1">
                         <Select value={preferredTimeStart || "none"} onValueChange={(v) => setPreferredTimeStart(v === "none" ? "" : v)}>
@@ -655,60 +685,43 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                       </div>
                     </div>
 
-                    {/* Restrictions */}
-                    <div className="space-y-1.5">
+                    {/* Notes */}
+                    <div className="space-y-1 flex-1 min-w-[200px]">
                       <Label htmlFor="restrictions" className="text-xs">Notes</Label>
-                      <Textarea
+                      <input
                         id="restrictions"
+                        type="text"
                         placeholder="e.g., mornings only..."
                         value={restrictions}
                         onChange={(e) => setRestrictions(e.target.value)}
-                        rows={2}
-                        className="text-xs"
+                        className="w-full h-7 px-2 text-xs rounded-md border border-input bg-background"
                       />
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                {/* Submit Button */}
-                <Button
-                  onClick={() => suggestMutation.mutate()}
-                  disabled={suggestMutation.isPending}
-                  className="w-full h-8 text-xs"
-                  size="sm"
-                >
-                  {suggestMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                      Get Suggestions
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* Results Header Row */}
+              <div className="flex items-center gap-3 flex-wrap">
                 {/* Create All Button */}
                 {pendingCount > 1 && (
                   <Button
                     onClick={handleCreateAll}
                     disabled={creatingAllProgress !== null}
-                    className="w-full h-8 text-xs"
+                    className="h-7 text-xs"
                     size="sm"
                   >
                     {creatingAllProgress ? (
                       <>
                         <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                        Creating job {creatingAllProgress.current} of {creatingAllProgress.total}...
+                        Creating {creatingAllProgress.current}/{creatingAllProgress.total}...
                       </>
                     ) : (
                       <>
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                        Create All Recommended Jobs ({pendingCount})
+                        Create All ({pendingCount})
                       </>
                     )}
                   </Button>
@@ -716,32 +729,48 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
 
                 {/* Estimated Duration from AI */}
                 {aiResponse?.estimatedDurationMinutes && (
-                  <div className="bg-primary/10 rounded-md p-2 text-xs">
-                    <div className="flex items-center gap-1.5 text-primary font-medium">
-                      <Clock className="h-3.5 w-3.5" />
-                      Est. Duration: {Math.round(aiResponse.estimatedDurationMinutes)} min
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Based on job history
-                    </p>
+                  <div className="flex items-center gap-1.5 text-xs text-primary">
+                    <Clock className="h-3.5 w-3.5" />
+                    Est. Duration: {Math.round(aiResponse.estimatedDurationMinutes)} min
                   </div>
                 )}
 
-                {/* Technician Driving Distances */}
+                {/* Warnings */}
+                {aiResponse?.warnings && aiResponse.warnings.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-[10px] text-warning">
+                    <AlertCircle className="h-3 w-3" />
+                    {aiResponse.warnings.length} warning{aiResponse.warnings.length > 1 ? 's' : ''}
+                  </div>
+                )}
+
+                {/* Adjust Parameters */}
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setAiResponse(null);
+                    setStructuredSuggestions([]);
+                  }}
+                  className="h-7 text-xs ml-auto"
+                  size="sm"
+                >
+                  Adjust
+                </Button>
+              </div>
+
+              {/* Horizontal Scrollable Suggestion Cards */}
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {/* Technician Distances Card */}
                 {aiResponse?.technicians && aiResponse.technicians.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium flex items-center gap-1.5">
-                      <Car className="h-3.5 w-3.5" />
-                      Technician Distances
+                  <div className="flex-shrink-0 bg-muted/50 rounded-md p-2 min-w-[160px]">
+                    <Label className="text-[10px] font-medium flex items-center gap-1 mb-1.5">
+                      <Car className="h-3 w-3" />
+                      Tech Distances
                     </Label>
-                    <div className="bg-muted/50 rounded-md p-2 space-y-1">
-                      {aiResponse.technicians.map((tech, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                            <span className="truncate">{tech.name}</span>
-                          </div>
-                          <span className="text-muted-foreground font-mono text-[10px] flex-shrink-0">
+                    <div className="space-y-0.5">
+                      {aiResponse.technicians.slice(0, 4).map((tech, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[10px]">
+                          <span className="truncate max-w-[80px]">{tech.name}</span>
+                          <span className="text-muted-foreground font-mono">
                             {formatDrivingDistance(tech)}
                           </span>
                         </div>
@@ -750,55 +779,21 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                   </div>
                 )}
 
-                {/* Warnings */}
-                {aiResponse?.warnings && aiResponse.warnings.length > 0 && (
-                  <div className="space-y-1">
-                    {aiResponse.warnings.map((warning, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-1.5 text-[10px] text-warning bg-warning/10 rounded p-1.5"
-                      >
-                        <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                        <span>{warning}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Actionable Suggestion Cards */}
-                <div className="space-y-3">
-                  <Label className="text-xs font-medium flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5" />
-                    Recommended Assignments ({structuredSuggestions.length})
-                  </Label>
-                  
-                  {structuredSuggestions.map((suggestion) => (
+                {/* Suggestion Cards */}
+                {structuredSuggestions.map((suggestion) => (
+                  <div key={suggestion.id} className="flex-shrink-0 w-64">
                     <SchedulingSuggestionCard
-                      key={suggestion.id}
                       suggestion={suggestion}
                       onCreateJob={handleCreateJob}
                       onModify={handleModify}
                       onRetry={handleRetry}
                       isDisabled={creatingJobId !== null || creatingAllProgress !== null}
                     />
-                  ))}
-                </div>
-
-                {/* Try Again */}
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setAiResponse(null);
-                    setStructuredSuggestions([]);
-                  }}
-                  className="w-full h-7 text-xs"
-                  size="sm"
-                >
-                  Adjust Parameters
-                </Button>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </Card>
 
