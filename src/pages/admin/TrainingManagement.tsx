@@ -15,6 +15,7 @@ import { VideoFormDialog } from "@/components/training/admin/VideoFormDialog";
 import { VideosTable } from "@/components/training/admin/VideosTable";
 import { CategoryFormDialog } from "@/components/training/admin/CategoryFormDialog";
 import { CategoriesList } from "@/components/training/admin/CategoriesList";
+import { TeamProgressTab } from "@/components/training/admin/TeamProgressTab";
 import {
   useAdminVideos,
   useAdminCategories,
@@ -134,9 +135,7 @@ export default function TrainingManagement() {
           </TabsContent>
 
           <TabsContent value="progress" className="mt-6">
-            <div className="border rounded-lg p-12 text-center text-muted-foreground">
-              Team progress tracking coming soon...
-            </div>
+            <TeamProgressTab />
           </TabsContent>
         </Tabs>
       </div>
