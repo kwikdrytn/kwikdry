@@ -279,6 +279,8 @@ export function useUpdateProgress() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["training-videos"] });
       queryClient.invalidateQueries({ queryKey: ["training-video"] });
+      queryClient.invalidateQueries({ queryKey: ["incomplete-training-count"] });
+      queryClient.invalidateQueries({ queryKey: ["training-status"] });
     },
   });
 }
@@ -309,6 +311,8 @@ export function useMarkComplete() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["training-videos"] });
       queryClient.invalidateQueries({ queryKey: ["training-video"] });
+      queryClient.invalidateQueries({ queryKey: ["incomplete-training-count"] });
+      queryClient.invalidateQueries({ queryKey: ["training-status"] });
     },
   });
 }
