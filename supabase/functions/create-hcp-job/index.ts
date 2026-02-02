@@ -1,0 +1,324 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+interface CreateJobRequest {
+  organizationId: string;
+  customerName: string;
+  customerPhone?: string;
+  address: string;
+  city: string;
+  state: string;
+  zip?: string;
+  scheduledDate: string; // YYYY-MM-DD
+  scheduledTime: string; // HH:MM
+  duration?: number; // minutes
+  serviceType: string;
+  technicianHcpId?: string;
+  notes?: string;
+  coordinates?: { lat: number; lng: number };
+}
+
+interface CreateJobResponse {
+  success: boolean;
+  jobId?: string;
+  hcpJobId?: string;
+  hcpJobUrl?: string;
+  error?: string;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const requestData: CreateJobRequest = await req.json();
+    const {
+      organizationId,
+      customerName,
+      customerPhone,
+      address,
+      city,
+      state,
+      zip,
+      scheduledDate,
+      scheduledTime,
+      duration = 60,
+      serviceType,
+      technicianHcpId,
+      notes,
+      coordinates,
+    } = requestData;
+
+    console.log("Creating job for:", customerName, "at", address, "on", scheduledDate, scheduledTime);
+
+    // Fetch organization's HCP API key
+    const { data: org, error: orgError } = await supabase
+      .from("organizations")
+      .select("hcp_api_key, hcp_company_id")
+      .eq("id", organizationId)
+      .single();
+
+    if (orgError || !org?.hcp_api_key) {
+      console.error("Organization or API key not found:", orgError);
+      return new Response(
+        JSON.stringify({ success: false, error: "HouseCall Pro API not configured" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const hcpApiKey = org.hcp_api_key;
+    const hcpBaseUrl = "https://api.housecallpro.com";
+
+    // Step 1: Find or create customer
+    let customerId: string | null = null;
+
+    // Search for existing customer by phone
+    if (customerPhone) {
+      const phoneSearch = customerPhone.replace(/\D/g, "");
+      const searchResponse = await fetch(
+        `${hcpBaseUrl}/customers?phone_number=${phoneSearch}`,
+        {
+          headers: {
+            Authorization: `Token ${hcpApiKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        if (searchData.customers && searchData.customers.length > 0) {
+          customerId = searchData.customers[0].id;
+          console.log("Found existing customer:", customerId);
+        }
+      }
+    }
+
+    // Create new customer if not found
+    if (!customerId) {
+      const nameParts = customerName.trim().split(" ");
+      const firstName = nameParts[0] || customerName;
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      const customerPayload: Record<string, any> = {
+        first_name: firstName,
+        last_name: lastName,
+        addresses: [
+          {
+            street: address,
+            city: city,
+            state: state,
+            zip: zip || "",
+            type: "service",
+          },
+        ],
+      };
+
+      if (customerPhone) {
+        customerPayload.mobile_number = customerPhone;
+      }
+
+      console.log("Creating new customer:", customerPayload);
+
+      const createCustomerResponse = await fetch(`${hcpBaseUrl}/customers`, {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${hcpApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(customerPayload),
+      });
+
+      if (!createCustomerResponse.ok) {
+        const errorText = await createCustomerResponse.text();
+        console.error("Failed to create customer:", errorText);
+        return new Response(
+          JSON.stringify({ success: false, error: `Failed to create customer: ${errorText}` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const newCustomer = await createCustomerResponse.json();
+      customerId = newCustomer.id;
+      console.log("Created new customer:", customerId);
+    }
+
+    // Step 2: Find the service in HCP price book
+    let serviceItemId: string | null = null;
+    const servicesResponse = await fetch(`${hcpBaseUrl}/price_book/services`, {
+      headers: {
+        Authorization: `Token ${hcpApiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (servicesResponse.ok) {
+      const servicesData = await servicesResponse.json();
+      const matchingService = servicesData.services?.find(
+        (s: any) => s.name?.toLowerCase() === serviceType.toLowerCase()
+      );
+      if (matchingService) {
+        serviceItemId = matchingService.id;
+        console.log("Found matching service:", serviceItemId);
+      }
+    }
+
+    // Step 3: Get employee details for assignment
+    let employeeId: string | null = null;
+    if (technicianHcpId) {
+      // Look up the HCP employee record
+      const { data: hcpEmployee } = await supabase
+        .from("hcp_employees")
+        .select("hcp_employee_id")
+        .eq("hcp_employee_id", technicianHcpId)
+        .eq("organization_id", organizationId)
+        .single();
+
+      if (hcpEmployee) {
+        employeeId = hcpEmployee.hcp_employee_id;
+        console.log("Assigning to employee:", employeeId);
+      }
+    }
+
+    // Step 4: Create the job
+    const scheduledStart = `${scheduledDate}T${scheduledTime}:00`;
+    
+    // Calculate end time
+    const startDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
+    const endDate = new Date(startDate.getTime() + duration * 60 * 1000);
+    const endHours = endDate.getHours().toString().padStart(2, "0");
+    const endMinutes = endDate.getMinutes().toString().padStart(2, "0");
+    const scheduledEnd = `${scheduledDate}T${endHours}:${endMinutes}:00`;
+
+    const jobPayload: Record<string, any> = {
+      customer_id: customerId,
+      schedule: {
+        scheduled_start: scheduledStart,
+        scheduled_end: scheduledEnd,
+      },
+      address: {
+        street: address,
+        city: city,
+        state: state,
+        zip: zip || "",
+      },
+    };
+
+    if (notes) {
+      jobPayload.note = notes;
+    }
+
+    if (employeeId) {
+      jobPayload.assigned_employee_ids = [employeeId];
+    }
+
+    console.log("Creating job payload:", JSON.stringify(jobPayload, null, 2));
+
+    const createJobResponse = await fetch(`${hcpBaseUrl}/jobs`, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${hcpApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(jobPayload),
+    });
+
+    if (!createJobResponse.ok) {
+      const errorText = await createJobResponse.text();
+      console.error("Failed to create job:", errorText);
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create job: ${errorText}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const newJob = await createJobResponse.json();
+    console.log("Created job:", newJob.id);
+
+    // Step 5: Add line item if we found a service
+    if (serviceItemId && newJob.id) {
+      const lineItemPayload = {
+        line_items: [
+          {
+            service_item_id: serviceItemId,
+            quantity: 1,
+          },
+        ],
+      };
+
+      const lineItemResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${hcpApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(lineItemPayload),
+      });
+
+      if (!lineItemResponse.ok) {
+        console.warn("Failed to add line item, job still created:", await lineItemResponse.text());
+      } else {
+        console.log("Added line item to job");
+      }
+    }
+
+    // Step 6: Store in local database for tracking
+    const { error: insertError } = await supabase.from("hcp_jobs").upsert({
+      organization_id: organizationId,
+      hcp_job_id: newJob.id,
+      customer_name: customerName,
+      customer_hcp_id: customerId,
+      address: address,
+      city: city,
+      state: state,
+      zip: zip,
+      lat: coordinates?.lat || null,
+      lng: coordinates?.lng || null,
+      scheduled_date: scheduledDate,
+      scheduled_time: scheduledTime,
+      scheduled_end: `${endHours}:${endMinutes}`,
+      status: "scheduled",
+      technician_hcp_id: employeeId,
+      services: serviceType ? [{ name: serviceType }] : [],
+      notes: notes,
+      synced_at: new Date().toISOString(),
+    }, {
+      onConflict: 'hcp_job_id,organization_id'
+    });
+
+    if (insertError) {
+      console.warn("Failed to store job locally:", insertError);
+    }
+
+    // Build HCP job URL
+    const hcpJobUrl = `https://pro.housecallpro.com/pro/jobs/${newJob.id}`;
+
+    const response: CreateJobResponse = {
+      success: true,
+      jobId: newJob.id,
+      hcpJobId: newJob.id,
+      hcpJobUrl: hcpJobUrl,
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Error in create-hcp-job:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ success: false, error: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

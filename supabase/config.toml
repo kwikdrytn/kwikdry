@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.send-checklist-notifications]
 verify_jwt = false
+
+[functions.create-hcp-job]
+verify_jwt = false
