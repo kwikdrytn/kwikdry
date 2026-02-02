@@ -52,7 +52,18 @@ const STATE_ABBREVIATIONS: Record<string, string> = {
 function normalizeState(state: string): string {
   if (!state) return "";
   
-  const trimmed = state.trim();
+  let trimmed = state.trim();
+  
+  // Handle "State Zip" format (e.g., "Tennessee 37934")
+  const parts = trimmed.split(/\s+/);
+  if (parts.length > 1) {
+    // Check if last part looks like a zip code
+    const lastPart = parts[parts.length - 1];
+    if (/^\d{5}(-\d{4})?$/.test(lastPart)) {
+      // Remove the zip code part
+      trimmed = parts.slice(0, -1).join(" ");
+    }
+  }
   
   // Already a 2-letter code
   if (trimmed.length === 2) {
@@ -229,7 +240,25 @@ serve(async (req) => {
       if (hcpEmployee) {
         employeeId = hcpEmployee.hcp_employee_id;
         console.log("Assigning to employee:", employeeId);
+      } else {
+        // If not found by hcp_employee_id, try searching by name in case we got a profile ID
+        console.log("Employee not found by ID, checking if it's a profile ID...");
+        const { data: linkedEmployee } = await supabase
+          .from("hcp_employees")
+          .select("hcp_employee_id, name")
+          .eq("linked_user_id", technicianHcpId)
+          .eq("organization_id", organizationId)
+          .single();
+        
+        if (linkedEmployee) {
+          employeeId = linkedEmployee.hcp_employee_id;
+          console.log("Found employee via linked profile:", employeeId, linkedEmployee.name);
+        }
       }
+    }
+    
+    if (!employeeId && technicianHcpId) {
+      console.warn("Could not find HCP employee for ID:", technicianHcpId);
     }
 
     // Step 4: Create the job
@@ -241,6 +270,16 @@ serve(async (req) => {
     const endHours = endDate.getHours().toString().padStart(2, "0");
     const endMinutes = endDate.getMinutes().toString().padStart(2, "0");
     const scheduledEnd = `${scheduledDate}T${endHours}:${endMinutes}:00`;
+
+    // Build line items array
+    const lineItems: Array<{ name: string; description?: string; quantity: number }> = [];
+    if (serviceType) {
+      lineItems.push({
+        name: serviceType,
+        description: serviceType,
+        quantity: 1,
+      });
+    }
 
     const jobPayload: Record<string, any> = {
       customer_id: customerId,
@@ -254,10 +293,14 @@ serve(async (req) => {
         state: state,
         zip: zip || "",
       },
+      // Include line items directly in job creation
+      line_items: lineItems,
+      // Set as draft/unscheduled
+      work_status: "scheduled",
     };
 
     if (notes) {
-      jobPayload.note = notes;
+      jobPayload.notes = notes;
     }
 
     if (employeeId) {
@@ -265,6 +308,8 @@ serve(async (req) => {
     }
 
     console.log("Creating job payload:", JSON.stringify(jobPayload, null, 2));
+    console.log("Service Item ID for price book:", serviceItemId);
+    console.log("Employee ID for assignment:", employeeId);
 
     const createJobResponse = await fetch(`${hcpBaseUrl}/jobs`, {
       method: "POST",
@@ -285,9 +330,9 @@ serve(async (req) => {
     }
 
     const newJob = await createJobResponse.json();
-    console.log("Created job:", newJob.id);
+    console.log("Created job:", newJob.id, "with", newJob.line_items?.length || 0, "line items");
 
-    // Step 5: Add line item if we found a service
+    // Step 5: If we have a price book service item, add it as a proper line item
     if (serviceItemId && newJob.id) {
       const lineItemPayload = {
         line_items: [
@@ -297,6 +342,8 @@ serve(async (req) => {
           },
         ],
       };
+
+      console.log("Adding price book line item:", JSON.stringify(lineItemPayload));
 
       const lineItemResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
         method: "POST",
@@ -308,9 +355,9 @@ serve(async (req) => {
       });
 
       if (!lineItemResponse.ok) {
-        console.warn("Failed to add line item, job still created:", await lineItemResponse.text());
+        console.warn("Failed to add price book line item:", await lineItemResponse.text());
       } else {
-        console.log("Added line item to job");
+        console.log("Added price book line item to job");
       }
     }
 
