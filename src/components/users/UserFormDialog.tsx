@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,10 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, User, Sliders } from "lucide-react";
 import { UserProfile, UserFormData, useLocations } from "@/hooks/useUsers";
 import { useCustomRoles } from "@/hooks/useRoles";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SkillsPreferencesTab } from "./SkillsPreferencesTab";
 
 const userFormSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
@@ -63,6 +66,8 @@ export function UserFormDialog({
   const { data: locations = [] } = useLocations();
   const { data: customRoles = [] } = useCustomRoles();
   const isEditing = !!user;
+  const isTechnician = user?.role === 'technician';
+  const [activeTab, setActiveTab] = useState("profile");
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userFormSchema),
@@ -85,6 +90,7 @@ export function UserFormDialog({
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       form.reset();
+      setActiveTab("profile");
     }
     onOpenChange(open);
   };
@@ -118,7 +124,7 @@ export function UserFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-background flex flex-col overflow-hidden min-h-0">
+      <DialogContent className={`${isEditing && isTechnician ? 'sm:max-w-[700px]' : 'sm:max-w-[500px]'} max-h-[90vh] bg-background flex flex-col overflow-hidden min-h-0`}>
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>{isEditing ? 'Edit User' : 'Add New User'}</DialogTitle>
           <DialogDescription>
@@ -128,232 +134,309 @@ export function UserFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1">
-            <ScrollArea className="flex-1 min-h-0">
-              <div className="space-y-4 pr-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="first_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+        {isEditing && isTechnician ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+              <TabsTrigger value="profile" className="gap-2">
+                <User className="h-4 w-4" />
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="skills" className="gap-2">
+                <Sliders className="h-4 w-4" />
+                Skills & Preferences
+              </TabsTrigger>
+            </TabsList>
 
-                  <FormField
-                    control={form.control}
-                    name="last_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            <TabsContent value="profile" className="flex-1 flex flex-col min-h-0 mt-4">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1">
+                  <ScrollArea className="flex-1 min-h-0">
+                    <div className="space-y-4 pr-4">
+                      <ProfileFormFields form={form} isEditing={isEditing} locations={locations} customRoles={customRoles} />
+                    </div>
+                  </ScrollArea>
+
+                  <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isLoading}>
+                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Save Changes
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </TabsContent>
+
+            <TabsContent value="skills" className="flex-1 flex flex-col min-h-0 mt-4">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="pr-4">
+                  <SkillsPreferencesTab profileId={user.id} />
                 </div>
-
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="email" 
-                          placeholder="john.doe@example.com" 
-                          {...field} 
-                          disabled={isEditing}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="tel" 
-                          placeholder="(555) 123-4567" 
-                          {...field} 
-                          value={field.value ?? ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="custom_role_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value ?? ''}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="bg-popover">
-                          {customRoles.map((role) => (
-                            <SelectItem key={role.id} value={role.id}>
-                              {role.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="location_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value ?? undefined}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select location" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="bg-popover">
-                          {locations.map((location) => (
-                            <SelectItem key={location.id} value={location.id}>
-                              {location.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Address Section */}
-                <div className="border-t pt-4 mt-4">
-                  <h4 className="text-sm font-medium mb-3 text-muted-foreground">Home Address (for route planning)</h4>
-                  
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Street Address</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="123 Main Street" 
-                            {...field} 
-                            value={field.value ?? ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-6 gap-3 mt-3">
-                    <FormField
-                      control={form.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem className="col-span-3">
-                          <FormLabel>City</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="City" 
-                              {...field} 
-                              value={field.value ?? ''}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="state"
-                      render={({ field }) => (
-                        <FormItem className="col-span-1">
-                          <FormLabel>State</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="ST" 
-                              maxLength={2}
-                              {...field} 
-                              value={field.value ?? ''}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="zip"
-                      render={({ field }) => (
-                        <FormItem className="col-span-2">
-                          <FormLabel>ZIP</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="12345" 
-                              {...field} 
-                              value={field.value ?? ''}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+              </ScrollArea>
+              <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="space-y-4 pr-4">
+                  <ProfileFormFields form={form} isEditing={isEditing} locations={locations} customRoles={customRoles} />
                 </div>
-              </div>
-            </ScrollArea>
+              </ScrollArea>
 
-            <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? 'Save Changes' : 'Create User'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+              <DialogFooter className="pt-4 mt-4 border-t flex-shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isEditing ? 'Save Changes' : 'Create User'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Extracted profile form fields component
+function ProfileFormFields({ 
+  form, 
+  isEditing, 
+  locations, 
+  customRoles 
+}: { 
+  form: any; 
+  isEditing: boolean; 
+  locations: any[]; 
+  customRoles: any[]; 
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="first_name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>First Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="last_name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Last Name</FormLabel>
+              <FormControl>
+                <Input placeholder="Doe" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <FormField
+        control={form.control}
+        name="email"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Email</FormLabel>
+            <FormControl>
+              <Input 
+                type="email" 
+                placeholder="john.doe@example.com" 
+                {...field} 
+                disabled={isEditing}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="phone"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Phone</FormLabel>
+            <FormControl>
+              <Input 
+                type="tel" 
+                placeholder="(555) 123-4567" 
+                {...field} 
+                value={field.value ?? ''}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="custom_role_id"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Role</FormLabel>
+            <Select 
+              onValueChange={field.onChange} 
+              value={field.value ?? ''}
+            >
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent className="bg-popover">
+                {customRoles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="location_id"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Location</FormLabel>
+            <Select 
+              onValueChange={field.onChange} 
+              value={field.value ?? undefined}
+            >
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent className="bg-popover">
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {/* Address Section */}
+      <div className="border-t pt-4 mt-4">
+        <h4 className="text-sm font-medium mb-3 text-muted-foreground">Home Address (for route planning)</h4>
+        
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Street Address</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="123 Main Street" 
+                  {...field} 
+                  value={field.value ?? ''}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-6 gap-3 mt-3">
+          <FormField
+            control={form.control}
+            name="city"
+            render={({ field }) => (
+              <FormItem className="col-span-3">
+                <FormLabel>City</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="City" 
+                    {...field} 
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="state"
+            render={({ field }) => (
+              <FormItem className="col-span-1">
+                <FormLabel>State</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="ST" 
+                    maxLength={2}
+                    {...field} 
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="zip"
+            render={({ field }) => (
+              <FormItem className="col-span-2">
+                <FormLabel>ZIP</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="12345" 
+                    {...field} 
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </div>
+    </>
   );
 }
