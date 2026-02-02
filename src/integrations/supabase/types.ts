@@ -858,6 +858,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           location_id: string | null
+          notes: string | null
           organization_id: string
           scheduled_date: string | null
           scheduled_end: string | null
@@ -881,6 +882,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           location_id?: string | null
+          notes?: string | null
           organization_id: string
           scheduled_date?: string | null
           scheduled_end?: string | null
@@ -904,6 +906,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           location_id?: string | null
+          notes?: string | null
           organization_id?: string
           scheduled_date?: string | null
           scheduled_end?: string | null

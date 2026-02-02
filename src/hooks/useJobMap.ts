@@ -17,11 +17,12 @@ export interface HCPJob {
   scheduled_time: string | null;
   scheduled_end: string | null;
   status: string | null;
-  services: { name?: string; code?: string }[] | null;
+  services: { name?: string; description?: string; price?: number; quantity?: number }[] | null;
   technician_name: string | null;
   technician_hcp_id: string | null;
   location_id: string | null;
   total_amount: number | null;
+  notes: string | null;
 }
 
 export interface ServiceZone {
