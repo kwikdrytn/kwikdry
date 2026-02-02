@@ -505,12 +505,22 @@ async function fetchServices(apiKey: string): Promise<HCPService[]> {
           break;
         }
         
-        console.log(`Found ${items.length} services on page ${page}, sample:`, JSON.stringify(items[0]).slice(0, 300));
+        console.log(`Found ${items.length} services on page ${page}, sample:`, JSON.stringify(items[0]).slice(0, 500));
         
         // Map each item - HCP service object has: id, name, price (in cents or dollars)
+        // According to HCP API docs, the service ID is in the 'id' field
         for (const item of items) {
+          // Try multiple possible ID field names from HCP API
+          const serviceId = item.id || item.service_id || item.item_id || item.pricebook_item_id;
+          
+          // Skip items without a valid ID - we can't use them for line items without an ID
+          if (!serviceId) {
+            console.log('Skipping service without ID:', item.name || 'Unknown');
+            continue;
+          }
+          
           allServices.push({
-            id: item.id || item.service_id || `service-${allServices.length}`,
+            id: serviceId,
             name: item.name || item.service_name || 'Unknown Service',
             description: item.description || item.service_description || null,
             // HCP prices are typically in cents, convert to dollars

@@ -54,13 +54,19 @@ export function ModifySuggestionDialog({
 
   useEffect(() => {
     if (open && suggestion) {
-      setTechnicianName(suggestion.technicianName || "");
+      // Find the technician in the list to get the proper name for the select
+      // The suggestion may have a technicianId but the select uses technicianName
+      const matchingTech = technicians.find(t => 
+        t.hcpEmployeeId === suggestion.technicianId || 
+        t.name === suggestion.technicianName
+      );
+      setTechnicianName(matchingTech?.name || suggestion.technicianName || "");
       setScheduledDate(suggestion.scheduledDate || "");
       setScheduledTime(suggestion.scheduledTime || "");
       setCustomerName(suggestion.customerName || "");
       setCustomerPhone(suggestion.customerPhone || "");
     }
-  }, [open, suggestion]);
+  }, [open, suggestion, technicians]);
 
   const handleConfirm = () => {
     if (!suggestion) return;

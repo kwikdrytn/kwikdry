@@ -475,7 +475,60 @@ serve(async (req) => {
 
         if (!lineItemResponse.ok) {
           const lineItemError = await lineItemResponse.text();
-          console.warn("Failed to add line items:", lineItemError);
+          console.warn("Failed to add line items with service_item_id:", lineItemError);
+          
+          // Fallback: Try adding as custom line items by name only
+          // This happens when service_item_id values are placeholders or invalid
+          console.log("Retrying with name-based line items...");
+          
+          const nameBasedItems = serviceNames.map(name => ({
+            name: name,
+            description: name,
+            quantity: 1,
+            // Don't include unit_price - let HCP fill it from their price book if it matches
+          }));
+          
+          const retryResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
+            method: "POST",
+            headers: {
+              Authorization: `Token ${hcpApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ line_items: nameBasedItems }),
+          });
+          
+          if (!retryResponse.ok) {
+            const retryError = await retryResponse.text();
+            console.warn("Fallback also failed:", retryError);
+            
+            // Last resort: Add each line item individually
+            console.log("Trying individual line item additions...");
+            let addedCount = 0;
+            for (const name of serviceNames) {
+              const singleItemResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Token ${hcpApiKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ 
+                  line_items: [{ name, description: name, quantity: 1 }] 
+                }),
+              });
+              
+              if (singleItemResponse.ok) {
+                addedCount++;
+                console.log(`Added line item: ${name}`);
+              } else {
+                const singleError = await singleItemResponse.text();
+                console.warn(`Failed to add "${name}":`, singleError);
+              }
+            }
+            console.log(`Individual additions: ${addedCount}/${serviceNames.length} succeeded`);
+          } else {
+            const retryResult = await retryResponse.json();
+            console.log("Added line items via name fallback:", retryResult?.line_items?.length || 0, "items");
+          }
         } else {
           const lineItemResult = await lineItemResponse.json();
           console.log("Added line items successfully:", lineItemResult?.line_items?.length || 0, "items");
