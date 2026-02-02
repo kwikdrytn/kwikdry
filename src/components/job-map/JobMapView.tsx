@@ -229,7 +229,7 @@ function createClickContent(
         ${job.total_amount ? `
           <div>
             <div style="color: #94a3b8; font-size: 11px;">Total</div>
-            <div style="font-weight: 600; color: #059669;">$${job.total_amount.toFixed(2)}</div>
+            <div style="font-weight: 600; color: #059669;">$${(job.total_amount / 100).toFixed(2)}</div>
           </div>
         ` : ''}
       </div>
