@@ -23,6 +23,7 @@ import IntegrationSettings from "./pages/admin/IntegrationSettings";
 import CallLog from "./pages/admin/CallLog";
 import CallMetrics from "./pages/admin/CallMetrics";
 import Training from "./pages/Training";
+import TrainingVideo from "./pages/TrainingVideo";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -166,6 +167,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Training />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training/video/:id"
+              element={
+                <ProtectedRoute>
+                  <TrainingVideo />
                 </ProtectedRoute>
               }
             />
