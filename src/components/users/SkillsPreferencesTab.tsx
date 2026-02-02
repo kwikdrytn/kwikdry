@@ -1,5 +1,5 @@
 import { TechnicianSkillsGrid } from "./TechnicianSkillsGrid";
-import { SchedulingNotesList } from "./SchedulingNotesList";
+import { TechnicianNotesSection } from "./TechnicianNotesSection";
 
 interface SkillsPreferencesTabProps {
   profileId: string;
@@ -10,7 +10,7 @@ export function SkillsPreferencesTab({ profileId, isEditable = true }: SkillsPre
   return (
     <div className="space-y-6">
       <TechnicianSkillsGrid profileId={profileId} isEditable={isEditable} />
-      <SchedulingNotesList profileId={profileId} />
+      <TechnicianNotesSection profileId={profileId} isEditable={isEditable} />
     </div>
   );
 }
