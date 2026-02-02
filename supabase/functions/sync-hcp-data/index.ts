@@ -37,6 +37,9 @@ interface HCPJob {
   total_amount?: number;
   invoice_number?: string;
   lead_source?: string;
+  notes?: string;
+  description?: string;
+  work_order_notes?: string;
   assigned_employees?: Array<{
     id: string;
     first_name?: string;
@@ -610,6 +613,11 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Combine all possible note fields from HCP
+        const jobNotes = [job.notes, job.description, job.work_order_notes]
+          .filter(Boolean)
+          .join('\n\n') || null;
+
         const record = {
           organization_id,
           location_id: location_id || null,
@@ -633,6 +641,7 @@ Deno.serve(async (req) => {
           status: job.work_status || null,
           total_amount: job.total_amount || null,
           services,
+          notes: jobNotes,
           synced_at: now,
         };
 

@@ -113,11 +113,54 @@ function createClickContent(
 ): string {
   const dateStr = job.scheduled_date ? format(parseISO(job.scheduled_date), 'EEE, MMM d') : '';
   const timeRange = formatTimeRange(job.scheduled_time, job.scheduled_end);
-  const services = job.services as { name?: string }[] | null;
-  const serviceList = services?.map(s => s.name).filter(Boolean).join(', ') || 'N/A';
+  const services = job.services as { name?: string; description?: string; price?: number; quantity?: number }[] | null;
+  
+  // Build services list with details
+  let servicesHtml = '';
+  if (services && services.length > 0) {
+    const serviceItems = services.map(s => {
+      const name = s.name || 'Unknown Service';
+      const details: string[] = [];
+      if (s.quantity && s.quantity > 1) details.push(`×${s.quantity}`);
+      if (s.price) details.push(`$${s.price.toFixed(2)}`);
+      return `<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
+        <span style="font-weight: 500; color: #1e293b;">${name}</span>
+        ${details.length > 0 ? `<span style="font-size: 11px; color: #64748b;">${details.join(' • ')}</span>` : ''}
+      </div>`;
+    }).join('');
+    servicesHtml = `
+      <div style="margin-top: 10px; font-size: 12px;">
+        <div style="color: #94a3b8; font-size: 11px; margin-bottom: 4px;">Services</div>
+        <div style="background: #f8fafc; border-radius: 6px; padding: 6px 8px;">
+          ${serviceItems}
+        </div>
+      </div>
+    `;
+  } else {
+    servicesHtml = `
+      <div style="margin-top: 10px; font-size: 12px;">
+        <div style="color: #94a3b8; font-size: 11px;">Services</div>
+        <div style="font-weight: 500; color: #64748b; font-style: italic;">No services listed</div>
+      </div>
+    `;
+  }
+  
+  // Build notes section
+  let notesHtml = '';
+  if (job.notes) {
+    const truncatedNotes = job.notes.length > 150 ? job.notes.substring(0, 150) + '...' : job.notes;
+    notesHtml = `
+      <div style="margin-top: 10px; font-size: 12px;">
+        <div style="color: #94a3b8; font-size: 11px; margin-bottom: 4px;">Notes</div>
+        <div style="background: #fffbeb; border-left: 3px solid #f59e0b; padding: 8px 10px; border-radius: 0 6px 6px 0; color: #78350f; font-size: 11px; line-height: 1.4;">
+          ${truncatedNotes.replace(/\n/g, '<br>')}
+        </div>
+      </div>
+    `;
+  }
   
   return `
-    <div style="min-width: 260px; max-width: 320px; font-family: system-ui, sans-serif;">
+    <div style="min-width: 280px; max-width: 360px; font-family: system-ui, sans-serif; max-height: 400px; overflow-y: auto;">
       <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px; color: #0f172a;">
         ${job.customer_name || 'Unknown Customer'}
       </div>
@@ -166,11 +209,15 @@ function createClickContent(
           <div style="color: #94a3b8; font-size: 11px;">Status</div>
           <div style="font-weight: 500; color: #1e293b; text-transform: capitalize;">${job.status || 'Scheduled'}</div>
         </div>
+        ${job.total_amount ? `
+          <div>
+            <div style="color: #94a3b8; font-size: 11px;">Total</div>
+            <div style="font-weight: 600; color: #059669;">$${job.total_amount.toFixed(2)}</div>
+          </div>
+        ` : ''}
       </div>
-      <div style="margin-top: 10px; font-size: 12px;">
-        <div style="color: #94a3b8; font-size: 11px;">Services</div>
-        <div style="font-weight: 500; color: #1e293b;">${serviceList}</div>
-      </div>
+      ${servicesHtml}
+      ${notesHtml}
     </div>
   `;
 }
