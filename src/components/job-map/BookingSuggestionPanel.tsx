@@ -794,6 +794,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
         technicians={technicianDistances}
         onConfirm={handleModifyConfirm}
         isLoading={createJobMutation.isPending}
+        availableServices={serviceTypes}
       />
     </>
   );

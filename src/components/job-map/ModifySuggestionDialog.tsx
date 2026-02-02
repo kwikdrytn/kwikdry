@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { format, parseISO, addDays } from "date-fns";
-import { Loader2, Calendar, Clock, User, MapPin, Lightbulb } from "lucide-react";
+import { Loader2, Calendar, Clock, User, MapPin, Lightbulb, Wrench, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import type { SchedulingSuggestion, TechnicianDistance } from "@/types/scheduling";
 
 interface ModifySuggestionDialogProps {
@@ -29,6 +37,7 @@ interface ModifySuggestionDialogProps {
   technicians: TechnicianDistance[];
   onConfirm: (modified: SchedulingSuggestion) => void;
   isLoading?: boolean;
+  availableServices?: string[];
 }
 
 const TIME_OPTIONS = [
@@ -45,27 +54,41 @@ export function ModifySuggestionDialog({
   technicians,
   onConfirm,
   isLoading = false,
+  availableServices = [],
 }: ModifySuggestionDialogProps) {
   const [technicianName, setTechnicianName] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (open && suggestion) {
       // Find the technician in the list to get the proper name for the select
-      // The suggestion may have a technicianId but the select uses technicianName
-      // Note: technicians from useTechnicians have 'id' property, TechnicianDistance has 'hcpEmployeeId'
+      // Use case-insensitive matching for name comparison
       const matchingTech = technicians.find(t => {
         const techHcpId = t.hcpEmployeeId || (t as unknown as { id?: string }).id;
-        return techHcpId === suggestion.technicianId || t.name === suggestion.technicianName;
+        const suggestionTechName = (suggestion.technicianName || "").toLowerCase().trim();
+        const techName = (t.name || "").toLowerCase().trim();
+        
+        // Match by HCP ID first, then by name (case-insensitive)
+        return techHcpId === suggestion.technicianId || 
+               (suggestionTechName && techName && techName === suggestionTechName);
       });
+      
       setTechnicianName(matchingTech?.name || suggestion.technicianName || "");
       setScheduledDate(suggestion.scheduledDate || "");
       setScheduledTime(suggestion.scheduledTime || "");
       setCustomerName(suggestion.customerName || "");
       setCustomerPhone(suggestion.customerPhone || "");
+      
+      // Parse services from comma-separated string
+      const services = suggestion.serviceType
+        ? suggestion.serviceType.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
+      setSelectedServices(services);
     }
   }, [open, suggestion, technicians]);
 
@@ -78,14 +101,24 @@ export function ModifySuggestionDialog({
     const modified: SchedulingSuggestion = {
       ...suggestion,
       technicianName,
-      technicianId: selectedTech?.hcpEmployeeId,
+      technicianId: selectedTech?.hcpEmployeeId || (selectedTech as unknown as { id?: string })?.id,
       scheduledDate,
       scheduledTime,
       customerName,
       customerPhone,
+      serviceType: selectedServices.join(", "),
     };
 
     onConfirm(modified);
+  };
+
+  // Toggle service selection
+  const toggleService = (service: string) => {
+    setSelectedServices(prev => 
+      prev.includes(service) 
+        ? prev.filter(s => s !== service)
+        : [...prev, service]
+    );
   };
 
   // Generate date options for next 14 days
@@ -96,6 +129,13 @@ export function ModifySuggestionDialog({
       label: format(date, "EEE, MMM d"),
     };
   });
+
+  // Get display text for selected services
+  const selectedServicesText = selectedServices.length === 0 
+    ? "Select services..." 
+    : selectedServices.length === 1 
+      ? selectedServices[0] 
+      : `${selectedServices.length} services selected`;
 
   if (!suggestion) return null;
 
@@ -110,10 +150,88 @@ export function ModifySuggestionDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4 flex-1 min-h-0 overflow-y-auto">
-          {/* Service & Customer Info - Read Only */}
-          <div className="space-y-1">
-            <Label className="text-sm font-medium text-muted-foreground">Service</Label>
-            <p className="font-medium">{suggestion.serviceType}</p>
+          {/* Services - Editable */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Wrench className="h-3.5 w-3.5" />
+              Services
+            </Label>
+            {availableServices.length > 0 ? (
+              <Popover open={servicesDropdownOpen} onOpenChange={setServicesDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={servicesDropdownOpen}
+                    className="w-full justify-between font-normal text-sm"
+                  >
+                    <span className="truncate">{selectedServicesText}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  className="w-72 p-0 z-50" 
+                  align="start"
+                  onPointerDownOutside={() => setServicesDropdownOpen(false)}
+                  onInteractOutside={() => setServicesDropdownOpen(false)}
+                >
+                  <div className="p-2 border-b">
+                    <p className="text-xs text-muted-foreground">
+                      Select one or more services
+                    </p>
+                  </div>
+                  <ScrollArea className="h-[200px]">
+                    <div className="p-2 space-y-1">
+                      {availableServices.map((service) => (
+                        <div
+                          key={service}
+                          className={cn(
+                            "flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent",
+                            selectedServices.includes(service) && "bg-accent"
+                          )}
+                          onClick={() => toggleService(service)}
+                        >
+                          <div className={cn(
+                            "flex h-4 w-4 items-center justify-center rounded border flex-shrink-0",
+                            selectedServices.includes(service) 
+                              ? "bg-primary border-primary text-primary-foreground" 
+                              : "border-input"
+                          )}>
+                            {selectedServices.includes(service) && (
+                              <Check className="h-3 w-3" />
+                            )}
+                          </div>
+                          <span className="text-sm truncate">{service}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  {selectedServices.length > 0 && (
+                    <div className="p-2 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs h-7"
+                        onClick={() => setSelectedServices([])}
+                      >
+                        Clear selection
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            ) : (
+              // Fallback: show badges when no available services list
+              <div className="flex flex-wrap gap-1.5">
+                {selectedServices.map((service) => (
+                  <Badge key={service} variant="secondary" className="text-xs">
+                    {service}
+                  </Badge>
+                ))}
+                {selectedServices.length === 0 && (
+                  <span className="text-sm text-muted-foreground">No services selected</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">
