@@ -124,7 +124,8 @@ function createClickContent(
       const name = s.name || 'Unknown Service';
       const details: string[] = [];
       if (s.quantity && s.quantity > 1) details.push(`×${s.quantity}`);
-      if (s.price) details.push(`$${s.price.toFixed(2)}`);
+      // Price is stored in cents, convert to dollars
+      if (s.price) details.push(`$${(s.price / 100).toFixed(2)}`);
       return `<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
         <span style="font-weight: 500; color: #1e293b;">${name}</span>
         ${details.length > 0 ? `<span style="font-size: 11px; color: #64748b;">${details.join(' • ')}</span>` : ''}
