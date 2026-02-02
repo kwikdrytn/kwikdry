@@ -1,9 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@4.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -59,6 +62,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Get organization name for email
+    const { data: orgData } = await supabaseAdmin
+      .from('organizations')
+      .select('name')
+      .eq('id', requestingProfile.organization_id)
+      .single();
+
+    const organizationName = orgData?.name || 'KwikDry';
+
     // Parse request body
     const { 
       email, 
@@ -88,6 +100,7 @@ Deno.serve(async (req) => {
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
     let userId: string;
+    let wasInvited = false;
 
     if (existingUser) {
       // User already exists in auth - check if they have a profile in this org
@@ -114,6 +127,7 @@ Deno.serve(async (req) => {
           last_name,
           full_name: `${first_name} ${last_name}`,
         },
+        redirectTo: `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/auth`,
       });
 
       if (inviteError) {
@@ -125,6 +139,81 @@ Deno.serve(async (req) => {
       }
 
       userId = newUser.user.id;
+      wasInvited = true;
+
+      // Send custom invitation email via Resend
+      const appUrl = 'https://kwikdry.lovable.app';
+      
+      try {
+        const { error: emailError } = await resend.emails.send({
+          from: 'KwikDry <noreply@kwikdry.com>', // Update this to your verified domain
+          to: [email],
+          subject: `You've been invited to join ${organizationName}`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to ${organizationName}!</h1>
+              </div>
+              
+              <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+                <p style="font-size: 16px; margin-bottom: 20px;">
+                  Hi <strong>${first_name}</strong>,
+                </p>
+                
+                <p style="font-size: 16px; margin-bottom: 20px;">
+                  You've been invited to join the <strong>${organizationName}</strong> team on our Field Operations Management platform.
+                </p>
+                
+                <p style="font-size: 16px; margin-bottom: 25px;">
+                  Click the button below to set up your password and access your account:
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${appUrl}/auth" 
+                     style="background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%); 
+                            color: white; 
+                            padding: 14px 32px; 
+                            text-decoration: none; 
+                            border-radius: 8px; 
+                            font-weight: 600; 
+                            font-size: 16px;
+                            display: inline-block;
+                            box-shadow: 0 4px 6px rgba(14, 165, 233, 0.3);">
+                    Accept Invitation
+                  </a>
+                </div>
+                
+                <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+                  If you didn't expect this invitation, you can safely ignore this email.
+                </p>
+                
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
+                
+                <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+                  ${organizationName} · Field Operations Management
+                </p>
+              </div>
+            </body>
+            </html>
+          `,
+        });
+
+        if (emailError) {
+          console.error('Resend email error:', emailError);
+          // Don't fail the whole request if email fails - user is still created
+        } else {
+          console.log('Invitation email sent successfully to:', email);
+        }
+      } catch (emailErr) {
+        console.error('Failed to send email via Resend:', emailErr);
+        // Continue - user is created even if email fails
+      }
     }
 
     // Create the profile
@@ -162,7 +251,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       profile,
-      invited: !existingUser,
+      invited: wasInvited,
+      emailSent: wasInvited,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
