@@ -223,7 +223,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
 
   return (
     <Card
-      className="absolute bottom-4 left-4 z-10 w-60 shadow-lg max-h-[50vh] flex flex-col overflow-hidden"
+      className="absolute bottom-4 left-4 z-10 w-80 shadow-lg max-h-[50vh] flex flex-col overflow-hidden"
       onWheelCapture={(e) => e.stopPropagation()}
       onTouchStartCapture={(e) => e.stopPropagation()}
       onTouchMoveCapture={(e) => e.stopPropagation()}
