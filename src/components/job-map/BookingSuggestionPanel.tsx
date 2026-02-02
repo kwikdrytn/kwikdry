@@ -152,19 +152,30 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
   // Fetch technicians with HCP IDs
   const { data: hcpTechnicians = [] } = useTechnicians();
 
+  const normalizeName = (name: string | undefined | null) => (name || "").trim().toLowerCase();
+  const hcpTechIdByName = useMemo(() => {
+    return new Map(hcpTechnicians.map((t) => [normalizeName(t.name), t.id] as const));
+  }, [hcpTechnicians]);
+
   // Build technician list for the dialog
   const technicianDistances = useMemo((): TechnicianDistance[] => {
-    if (aiResponse?.technicians) {
-      return aiResponse.technicians.map(t => ({
-        ...t,
-        hcpEmployeeId: hcpTechnicians.find(ht => ht.name === t.name)?.id,
-      }));
+    // If the edge function returns an empty technicians array, fall back to our synced HCP employees.
+    if (aiResponse?.technicians && aiResponse.technicians.length > 0) {
+      return aiResponse.technicians.map((t) => {
+        const resolvedId =
+          t.hcpEmployeeId ||
+          hcpTechIdByName.get(normalizeName(t.name));
+        return {
+          ...t,
+          hcpEmployeeId: resolvedId,
+        };
+      });
     }
     return hcpTechnicians.map(t => ({
       name: t.name,
       hcpEmployeeId: t.id,
     }));
-  }, [aiResponse?.technicians, hcpTechnicians]);
+  }, [aiResponse?.technicians, hcpTechnicians, hcpTechIdByName]);
 
   // Toggle service selection
   const toggleService = (service: string) => {
@@ -219,7 +230,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
       const structured = data.suggestions.map((s, idx): SchedulingSuggestion => ({
         id: `suggestion-${idx}-${Date.now()}`,
         technicianName: s.suggestedTechnician || "Unassigned",
-        technicianId: hcpTechnicians.find(t => t.name === s.suggestedTechnician)?.id,
+        technicianId: hcpTechIdByName.get(normalizeName(s.suggestedTechnician)) || undefined,
         serviceType: selectedServices.join(", ") || "General Service",
         customerName: customerName || "New Customer",
         address: addressParts.address,
