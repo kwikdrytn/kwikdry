@@ -26,9 +26,8 @@ if (typeof window !== 'undefined' && 'Notification' in window) {
   }
 }
 
-// VAPID key for web push - you'll need to generate this from Firebase Console
-// Go to: Project Settings > Cloud Messaging > Web Push certificates > Generate key pair
-const VAPID_KEY = "BKgZ7IQxqQgPNGLQI7GCvXJcMwxQHqKnYCBJvPtCpFqYxYPdXxPqPwQiKwJzYwYpJwQxYzYpJwYxYzYpJwYxYz";
+// VAPID key for web push - from Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+const VAPID_KEY = "BIZ70LRApNvMqBW4D9ck-zPLwO0rou0y_jkZFR0KJFwD0nhfxGF1_sU8-e79oqdzMCEckooPzRnj-w-YlAEF9fM";
 
 export async function requestNotificationPermission(): Promise<string | null> {
   if (!messaging) {
