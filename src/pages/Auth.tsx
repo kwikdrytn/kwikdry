@@ -35,7 +35,7 @@ export default function Auth() {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
         });
-        
+
         if (error) {
           setError(error.message);
         } else {
@@ -81,13 +81,9 @@ export default function Auth() {
 
   const getDescription = () => {
     if (mode === "forgot") {
-      return resetEmailSent 
-        ? "We've sent you a password reset link" 
-        : "Enter your email to receive a reset link";
+      return resetEmailSent ? "We've sent you a password reset link" : "Enter your email to receive a reset link";
     }
-    return mode === "login" 
-      ? "Enter your credentials to access your account" 
-      : "Enter your details to get started";
+    return mode === "login" ? "Enter your credentials to access your account" : "Enter your details to get started";
   };
 
   return (
@@ -95,11 +91,7 @@ export default function Auth() {
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="flex flex-col items-center space-y-4">
-          <img 
-            src={KwikDryLogo} 
-            alt="KwikDry" 
-            className="h-20 w-auto"
-          />
+          <img src={KwikDryLogo} alt="KwikDry" className="h-20 w-auto" />
           <p className="text-muted-foreground">Dealership Management</p>
         </div>
 
@@ -113,13 +105,10 @@ export default function Auth() {
               <div className="flex flex-col items-center space-y-4 py-4">
                 <CheckCircle className="h-16 w-16 text-green-500" />
                 <p className="text-center text-muted-foreground">
-                  Check your email at <span className="font-medium text-foreground">{email}</span> for a link to reset your password.
+                  Check your email at <span className="font-medium text-foreground">{email}</span> for a link to reset
+                  your password.
                 </p>
-                <Button
-                  variant="outline"
-                  onClick={() => switchMode("login")}
-                  className="mt-4"
-                >
+                <Button variant="outline" onClick={() => switchMode("login")} className="mt-4">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Sign In
                 </Button>
@@ -189,7 +178,7 @@ export default function Auth() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-[#0f1729] hover:bg-[#1a2540] text-white font-medium"
+                  className="w-full h-11 bg-primary hover:bg-[#1a2540] text-white font-medium"
                   disabled={isLoading}
                 >
                   {isLoading ? (
