@@ -693,10 +693,11 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Combine all possible note fields from HCP
-        const jobNotes = [job.notes, job.description, job.work_order_notes]
-          .filter(Boolean)
-          .join('\n\n') || null;
+        // Combine all possible note fields from HCP (ensure they are strings)
+        const noteFields = [job.notes, job.description, job.work_order_notes]
+          .filter(n => typeof n === 'string' && n.trim().length > 0)
+          .map(n => (n as string).trim());
+        const jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
 
         const record = {
           organization_id,
