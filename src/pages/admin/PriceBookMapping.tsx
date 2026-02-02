@@ -60,11 +60,14 @@ export default function PriceBookMappingPage() {
     enabled: !!profile?.organization_id,
   });
 
-  // Fetch HCP services from local cache
-  const { data: localServices } = useQuery({
-    queryKey: ["hcp-services", profile?.organization_id],
+  // Fetch HCP services from hcp_services table (synced from HCP Price Book API)
+  // Same pattern as useServiceTypes in useJobMap.ts
+  const { data: localServices, isLoading: isLoadingServices } = useQuery({
+    queryKey: ["hcp-pricebook-services", profile?.organization_id],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
+      
+      // Primary source: hcp_services table (synced from HCP Price Book API)
       const { data, error } = await supabase
         .from("hcp_services")
         .select("hcp_service_id, name, price")
@@ -73,10 +76,11 @@ export default function PriceBookMappingPage() {
         .order("name");
 
       if (error) throw error;
-      return data.map((s) => ({
+      
+      return (data || []).map((s) => ({
         id: s.hcp_service_id,
         name: s.name,
-        price: s.price || undefined,
+        price: s.price ?? undefined,
       }));
     },
     enabled: !!profile?.organization_id,
