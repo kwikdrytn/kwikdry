@@ -452,66 +452,82 @@ interface HCPLineItem {
 }
 
 // Fetch products/services catalog from HCP Price Book API
-// Primary endpoint: GET https://api.housecallpro.com/api/price_book/services
+// HCP API: GET https://api.housecallpro.com/price_book/services
 async function fetchServices(apiKey: string): Promise<HCPService[]> {
   const allServices: HCPService[] = [];
-  const pageSize = 100;
+  const pageSize = 200;
   
-  // Primary endpoint: /api/price_book/services (per HCP API docs)
-  let page = 1;
-  try {
-    while (true) {
-      const url = `${HCP_BASE_URL}/api/price_book/services?page=${page}&page_size=${pageSize}`;
-      console.log(`Fetching price book services page ${page}...`);
-      
-      const response = await fetchWithRetry(url, apiKey);
-      const data = await response.json();
-      
-      // Response format: { services: [...], page: N, total_pages: N }
-      const items = data.services || data.data || [];
-      if (items.length === 0) break;
-      
-      console.log(`Found ${items.length} services on page ${page}`);
-      allServices.push(...items);
-      
-      // Check pagination
-      const totalPages = data.total_pages || 1;
-      if (page >= totalPages || items.length < pageSize) break;
-      page++;
-      
-      if (page > 50) break; // Safety limit
-    }
+  // HCP Price Book endpoints to try (in order of likelihood)
+  const endpoints = [
+    '/price_book/services',     // Most common HCP endpoint
+    '/pricebook/services',       // Alternate
+    '/api/price_book/services',  // Full path
+    '/services',                 // Legacy
+  ];
+  
+  for (const endpoint of endpoints) {
+    let page = 1;
+    let foundServices = false;
     
-    console.log(`Total price book services fetched: ${allServices.length}`);
-  } catch (error) {
-    console.log('Primary /api/price_book/services endpoint failed:', error);
-    
-    // Fallback: try alternate endpoints
-    const fallbackEndpoints = [
-      'pricebook/services',
-      'price_book/services',
-      'pricebook',
-      'services',
-    ];
-    
-    for (const endpoint of fallbackEndpoints) {
-      try {
-        const url = `${HCP_BASE_URL}/${endpoint}?page=1&page_size=${pageSize}`;
-        console.log(`Trying fallback: ${endpoint}...`);
+    try {
+      while (true) {
+        const url = `${HCP_BASE_URL}${endpoint}?page=${page}&page_size=${pageSize}`;
+        console.log(`Fetching price book from ${endpoint} page ${page}...`);
         
-        const response = await fetchWithRetry(url, apiKey);
-        const data = await response.json();
-        const items = data.services || data.data || data.items || [];
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        });
         
-        if (items.length > 0) {
-          console.log(`Found ${items.length} services from ${endpoint}`);
-          allServices.push(...items);
+        if (!response.ok) {
+          console.log(`Endpoint ${endpoint} returned ${response.status}`);
           break;
         }
-      } catch (e) {
-        console.log(`Fallback ${endpoint} failed:`, e);
+        
+        const data = await response.json();
+        console.log(`Response from ${endpoint}:`, JSON.stringify(data).slice(0, 500));
+        
+        // HCP may return services in different formats
+        const items = data.services || data.price_book_services || data.data || data.items || [];
+        
+        if (!Array.isArray(items) || items.length === 0) {
+          // If first page is empty, try next endpoint
+          if (page === 1) break;
+          // Otherwise we've exhausted pages
+          break;
+        }
+        
+        console.log(`Found ${items.length} services on page ${page}`);
+        allServices.push(...items);
+        foundServices = true;
+        
+        // Check for more pages
+        const totalPages = data.total_pages || data.totalPages || 1;
+        const hasMore = data.has_more || data.hasMore || false;
+        
+        if (page >= totalPages && !hasMore) break;
+        if (items.length < pageSize && !hasMore) break;
+        
+        page++;
+        if (page > 50) break; // Safety limit
       }
+      
+      // If we found services with this endpoint, stop trying others
+      if (foundServices) {
+        console.log(`Successfully fetched ${allServices.length} services from ${endpoint}`);
+        break;
+      }
+    } catch (error) {
+      console.log(`Endpoint ${endpoint} failed:`, error);
     }
+  }
+  
+  // If still no services, log a clear message
+  if (allServices.length === 0) {
+    console.log('WARNING: No Price Book services found. Check HCP API permissions or PriceBook configuration.');
   }
   
   return allServices;
