@@ -263,7 +263,7 @@ export default function TrainingVideo() {
 
   return (
     <DashboardLayout title={video.title}>
-      <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="space-y-6 max-w-5xl mx-auto w-full overflow-x-hidden">
         {/* Confetti overlay */}
         {showConfetti && (
           <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
@@ -308,8 +308,8 @@ export default function TrainingVideo() {
         {/* Video info */}
         <div className="space-y-4">
           {/* Title and badges */}
-          <div className="flex flex-wrap items-start gap-3">
-            <h1 className="text-2xl font-bold flex-1">{video.title}</h1>
+          <div className="flex flex-wrap items-start gap-3 min-w-0">
+            <h1 className="text-2xl font-bold flex-1 min-w-0 break-words">{video.title}</h1>
             <div className="flex flex-wrap gap-2">
               {video.category_name && (
                 <Badge variant="secondary">{video.category_name}</Badge>
