@@ -228,37 +228,60 @@ serve(async (req) => {
 
     // Step 3: Get employee details for assignment
     let employeeId: string | null = null;
+    console.log("Looking up technician with ID:", technicianHcpId);
+    
     if (technicianHcpId) {
-      // Look up the HCP employee record
+      // First try: direct match on hcp_employee_id
       const { data: hcpEmployee } = await supabase
         .from("hcp_employees")
-        .select("hcp_employee_id")
+        .select("hcp_employee_id, name")
         .eq("hcp_employee_id", technicianHcpId)
         .eq("organization_id", organizationId)
-        .single();
+        .maybeSingle();
 
       if (hcpEmployee) {
         employeeId = hcpEmployee.hcp_employee_id;
-        console.log("Assigning to employee:", employeeId);
+        console.log("Found employee by HCP ID:", employeeId, hcpEmployee.name);
       } else {
-        // If not found by hcp_employee_id, try searching by name in case we got a profile ID
-        console.log("Employee not found by ID, checking if it's a profile ID...");
+        // Second try: maybe we got a profile ID (UUID format)
+        console.log("Employee not found by HCP ID, trying profile ID lookup...");
         const { data: linkedEmployee } = await supabase
           .from("hcp_employees")
           .select("hcp_employee_id, name")
           .eq("linked_user_id", technicianHcpId)
           .eq("organization_id", organizationId)
-          .single();
+          .maybeSingle();
         
         if (linkedEmployee) {
           employeeId = linkedEmployee.hcp_employee_id;
           console.log("Found employee via linked profile:", employeeId, linkedEmployee.name);
+        } else {
+          // Third try: maybe we got the name directly
+          console.log("Trying name-based lookup...");
+          const { data: namedEmployee } = await supabase
+            .from("hcp_employees")
+            .select("hcp_employee_id, name")
+            .eq("organization_id", organizationId)
+            .ilike("name", `%${technicianHcpId}%`)
+            .maybeSingle();
+          
+          if (namedEmployee) {
+            employeeId = namedEmployee.hcp_employee_id;
+            console.log("Found employee by name search:", employeeId, namedEmployee.name);
+          }
         }
       }
     }
     
     if (!employeeId && technicianHcpId) {
-      console.warn("Could not find HCP employee for ID:", technicianHcpId);
+      console.warn("Could not find HCP employee for:", technicianHcpId);
+      // List available employees for debugging
+      const { data: allEmployees } = await supabase
+        .from("hcp_employees")
+        .select("hcp_employee_id, name")
+        .eq("organization_id", organizationId)
+        .limit(10);
+      console.log("Available employees:", allEmployees?.map(e => ({ id: e.hcp_employee_id, name: e.name })));
     }
 
     // Step 4: Create the job
@@ -271,14 +294,35 @@ serve(async (req) => {
     const endMinutes = endDate.getMinutes().toString().padStart(2, "0");
     const scheduledEnd = `${scheduledDate}T${endHours}:${endMinutes}:00`;
 
-    // Build line items array
-    const lineItems: Array<{ name: string; description?: string; quantity: number }> = [];
+    // Build line items array with pricing from price book if available
+    const lineItems: Array<{ name: string; description?: string; quantity: number; unit_price?: number }> = [];
     if (serviceType) {
-      lineItems.push({
-        name: serviceType,
-        description: serviceType,
-        quantity: 1,
-      });
+      // Look up price from local database
+      const serviceNames = serviceType.split(',').map(s => s.trim());
+      for (const serviceName of serviceNames) {
+        const { data: serviceData } = await supabase
+          .from("hcp_services")
+          .select("name, price")
+          .eq("organization_id", organizationId)
+          .ilike("name", serviceName)
+          .maybeSingle();
+        
+        lineItems.push({
+          name: serviceName,
+          description: serviceName,
+          quantity: 1,
+          unit_price: serviceData?.price ? Math.round(serviceData.price * 100) : undefined, // HCP expects cents
+        });
+      }
+      
+      // If no services were found, add a generic line item
+      if (lineItems.length === 0) {
+        lineItems.push({
+          name: serviceType,
+          description: serviceType,
+          quantity: 1,
+        });
+      }
     }
 
     const jobPayload: Record<string, any> = {
