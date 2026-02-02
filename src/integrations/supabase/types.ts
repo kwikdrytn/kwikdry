@@ -1619,6 +1619,180 @@ export type Database = {
           },
         ]
       }
+      training_categories: {
+        Row: {
+          created_at: string | null
+          deleted_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          organization_id: string
+          sort_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          is_completed: boolean
+          last_position_seconds: number
+          last_watched_at: string | null
+          progress_percent: number
+          updated_at: string | null
+          user_id: string
+          video_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean
+          last_position_seconds?: number
+          last_watched_at?: string | null
+          progress_percent?: number
+          updated_at?: string | null
+          user_id: string
+          video_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean
+          last_position_seconds?: number
+          last_watched_at?: string | null
+          progress_percent?: number
+          updated_at?: string | null
+          user_id?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "technician_checklist_compliance"
+            referencedColumns: ["technician_id"]
+          },
+          {
+            foreignKeyName: "training_progress_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "training_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_videos: {
+        Row: {
+          category_id: string | null
+          created_at: string | null
+          deleted_at: string | null
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          organization_id: string
+          required_for_roles: string[] | null
+          sort_order: number
+          thumbnail_url: string | null
+          title: string
+          updated_at: string | null
+          youtube_video_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          organization_id: string
+          required_for_roles?: string[] | null
+          sort_order?: number
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string | null
+          youtube_video_id: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          organization_id?: string
+          required_for_roles?: string[] | null
+          sort_order?: number
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string | null
+          youtube_video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_videos_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "training_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_events: {
         Row: {
           error_message: string | null
