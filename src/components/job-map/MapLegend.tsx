@@ -95,7 +95,7 @@ export function MapLegend({ zones, jobs, filters, onZoneClick }: MapLegendProps)
   }, [jobs, filters.weekView]);
 
   return (
-    <Card className="absolute bottom-4 left-4 z-10 w-60 shadow-lg max-h-[50vh] overflow-hidden flex flex-col">
+    <Card className="absolute top-4 right-14 z-10 w-60 shadow-lg max-h-[50vh] overflow-hidden flex flex-col">
       <CardContent className="p-3 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 text-sm font-medium">
