@@ -404,12 +404,13 @@ serve(async (req) => {
         console.log("No valid service names provided, skipping line items");
       } else {
         // Line items must always include 'name' - HCP API requires it even with service_item_id
+        // We MUST also include unit_price - HCP does not auto-populate from price book
         const lineItemsToAdd: Array<{
           service_item_id?: string;
           name: string;  // Required by HCP API
           description?: string;
           quantity: number;
-          unit_price?: number;
+          unit_price?: number;  // Price in cents for HCP API
         }> = [];
 
         // Look up each service in hcp_services table
@@ -423,12 +424,23 @@ serve(async (req) => {
             .maybeSingle();
 
           if (mapping?.hcp_pricebook_item_id) {
+            // Look up the price from hcp_services table
+            const { data: servicePrice } = await supabase
+              .from("hcp_services")
+              .select("price")
+              .eq("organization_id", organizationId)
+              .eq("hcp_service_id", mapping.hcp_pricebook_item_id)
+              .maybeSingle();
+            
+            const priceInCents = servicePrice?.price ? Math.round(servicePrice.price * 100) : undefined;
+            
             lineItemsToAdd.push({
               service_item_id: mapping.hcp_pricebook_item_id,
-              name: mapping.hcp_pricebook_item_name || serviceName,  // Always include name
+              name: mapping.hcp_pricebook_item_name || serviceName,
               quantity: 1,
+              unit_price: priceInCents,
             });
-            console.log(`Found PriceBook mapping for "${serviceName}":`, mapping.hcp_pricebook_item_id);
+            console.log(`Found PriceBook mapping for "${serviceName}":`, mapping.hcp_pricebook_item_id, "price:", priceInCents);
             continue;
           }
 
@@ -441,12 +453,14 @@ serve(async (req) => {
             .maybeSingle();
 
           if (serviceData?.hcp_service_id) {
+            const priceInCents = serviceData.price ? Math.round(serviceData.price * 100) : undefined;
             lineItemsToAdd.push({
               service_item_id: serviceData.hcp_service_id,
-              name: serviceData.name,  // Always include name
+              name: serviceData.name,
               quantity: 1,
+              unit_price: priceInCents,
             });
-            console.log(`Found hcp_service for "${serviceName}":`, serviceData.hcp_service_id, serviceData.name);
+            console.log(`Found hcp_service for "${serviceName}":`, serviceData.hcp_service_id, serviceData.name, "price:", priceInCents);
             continue;
           }
 
@@ -460,16 +474,18 @@ serve(async (req) => {
             .maybeSingle();
 
           if (partialMatch?.hcp_service_id) {
+            const priceInCents = partialMatch.price ? Math.round(partialMatch.price * 100) : undefined;
             lineItemsToAdd.push({
               service_item_id: partialMatch.hcp_service_id,
-              name: partialMatch.name,  // Always include name
+              name: partialMatch.name,
               quantity: 1,
+              unit_price: priceInCents,
             });
-            console.log(`Found partial match for "${serviceName}":`, partialMatch.hcp_service_id, partialMatch.name);
+            console.log(`Found partial match for "${serviceName}":`, partialMatch.hcp_service_id, partialMatch.name, "price:", priceInCents);
             continue;
           }
 
-          // Ultimate fallback: Add as custom line item by name only
+          // Ultimate fallback: Add as custom line item by name only (no price)
           console.warn(`No HCP service ID found for "${serviceName}", adding by name only`);
           lineItemsToAdd.push({
             name: serviceName,
@@ -489,16 +505,20 @@ serve(async (req) => {
           
           for (const item of lineItemsToAdd) {
             // Build the payload - HCP expects fields at ROOT level, not in an array
-            // Only include service_item_id if we have one - this links to the price book
+            // MUST include unit_price explicitly - HCP does NOT auto-populate from price book
             const itemPayload: Record<string, any> = {
               name: item.name,
               quantity: item.quantity || 1,
             };
             
-            // If we have a service_item_id, include it to link to price book
-            // This is what populates the price automatically
+            // Include service_item_id if we have one - links to price book item
             if (item.service_item_id) {
               itemPayload.service_item_id = item.service_item_id;
+            }
+            
+            // CRITICAL: Include unit_price explicitly (in cents) - HCP won't pull it automatically
+            if (item.unit_price !== undefined && item.unit_price !== null) {
+              itemPayload.unit_price = item.unit_price;
             }
             
             console.log(`Adding line item: ${item.name}`, JSON.stringify(itemPayload));
