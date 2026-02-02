@@ -1,3 +1,27 @@
+// Suggestion status types
+export type SuggestionStatus = 'pending' | 'creating' | 'created' | 'modified' | 'rejected' | 'failed' | 'error';
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+// Service types matching the PriceBook
+export type ServiceType =
+  | 'Carpet Cleaning'
+  | 'Upholstery Cleaning'
+  | 'Air Duct Cleaning'
+  | 'Tile & Grout Cleaning'
+  | 'Dryer Vent Cleaning'
+  | 'Mattress Cleaning'
+  | 'Wood Floor Cleaning';
+
+export const SERVICE_TYPES: ServiceType[] = [
+  'Carpet Cleaning',
+  'Upholstery Cleaning',
+  'Air Duct Cleaning',
+  'Tile & Grout Cleaning',
+  'Dryer Vent Cleaning',
+  'Mattress Cleaning',
+  'Wood Floor Cleaning',
+];
+
 export interface SchedulingSuggestion {
   id: string;
   jobId?: string; // If assigning existing job
@@ -6,6 +30,7 @@ export interface SchedulingSuggestion {
   serviceType: string;
   customerName: string;
   customerPhone?: string;
+  customerEmail?: string;
   address: string;
   city: string;
   state: string;
@@ -14,15 +39,35 @@ export interface SchedulingSuggestion {
   scheduledTime: string; // HH:MM
   duration?: number; // minutes
   reasoning: string;
-  confidence: 'high' | 'medium' | 'low';
+  confidence: ConfidenceLevel;
   nearbyJobsCount?: number;
   nearestExistingJob?: string;
   skillMatch?: 'preferred' | 'standard' | 'avoid';
   // State for UI
-  status?: 'pending' | 'creating' | 'created' | 'error';
+  status?: SuggestionStatus;
   hcpJobId?: string;
   hcpJobUrl?: string;
+  hcpCustomerId?: string;
   error?: string;
+  // Modifications
+  actualTechnicianId?: string;
+  actualDate?: string;
+  actualTime?: string;
+  // Meta
+  createdAt?: string;
+  actedOnAt?: string;
+  batchId?: string;
+}
+
+export interface PriceBookMapping {
+  id: string;
+  organization_id: string;
+  service_type: string;
+  hcp_pricebook_item_id: string;
+  hcp_pricebook_item_name: string | null;
+  default_duration_minutes: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TechnicianDistance {
@@ -40,7 +85,7 @@ export interface SuggestionResponse {
     dayName: string;
     timeSlot: string;
     reason: string;
-    confidence: 'high' | 'medium' | 'low';
+    confidence: ConfidenceLevel;
     nearbyJobsCount?: number;
     suggestedTechnician?: string;
     nearestExistingJob?: string;
@@ -67,6 +112,7 @@ export interface CreateJobRequest {
   technicianHcpId?: string;
   notes?: string;
   coordinates?: { lat: number; lng: number };
+  createAsDraft?: boolean; // Create as "needs scheduling" instead of scheduled
 }
 
 export interface CreateJobResponse {
@@ -74,5 +120,14 @@ export interface CreateJobResponse {
   jobId?: string;
   hcpJobId?: string;
   hcpJobUrl?: string;
+  customerId?: string;
+  error?: string;
+}
+
+export interface HCPJobResult {
+  success: boolean;
+  job_id?: string;
+  job_url?: string;
+  customer_id?: string;
   error?: string;
 }
