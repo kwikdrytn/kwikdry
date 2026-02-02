@@ -2086,6 +2086,8 @@ export type Database = {
         | "locations.manage"
         | "settings.view"
         | "settings.manage_integrations"
+        | "training.view"
+        | "training.manage"
       processing_status: "pending" | "processing" | "completed" | "failed"
       transaction_type:
         | "restock"
@@ -2278,6 +2280,8 @@ export const Constants = {
         "locations.manage",
         "settings.view",
         "settings.manage_integrations",
+        "training.view",
+        "training.manage",
       ],
       processing_status: ["pending", "processing", "completed", "failed"],
       transaction_type: ["restock", "usage", "transfer", "adjustment", "count"],

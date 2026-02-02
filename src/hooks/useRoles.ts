@@ -20,6 +20,8 @@ export type PermissionKey =
   | 'calls.manage'
   | 'job_map.view'
   | 'job_map.use_ai_suggestions'
+  | 'training.view'
+  | 'training.manage'
   | 'users.view'
   | 'users.manage'
   | 'locations.view'
@@ -74,6 +76,13 @@ export const PERMISSION_GROUPS = {
       { key: 'job_map.use_ai_suggestions', label: 'Use AI Booking Suggestions' },
     ],
   },
+  training: {
+    label: 'Training',
+    permissions: [
+      { key: 'training.view', label: 'View Training Videos' },
+      { key: 'training.manage', label: 'Manage Training Content' },
+    ],
+  },
   users: {
     label: 'Users',
     permissions: [
@@ -112,6 +121,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     'inventory.view',
     'inventory.adjust_stock',
     'checklists.submit',
+    'training.view',
   ],
 };
 
