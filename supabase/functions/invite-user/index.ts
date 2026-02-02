@@ -142,10 +142,69 @@ Deno.serve(async (req) => {
             });
           }
 
+          // Send reactivation email
+          const appUrl = 'https://kwikdry.lovable.app';
+          try {
+            await resend.emails.send({
+              from: 'KwikDry <onboarding@resend.dev>',
+              to: [email],
+              subject: `Welcome back to ${organizationName}`,
+              html: `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 28px;">Welcome Back to ${organizationName}!</h1>
+                  </div>
+                  
+                  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+                    <p style="font-size: 16px; margin-bottom: 20px;">
+                      Hi <strong>${first_name}</strong>,
+                    </p>
+                    
+                    <p style="font-size: 16px; margin-bottom: 20px;">
+                      Your account has been reactivated on the <strong>${organizationName}</strong> team.
+                    </p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="${appUrl}/auth" 
+                         style="background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%); 
+                                color: white; 
+                                padding: 14px 32px; 
+                                text-decoration: none; 
+                                border-radius: 8px; 
+                                font-weight: 600; 
+                                font-size: 16px;
+                                display: inline-block;
+                                box-shadow: 0 4px 6px rgba(14, 165, 233, 0.3);">
+                        Sign In
+                      </a>
+                    </div>
+                    
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 25px 0;">
+                    
+                    <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+                      ${organizationName} · Field Operations Management
+                    </p>
+                  </div>
+                </body>
+                </html>
+              `,
+            });
+            console.log('Reactivation email sent to:', email);
+          } catch (emailErr) {
+            console.error('Failed to send reactivation email:', emailErr);
+          }
+
           return new Response(JSON.stringify({ 
             success: true, 
             profile: { id: existingProfile.id },
             reactivated: true,
+            emailSent: true,
           }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
