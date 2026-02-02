@@ -441,93 +441,94 @@ interface HCPService {
   is_active?: boolean;
 }
 
-// Fetch products/services catalog from HCP Pricebook API
+interface HCPLineItem {
+  id: string;
+  name?: string;
+  description?: string;
+  unit_price?: number;
+  price?: number;
+  quantity?: number;
+  service_item_id?: string;
+}
+
+// Fetch products/services catalog from HCP Price Book API
+// Primary endpoint: GET https://api.housecallpro.com/api/price_book/services
 async function fetchServices(apiKey: string): Promise<HCPService[]> {
   const allServices: HCPService[] = [];
   const pageSize = 100;
   
-  // Try the pricebook endpoints - HCP uses /pricebook/services and /pricebook/materials
-  const pricebookEndpoints = [
-    { path: 'pricebook/services', key: 'services' },
-    { path: 'pricebook/materials', key: 'materials' },
-    { path: 'pricebook', key: 'items' },
-  ];
-  
-  for (const endpoint of pricebookEndpoints) {
-    let page = 1;
-    try {
-      const url = `${HCP_BASE_URL}/${endpoint.path}?page=1&page_size=${pageSize}`;
-      console.log(`Trying ${endpoint.path} endpoint...`);
+  // Primary endpoint: /api/price_book/services (per HCP API docs)
+  let page = 1;
+  try {
+    while (true) {
+      const url = `${HCP_BASE_URL}/api/price_book/services?page=${page}&page_size=${pageSize}`;
+      console.log(`Fetching price book services page ${page}...`);
       
       const response = await fetchWithRetry(url, apiKey);
       const data = await response.json();
       
-      // Try different response shapes
-      const items = data[endpoint.key] || data.data || data.items || data.services || data.materials || [];
-      if (items.length > 0) {
-        console.log(`Found ${items.length} items from ${endpoint.path} endpoint`);
-        allServices.push(...items);
-        
-        // Paginate if needed
-        let currentItems = items;
-        while (currentItems.length === pageSize && page < 20) {
-          page++;
-          const nextUrl = `${HCP_BASE_URL}/${endpoint.path}?page=${page}&page_size=${pageSize}`;
-          console.log(`Fetching ${endpoint.path} page ${page}...`);
-          const nextResponse = await fetchWithRetry(nextUrl, apiKey);
-          const nextData = await nextResponse.json();
-          currentItems = nextData[endpoint.key] || nextData.data || nextData.items || nextData.services || nextData.materials || [];
-          if (currentItems.length === 0) break;
-          allServices.push(...currentItems);
-        }
-        
-        console.log(`Total items from ${endpoint.path}: ${allServices.length}`);
-      }
-    } catch (error) {
-      console.log(`${endpoint.path} endpoint not available:`, error);
+      // Response format: { services: [...], page: N, total_pages: N }
+      const items = data.services || data.data || [];
+      if (items.length === 0) break;
+      
+      console.log(`Found ${items.length} services on page ${page}`);
+      allServices.push(...items);
+      
+      // Check pagination
+      const totalPages = data.total_pages || 1;
+      if (page >= totalPages || items.length < pageSize) break;
+      page++;
+      
+      if (page > 50) break; // Safety limit
     }
-  }
-  
-  // Fallback to legacy endpoints if pricebook didn't work
-  if (allServices.length === 0) {
-    console.log('Pricebook endpoints failed, trying legacy endpoints...');
-    const legacyEndpoints = ['products', 'services', 'price_book', 'price_book_items', 'line_items'];
     
-    for (const endpoint of legacyEndpoints) {
-      let page = 1;
+    console.log(`Total price book services fetched: ${allServices.length}`);
+  } catch (error) {
+    console.log('Primary /api/price_book/services endpoint failed:', error);
+    
+    // Fallback: try alternate endpoints
+    const fallbackEndpoints = [
+      'pricebook/services',
+      'price_book/services',
+      'pricebook',
+      'services',
+    ];
+    
+    for (const endpoint of fallbackEndpoints) {
       try {
         const url = `${HCP_BASE_URL}/${endpoint}?page=1&page_size=${pageSize}`;
-        console.log(`Trying legacy ${endpoint} endpoint...`);
+        console.log(`Trying fallback: ${endpoint}...`);
         
         const response = await fetchWithRetry(url, apiKey);
         const data = await response.json();
+        const items = data.services || data.data || data.items || [];
         
-        const items = data[endpoint] || data.data || data.items || [];
         if (items.length > 0) {
-          console.log(`Found ${items.length} items from ${endpoint} endpoint`);
+          console.log(`Found ${items.length} services from ${endpoint}`);
           allServices.push(...items);
-          
-          // Paginate if needed
-          let currentItems = items;
-          while (currentItems.length === pageSize && page < 20) {
-            page++;
-            const nextUrl = `${HCP_BASE_URL}/${endpoint}?page=${page}&page_size=${pageSize}`;
-            const nextResponse = await fetchWithRetry(nextUrl, apiKey);
-            const nextData = await nextResponse.json();
-            currentItems = nextData[endpoint] || nextData.data || nextData.items || [];
-            if (currentItems.length === 0) break;
-            allServices.push(...currentItems);
-          }
-          
-          break; // Found working endpoint
+          break;
         }
-      } catch (error) {
-        console.log(`${endpoint} endpoint not available:`, error);
+      } catch (e) {
+        console.log(`Fallback ${endpoint} failed:`, e);
       }
     }
   }
   
   return allServices;
+}
+
+// Fetch line items for a specific job
+// Uses: GET https://api.housecallpro.com/jobs/{job_id}/line_items
+async function fetchJobLineItems(apiKey: string, jobId: string): Promise<HCPLineItem[]> {
+  try {
+    const url = `${HCP_BASE_URL}/jobs/${jobId}/line_items`;
+    const response = await fetchWithRetry(url, apiKey);
+    const data = await response.json();
+    return data.line_items || data.data || [];
+  } catch (error) {
+    // Don't log every failure - this is expected for some jobs
+    return [];
+  }
 }
 
 Deno.serve(async (req) => {
@@ -722,14 +723,36 @@ Deno.serve(async (req) => {
 
         const assignedEmployee = job.assigned_employees?.[0];
         
-        // Prefer total_items if available, fall back to line_items
-        const lineItemsSource = job.total_items || job.line_items || [];
-        const services = lineItemsSource.map(item => ({
-          name: item.name,
-          description: item.description,
-          price: item.unit_price || item.price,
-          quantity: item.quantity,
-        }));
+        // Fetch line items from the dedicated endpoint: GET /jobs/{job_id}/line_items
+        // This provides service_item_id which links to the price book
+        let services: Array<{
+          name?: string;
+          description?: string;
+          price?: number;
+          quantity?: number;
+          service_item_id?: string;
+        }> = [];
+        
+        // Try fetching from the dedicated line_items endpoint first
+        const lineItems = await fetchJobLineItems(api_key, job.id);
+        if (lineItems.length > 0) {
+          services = lineItems.map(item => ({
+            name: item.name,
+            description: item.description,
+            price: item.unit_price || item.price,
+            quantity: item.quantity,
+            service_item_id: item.service_item_id,
+          }));
+        } else {
+          // Fallback to embedded line_items or total_items if endpoint failed
+          const lineItemsSource = job.total_items || job.line_items || [];
+          services = lineItemsSource.map(item => ({
+            name: item.name,
+            description: item.description,
+            price: item.unit_price || item.price,
+            quantity: item.quantity,
+          }));
+        }
 
         const extracted = extractLatLngFromJob(job);
         let lat: number | null = extracted?.lat ?? null;

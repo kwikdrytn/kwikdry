@@ -1619,6 +1619,116 @@ export type Database = {
           },
         ]
       }
+      technician_notes: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          note: string
+          note_type: string | null
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          note: string
+          note_type?: string | null
+          profile_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          note?: string
+          note_type?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "technician_checklist_compliance"
+            referencedColumns: ["technician_id"]
+          },
+          {
+            foreignKeyName: "technician_notes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_notes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "technician_checklist_compliance"
+            referencedColumns: ["technician_id"]
+          },
+        ]
+      }
+      technician_skills: {
+        Row: {
+          avg_job_duration_minutes: number | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          profile_id: string
+          quality_rating: number | null
+          service_type: string
+          skill_level: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_job_duration_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          profile_id: string
+          quality_rating?: number | null
+          service_type: string
+          skill_level?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_job_duration_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          profile_id?: string
+          quality_rating?: number | null
+          service_type?: string
+          skill_level?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_skills_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_skills_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "technician_checklist_compliance"
+            referencedColumns: ["technician_id"]
+          },
+        ]
+      }
       training_categories: {
         Row: {
           created_at: string | null
@@ -1897,6 +2007,14 @@ export type Database = {
       }
     }
     Functions: {
+      get_all_technicians_scheduling_context: {
+        Args: { org_id: string }
+        Returns: string
+      }
+      get_technician_scheduling_context: {
+        Args: { tech_profile_id: string }
+        Returns: string
+      }
       get_user_location_id: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_role: {
