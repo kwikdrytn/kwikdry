@@ -227,26 +227,42 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
       // Parse AI suggestions into structured data
       const addressParts = searchedLocation ? parseAddressComponents(searchedLocation.name) : { address: '', city: '', state: 'TN' };
       
-      const structured = data.suggestions.map((s, idx): SchedulingSuggestion => ({
-        id: `suggestion-${idx}-${Date.now()}`,
-        technicianName: s.suggestedTechnician || "Unassigned",
-        technicianId: hcpTechIdByName.get(normalizeName(s.suggestedTechnician)) || undefined,
-        serviceType: selectedServices.join(", ") || "General Service",
-        customerName: customerName || "New Customer",
-        address: addressParts.address,
-        city: addressParts.city,
-        state: addressParts.state,
-        zip: addressParts.zip,
-        scheduledDate: s.date,
-        scheduledTime: parseTimeSlot(s.timeSlot),
-        duration: data.estimatedDurationMinutes || parseInt(jobDuration) || 60,
-        reasoning: s.reason,
-        confidence: s.confidence,
-        nearbyJobsCount: s.nearbyJobsCount,
-        nearestExistingJob: s.nearestExistingJob,
-        skillMatch: s.skillMatch,
-        status: 'pending',
-      }));
+      const structured = data.suggestions.map((s, idx): SchedulingSuggestion => {
+        // Robust technician ID lookup with fallback to partial matching
+        let techId = hcpTechIdByName.get(normalizeName(s.suggestedTechnician));
+        
+        // If exact match failed, try partial matching
+        if (!techId && s.suggestedTechnician) {
+          const suggestedNorm = normalizeName(s.suggestedTechnician);
+          for (const [techName, id] of hcpTechIdByName.entries()) {
+            if (techName.includes(suggestedNorm) || suggestedNorm.includes(techName)) {
+              techId = id;
+              break;
+            }
+          }
+        }
+        
+        return {
+          id: `suggestion-${idx}-${Date.now()}`,
+          technicianName: s.suggestedTechnician || "Unassigned",
+          technicianId: techId,
+          serviceType: selectedServices.join(", ") || "General Service",
+          customerName: customerName || "New Customer",
+          address: addressParts.address,
+          city: addressParts.city,
+          state: addressParts.state,
+          zip: addressParts.zip,
+          scheduledDate: s.date,
+          scheduledTime: parseTimeSlot(s.timeSlot),
+          duration: data.estimatedDurationMinutes || parseInt(jobDuration) || 60,
+          reasoning: s.reason,
+          confidence: s.confidence,
+          nearbyJobsCount: s.nearbyJobsCount,
+          nearestExistingJob: s.nearestExistingJob,
+          skillMatch: s.skillMatch,
+          status: 'pending',
+        };
+      });
       
       setStructuredSuggestions(structured);
       
