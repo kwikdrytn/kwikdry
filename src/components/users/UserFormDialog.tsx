@@ -135,7 +135,7 @@ export function UserFormDialog({
         </DialogHeader>
 
         {isEditing && isTechnician ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
               <TabsTrigger value="profile" className="gap-2">
                 <User className="h-4 w-4" />
@@ -147,10 +147,10 @@ export function UserFormDialog({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="profile" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden">
+            <TabsContent value="profile" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden data-[state=active]:flex">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col min-h-0 flex-1 overflow-hidden">
-                  <ScrollArea className="flex-1 min-h-0 h-0">
+                  <ScrollArea className="flex-1 min-h-0 max-h-[calc(90vh-280px)]">
                     <div className="space-y-4 pr-4">
                       <ProfileFormFields form={form} isEditing={isEditing} locations={locations} customRoles={customRoles} />
                     </div>
@@ -173,8 +173,8 @@ export function UserFormDialog({
               </Form>
             </TabsContent>
 
-            <TabsContent value="skills" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden">
-              <ScrollArea className="flex-1 min-h-0 h-0">
+            <TabsContent value="skills" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden data-[state=active]:flex">
+              <ScrollArea className="flex-1 min-h-0 max-h-[calc(90vh-280px)]">
                 <div className="pr-4">
                   <SkillsPreferencesTab profileId={user.id} />
                 </div>
