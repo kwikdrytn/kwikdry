@@ -236,6 +236,19 @@ export function useServiceTypes() {
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
+      // First try to get services from the hcp_services catalog
+      const { data: catalogServices, error: catalogError } = await supabase
+        .from('hcp_services')
+        .select('name')
+        .eq('organization_id', profile.organization_id)
+        .eq('is_active', true)
+        .order('name');
+
+      if (!catalogError && catalogServices && catalogServices.length > 0) {
+        return catalogServices.map(s => s.name);
+      }
+
+      // Fall back to extracting from job services if catalog is empty
       const { data, error } = await supabase
         .from('hcp_jobs')
         .select('services')
@@ -247,7 +260,7 @@ export function useServiceTypes() {
 
       const serviceSet = new Set<string>();
       (data || []).forEach(job => {
-        const services = job.services as { name?: string; code?: string }[] | null;
+        const services = job.services as { name?: string }[] | null;
         if (services) {
           services.forEach(s => {
             if (s.name) serviceSet.add(s.name);
