@@ -18,6 +18,20 @@ interface JobSuggestionRequest {
   serviceName?: string;
 }
 
+interface TechnicianSkill {
+  id: string;
+  service_type: string;
+  skill_level: string;
+  notes: string | null;
+}
+
+interface TechnicianNote {
+  id: string;
+  note_type: string;
+  note: string;
+  is_active: boolean;
+}
+
 interface TechnicianWithLocation {
   id: string;
   name: string;
@@ -27,6 +41,52 @@ interface TechnicianWithLocation {
   distanceFromJob?: number;
   drivingDistanceMiles?: number;
   drivingDurationMinutes?: number;
+  skills?: TechnicianSkill[];
+  notes?: TechnicianNote[];
+}
+
+// Service type display mapping
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  'carpet_cleaning': 'Carpet Cleaning',
+  'upholstery_cleaning': 'Upholstery Cleaning',
+  'air_duct_cleaning': 'Air Duct/HVAC Cleaning',
+  'tile_grout_cleaning': 'Tile & Grout Cleaning',
+  'dryer_vent_cleaning': 'Dryer Vent Cleaning',
+  'mattress_cleaning': 'Mattress Cleaning',
+  'wood_floor_cleaning': 'Wood Floor Cleaning',
+};
+
+function formatServiceType(serviceType: string): string {
+  return SERVICE_TYPE_LABELS[serviceType] || serviceType;
+}
+
+// Build skills and notes context for a technician
+function buildTechnicianSkillsContext(tech: TechnicianWithLocation): string {
+  let context = '';
+  
+  const skills = tech.skills || [];
+  if (skills.length > 0) {
+    const preferred = skills.filter(s => s.skill_level === 'preferred');
+    const avoid = skills.filter(s => s.skill_level === 'avoid');
+    const never = skills.filter(s => s.skill_level === 'never');
+    
+    if (preferred.length > 0) {
+      context += `  PREFERRED: ${preferred.map(s => formatServiceType(s.service_type)).join(', ')}\n`;
+    }
+    if (avoid.length > 0) {
+      context += `  AVOID: ${avoid.map(s => formatServiceType(s.service_type)).join(', ')}\n`;
+    }
+    if (never.length > 0) {
+      context += `  NEVER ASSIGN: ${never.map(s => formatServiceType(s.service_type)).join(', ')}\n`;
+    }
+  }
+  
+  const notes = tech.notes || [];
+  if (notes.length > 0) {
+    context += `  Notes: ${notes.map(n => `[${n.note_type.toUpperCase()}] ${n.note}`).join('; ')}\n`;
+  }
+  
+  return context;
 }
 
 // Fetch driving distance from Mapbox Directions API
@@ -125,10 +185,14 @@ serve(async (req) => {
       console.error("Error fetching zones:", zonesError);
     }
 
-    // Fetch technicians with home locations
+    // Fetch technicians with home locations, skills, and notes
     const { data: technicians, error: techError } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, home_lat, home_lng, address, city, state, zip")
+      .select(`
+        id, first_name, last_name, home_lat, home_lng, address, city, state, zip,
+        technician_skills(id, service_type, skill_level, notes),
+        technician_notes(id, note_type, note, is_active)
+      `)
       .eq("organization_id", organizationId)
       .eq("role", "technician")
       .eq("is_active", true)
@@ -157,6 +221,8 @@ serve(async (req) => {
         home_lng: tech.home_lng,
         address: techAddress,
         distanceFromJob: distance,
+        skills: tech.technician_skills || [],
+        notes: (tech.technician_notes || []).filter((n: any) => n.is_active),
       };
     }).sort((a, b) => (a.distanceFromJob || 999) - (b.distanceFromJob || 999));
 
@@ -254,14 +320,15 @@ serve(async (req) => {
       })
       .join("\n\n");
 
-    // Build technician location context with driving distances
+    // Build technician location context with driving distances AND skills
     const techLocationContext = techsWithDistance.length > 0
-      ? `TECHNICIAN HOME LOCATIONS (sorted by distance from job):
+      ? `TECHNICIAN HOME LOCATIONS & SKILLS (sorted by distance from job):
 ${techsWithDistance.slice(0, 5).map((tech) => {
   const drivingInfo = tech.drivingDistanceMiles 
     ? `${tech.drivingDistanceMiles.toFixed(1)} miles / ${Math.round(tech.drivingDurationMinutes || 0)} min drive`
     : `${tech.distanceFromJob?.toFixed(1)} miles (straight-line)`;
-  return `- ${tech.name}: ${drivingInfo} from job location`;
+  const skillsContext = buildTechnicianSkillsContext(tech);
+  return `- ${tech.name}: ${drivingInfo} from job location\n${skillsContext}`;
 }).join("\n")}
 
 Consider these technicians for optimal routing - technicians living closer can start the day with this job or end their day here with less travel time.`
@@ -295,15 +362,23 @@ Consider these technicians for optimal routing - technicians living closer can s
 IMPORTANT: Prioritize scheduling the new job on the SAME DAY and NEAR THE SAME TIME as this closest job to minimize travel. Suggest times immediately before or after this job as the top recommendation.`
       : "No nearby existing jobs found - schedule based on technician availability and home locations.";
 
-const systemPrompt = `You are a job scheduling assistant for a service company. Analyze the existing job schedule and suggest optimal times for a new job.
+const systemPrompt = `You are a job scheduling assistant for Kwik Dry Total Cleaning. Analyze the existing job schedule and suggest optimal times for a new job.
 
-PRIORITY FACTORS (in order of importance):
-1. **CLOSEST EXISTING JOB**: Schedule near the closest booked job to minimize travel time. This is the #1 priority.
-2. Cluster jobs geographically - suggest times adjacent to nearby existing appointments
-3. Consider technician home locations for first/last appointments of the day
-4. Avoid scheduling conflicts
-5. Honor time preferences and restrictions
-6. Balance workload across days
+## TECHNICIAN SKILL LEVELS (must follow strictly):
+- **PREFERRED**: Prioritize assigning this job type to this technician when possible
+- **STANDARD**: Normal assignment, no special preference (default if not specified)
+- **AVOID**: Only assign this job type if no other technicians are available
+- **NEVER**: Do not assign this job type to this technician under any circumstances
+
+## PRIORITY FACTORS (in order of importance):
+1. **RESPECT SKILL RESTRICTIONS**: Never assign a job to a technician with "NEVER" for that service type
+2. **CLOSEST EXISTING JOB**: Schedule near the closest booked job to minimize travel time
+3. **SKILL PREFERENCES**: Prioritize technicians with "PREFERRED" skill level for the service type
+4. Cluster jobs geographically - suggest times adjacent to nearby existing appointments
+5. Consider technician home locations for first/last appointments of the day
+6. Consider scheduling notes for each technician (time preferences, speed, restrictions)
+7. Avoid scheduling conflicts
+8. Balance workload across days
 
 Respond with a JSON object containing:
 {
@@ -312,18 +387,19 @@ Respond with a JSON object containing:
       "date": "YYYY-MM-DD",
       "dayName": "Monday",
       "timeSlot": "09:00-11:00",
-      "reason": "Brief explanation - mention the nearby job this clusters with",
+      "reason": "Brief explanation - mention skill match and nearby job this clusters with",
       "confidence": "high" | "medium" | "low",
       "nearbyJobsCount": 3,
-      "suggestedTechnician": "Tech name if applicable",
-      "nearestExistingJob": "Description of the closest job this would cluster with"
+      "suggestedTechnician": "Tech name - explain skill match",
+      "nearestExistingJob": "Description of the closest job this would cluster with",
+      "skillMatch": "preferred" | "standard" | "avoid"
     }
   ],
-  "analysis": "Brief overall analysis emphasizing routing efficiency and job clustering",
-  "warnings": ["Any potential issues or conflicts"]
+  "analysis": "Brief overall analysis emphasizing routing efficiency, job clustering, and skill matching",
+  "warnings": ["Any potential issues, conflicts, or skill mismatches to flag"]
 }
 
-Provide 3-5 suggestions, ranked by proximity to existing jobs first.`;
+Provide 3-5 suggestions, ranked by skill match and proximity to existing jobs.`;
 
     const userPrompt = `Please suggest the best times to schedule a new job with these details:
 
