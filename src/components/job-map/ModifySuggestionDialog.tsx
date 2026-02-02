@@ -66,19 +66,57 @@ export function ModifySuggestionDialog({
 
   useEffect(() => {
     if (open && suggestion) {
-      // Find the technician in the list to get the proper name for the select
-      // Use case-insensitive matching for name comparison
+      // Normalize names for comparison (lowercase, trim, collapse whitespace)
+      const normalizeName = (name: string | undefined | null) => 
+        (name || "").toLowerCase().trim().replace(/\s+/g, ' ');
+
+      // Debug logging to trace matching issues
+      console.log('[ModifyDialog] Matching technician:', {
+        suggestionTechName: suggestion.technicianName,
+        suggestionTechId: suggestion.technicianId,
+        availableTechs: technicians.map(t => ({ 
+          name: t.name, 
+          hcpEmployeeId: t.hcpEmployeeId 
+        }))
+      });
+
+      // Find matching technician with flexible matching
       const matchingTech = technicians.find(t => {
+        // Get HCP ID from technician (could be in different properties)
         const techHcpId = t.hcpEmployeeId || (t as unknown as { id?: string }).id;
-        const suggestionTechName = (suggestion.technicianName || "").toLowerCase().trim();
-        const techName = (t.name || "").toLowerCase().trim();
         
-        // Match by HCP ID first, then by name (case-insensitive)
-        return techHcpId === suggestion.technicianId || 
-               (suggestionTechName && techName && techName === suggestionTechName);
+        const suggestionTechName = normalizeName(suggestion.technicianName);
+        const techName = normalizeName(t.name);
+        
+        // Skip if suggestion has no technician assigned
+        if (!suggestionTechName || suggestionTechName === 'unassigned') {
+          return false;
+        }
+        
+        // Match by HCP ID first (most reliable)
+        if (techHcpId && suggestion.technicianId && techHcpId === suggestion.technicianId) {
+          return true;
+        }
+        
+        // Match by exact name (case-insensitive, whitespace-normalized)
+        if (techName && suggestionTechName && techName === suggestionTechName) {
+          return true;
+        }
+        
+        // Match by name containment (for partial matches like "John" vs "John Smith")
+        if (techName && suggestionTechName) {
+          if (techName.includes(suggestionTechName) || suggestionTechName.includes(techName)) {
+            return true;
+          }
+        }
+        
+        return false;
       });
       
-      setTechnicianName(matchingTech?.name || suggestion.technicianName || "");
+      console.log('[ModifyDialog] Matched tech:', matchingTech?.name || 'none');
+      
+      // Set form state
+      setTechnicianName(matchingTech?.name || "");
       setScheduledDate(suggestion.scheduledDate || "");
       setScheduledTime(suggestion.scheduledTime || "");
       setCustomerName(suggestion.customerName || "");
