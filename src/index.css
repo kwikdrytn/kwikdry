@@ -143,3 +143,16 @@ All colors MUST be HSL.
 .mapboxgl-popup-tip {
   border-top-color: white !important;
 }
+
+/* YouTube iframe responsive styling */
+.aspect-video iframe {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.aspect-video {
+  position: relative;
+}
