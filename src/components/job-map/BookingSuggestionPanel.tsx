@@ -199,11 +199,11 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
   const getConfidenceBadge = (confidence: string) => {
     switch (confidence) {
       case "high":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">High</Badge>;
+        return <Badge className="bg-success/20 text-success hover:bg-success/20 text-[10px] px-1 py-0">High</Badge>;
       case "medium":
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Medium</Badge>;
+        return <Badge className="bg-warning/20 text-warning hover:bg-warning/20 text-[10px] px-1 py-0">Med</Badge>;
       case "low":
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Low</Badge>;
+        return <Badge className="bg-destructive/20 text-destructive hover:bg-destructive/20 text-[10px] px-1 py-0">Low</Badge>;
       default:
         return null;
     }
@@ -223,48 +223,48 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
 
   return (
     <Card
-      className="absolute bottom-4 left-4 z-10 w-96 shadow-lg h-[70dvh] max-h-[70dvh] flex flex-col"
+      className="absolute bottom-4 left-4 z-10 w-60 shadow-lg max-h-[50vh] flex flex-col overflow-hidden"
       onWheelCapture={(e) => e.stopPropagation()}
       onTouchStartCapture={(e) => e.stopPropagation()}
       onTouchMoveCapture={(e) => e.stopPropagation()}
       onPointerDownCapture={(e) => e.stopPropagation()}
     >
-      <CardHeader className="p-4 pb-2 shrink-0">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            AI Booking Suggestions
+      <CardHeader className="p-3 pb-2 shrink-0">
+        <div className="flex items-center justify-between gap-1">
+          <CardTitle className="text-sm flex items-center gap-1.5 min-w-0">
+            <Sparkles className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+            <span className="truncate">AI Suggestions</span>
           </CardTitle>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 flex-shrink-0" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-          <MapPin className="h-3 w-3" />
+          <MapPin className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{searchedLocation.name}</span>
         </div>
       </CardHeader>
 
-      <ScrollArea className="flex-1 min-h-0 h-full">
-        <CardContent className="p-4 pt-2">
+      <ScrollArea className="flex-1 min-h-0">
+        <CardContent className="p-3 pt-0">
           {!suggestions ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Service Types Multi-Select */}
-              <div className="space-y-2">
-                <Label className="text-sm">Service Type(s)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Service Type(s)</Label>
                 <Popover open={serviceDropdownOpen} onOpenChange={setServiceDropdownOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
                       aria-expanded={serviceDropdownOpen}
-                      className="w-full justify-between font-normal"
+                      className="w-full justify-between font-normal h-8 text-xs px-2"
                     >
                       <span className="truncate">{selectedServicesText}</span>
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[350px] p-0" align="start">
+                  <PopoverContent className="w-56 p-0" align="start">
                     <div className="p-2 border-b">
                       <p className="text-xs text-muted-foreground">
                         Select one or more services
@@ -277,30 +277,30 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                             <Loader2 className="h-4 w-4 animate-spin" />
                           </div>
                         ) : serviceTypes.length === 0 ? (
-                          <p className="text-sm text-muted-foreground py-4 text-center">
-                            No services found. Run HCP sync to import services.
+                          <p className="text-xs text-muted-foreground py-4 text-center">
+                            No services found. Run HCP sync.
                           </p>
                         ) : (
                           serviceTypes.map((service) => (
                             <div
                               key={service}
                               className={cn(
-                                "flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent",
+                                "flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer hover:bg-accent",
                                 selectedServices.includes(service) && "bg-accent"
                               )}
                               onClick={() => toggleService(service)}
                             >
                               <div className={cn(
-                                "flex h-4 w-4 items-center justify-center rounded border",
+                                "flex h-3.5 w-3.5 items-center justify-center rounded border flex-shrink-0",
                                 selectedServices.includes(service) 
                                   ? "bg-primary border-primary text-primary-foreground" 
                                   : "border-input"
                               )}>
                                 {selectedServices.includes(service) && (
-                                  <Check className="h-3 w-3" />
+                                  <Check className="h-2.5 w-2.5" />
                                 )}
                               </div>
-                              <span className="text-sm truncate">{service}</span>
+                              <span className="text-xs truncate">{service}</span>
                             </div>
                           ))
                         )}
@@ -311,7 +311,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="w-full text-xs"
+                          className="w-full text-xs h-7"
                           onClick={() => setSelectedServices([])}
                         >
                           Clear selection
@@ -321,16 +321,16 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                   </PopoverContent>
                 </Popover>
                 {selectedServices.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
+                  <div className="flex flex-wrap gap-1 mt-1">
                     {selectedServices.map((service) => (
                       <Badge
                         key={service}
                         variant="secondary"
-                        className="text-xs cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                        className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
                         onClick={() => toggleService(service)}
                       >
-                        {service}
-                        <X className="h-3 w-3 ml-1" />
+                        <span className="truncate max-w-[80px]">{service}</span>
+                        <X className="h-2.5 w-2.5 ml-0.5 flex-shrink-0" />
                       </Badge>
                     ))}
                   </div>
@@ -338,52 +338,47 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
               </div>
 
               {/* Job Duration */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="duration" className="text-sm">
-                    Estimated Job Duration
-                  </Label>
-                  <span className="text-xs text-muted-foreground">
-                    (auto-estimated from job history)
-                  </span>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="duration" className="text-xs">Duration</Label>
                 <Select value={jobDuration} onValueChange={setJobDuration}>
-                  <SelectTrigger id="duration">
+                  <SelectTrigger id="duration" className="h-8 text-xs">
                     <SelectValue placeholder="Select duration" />
                   </SelectTrigger>
                   <SelectContent>
                     {DURATION_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
                         {opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-muted-foreground">Auto-estimated from history</p>
               </div>
 
               {/* Advanced Options */}
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground">
+                <CollapsibleTrigger className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground">
                   <span>Advanced Options</span>
                   {showAdvanced ? (
-                    <ChevronUp className="h-4 w-4" />
+                    <ChevronUp className="h-3.5 w-3.5" />
                   ) : (
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-3.5 w-3.5" />
                   )}
                 </CollapsibleTrigger>
-                <CollapsibleContent className="mt-3 space-y-4">
+                <CollapsibleContent className="mt-2 space-y-3">
                   {/* Preferred Days */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Preferred Days</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Preferred Days</Label>
+                    <div className="grid grid-cols-2 gap-1">
                       {DAYS_OF_WEEK.map((day) => (
-                        <div key={day.value} className="flex items-center space-x-2">
+                        <div key={day.value} className="flex items-center space-x-1.5">
                           <Checkbox
                             id={day.value}
                             checked={preferredDays.includes(day.value)}
                             onCheckedChange={() => toggleDay(day.value)}
+                            className="h-3.5 w-3.5"
                           />
-                          <Label htmlFor={day.value} className="text-xs cursor-pointer">
+                          <Label htmlFor={day.value} className="text-[10px] cursor-pointer">
                             {day.label}
                           </Label>
                         </div>
@@ -392,31 +387,31 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                   </div>
 
                   {/* Time Window */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Preferred Time Window</Label>
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Time Window</Label>
+                    <div className="flex items-center gap-1">
                       <Select value={preferredTimeStart || "none"} onValueChange={(v) => setPreferredTimeStart(v === "none" ? "" : v)}>
-                        <SelectTrigger className="flex-1">
+                        <SelectTrigger className="flex-1 h-7 text-xs px-2">
                           <SelectValue placeholder="Start" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Start</SelectItem>
+                          <SelectItem value="none" className="text-xs">Start</SelectItem>
                           {TIME_OPTIONS.map((time) => (
-                            <SelectItem key={time} value={time}>
+                            <SelectItem key={time} value={time} className="text-xs">
                               {time}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <span className="text-sm text-muted-foreground">to</span>
+                      <span className="text-[10px] text-muted-foreground">to</span>
                       <Select value={preferredTimeEnd || "none"} onValueChange={(v) => setPreferredTimeEnd(v === "none" ? "" : v)}>
-                        <SelectTrigger className="flex-1">
+                        <SelectTrigger className="flex-1 h-7 text-xs px-2">
                           <SelectValue placeholder="End" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">End</SelectItem>
+                          <SelectItem value="none" className="text-xs">End</SelectItem>
                           {TIME_OPTIONS.map((time) => (
-                            <SelectItem key={time} value={time}>
+                            <SelectItem key={time} value={time} className="text-xs">
                               {time}
                             </SelectItem>
                           ))}
@@ -426,16 +421,15 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                   </div>
 
                   {/* Restrictions */}
-                  <div className="space-y-2">
-                    <Label htmlFor="restrictions" className="text-sm">
-                      Restrictions / Notes
-                    </Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="restrictions" className="text-xs">Notes</Label>
                     <Textarea
                       id="restrictions"
-                      placeholder="e.g., Customer only available mornings, avoid Wednesdays..."
+                      placeholder="e.g., mornings only..."
                       value={restrictions}
                       onChange={(e) => setRestrictions(e.target.value)}
                       rows={2}
+                      className="text-xs"
                     />
                   </div>
                 </CollapsibleContent>
@@ -445,51 +439,52 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
               <Button
                 onClick={() => suggestMutation.mutate()}
                 disabled={suggestMutation.isPending}
-                className="w-full"
+                className="w-full h-8 text-xs"
+                size="sm"
               >
                 {suggestMutation.isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Analyzing Schedule...
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Analyzing...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Get AI Suggestions
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    Get Suggestions
                   </>
                 )}
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Estimated Duration from AI */}
               {suggestions.estimatedDurationMinutes && (
-                <div className="bg-primary/10 rounded-lg p-3 text-sm">
-                  <div className="flex items-center gap-2 text-primary font-medium">
-                    <Clock className="h-4 w-4" />
-                    Estimated Duration: {Math.round(suggestions.estimatedDurationMinutes)} min
+                <div className="bg-primary/10 rounded-md p-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-primary font-medium">
+                    <Clock className="h-3.5 w-3.5" />
+                    Est. Duration: {Math.round(suggestions.estimatedDurationMinutes)} min
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Based on similar jobs in your history
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Based on job history
                   </p>
                 </div>
               )}
 
               {/* Technician Driving Distances */}
               {suggestions.technicians && suggestions.technicians.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Car className="h-4 w-4" />
-                    Technician Driving Distances
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
+                    <Car className="h-3.5 w-3.5" />
+                    Technician Distances
                   </Label>
-                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                  <div className="bg-muted/50 rounded-md p-2 space-y-1">
                     {suggestions.technicians.map((tech, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>{tech.name}</span>
+                      <div key={idx} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span className="truncate">{tech.name}</span>
                         </div>
-                        <span className="text-muted-foreground font-mono text-xs">
+                        <span className="text-muted-foreground font-mono text-[10px] flex-shrink-0">
                           {formatDrivingDistance(tech)}
                         </span>
                       </div>
@@ -500,7 +495,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
 
               {/* Analysis Summary */}
               {suggestions.analysis && (
-                <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                <div className="bg-muted/50 rounded-md p-2 text-xs">
                   <p className="text-muted-foreground">{suggestions.analysis}</p>
                 </div>
               )}
@@ -511,9 +506,9 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
                   {suggestions.warnings.map((warning, idx) => (
                     <div
                       key={idx}
-                      className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 rounded p-2"
+                      className="flex items-start gap-1.5 text-[10px] text-warning bg-warning/10 rounded p-1.5"
                     >
-                      <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
                       <span>{warning}</span>
                     </div>
                   ))}
@@ -521,49 +516,49 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
               )}
 
               {/* Suggestions */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Suggested Times</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Suggested Times</Label>
                 {suggestions.suggestions.map((suggestion, idx) => (
                   <div
                     key={idx}
-                    className="border rounded-lg p-3 hover:bg-accent/50 transition-colors cursor-pointer"
+                    className="border rounded-md p-2 hover:bg-accent/50 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-primary" />
-                          <span className="font-medium text-sm">
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                          <span className="font-medium text-xs">
                             {suggestion.dayName},{" "}
                             {format(parseISO(suggestion.date), "MMM d")}
                           </span>
                           {getConfidenceBadge(suggestion.confidence)}
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5" />
-                          <span>{suggestion.timeSlot}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{suggestion.timeSlot}</span>
                           {suggestion.nearbyJobsCount !== undefined && (
-                            <span className="text-xs">
-                              • {suggestion.nearbyJobsCount} nearby jobs
+                            <span className="text-[10px]">
+                              • {suggestion.nearbyJobsCount} nearby
                             </span>
                           )}
                         </div>
                         {suggestion.suggestedTechnician && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-primary">
-                            <User className="h-3 w-3" />
-                            <span>{suggestion.suggestedTechnician}</span>
+                          <div className="flex items-center gap-1 mt-0.5 text-[10px] text-primary">
+                            <User className="h-2.5 w-2.5" />
+                            <span className="truncate">{suggestion.suggestedTechnician}</span>
                           </div>
                         )}
                         {suggestion.nearestExistingJob && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span>Near: {suggestion.nearestExistingJob}</span>
+                          <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground">
+                            <MapPin className="h-2.5 w-2.5" />
+                            <span className="truncate">Near: {suggestion.nearestExistingJob}</span>
                           </div>
                         )}
-                        <p className="text-xs text-muted-foreground mt-2">
+                        <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
                           {suggestion.reason}
                         </p>
                       </div>
-                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                     </div>
                   </div>
                 ))}
@@ -573,7 +568,8 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
               <Button
                 variant="outline"
                 onClick={() => setSuggestions(null)}
-                className="w-full"
+                className="w-full h-7 text-xs"
+                size="sm"
               >
                 Adjust Parameters
               </Button>
