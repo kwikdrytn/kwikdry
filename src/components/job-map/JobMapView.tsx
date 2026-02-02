@@ -723,7 +723,7 @@ export function JobMapView() {
         // Show loading state
         const loadingPopup = new mapboxgl.Popup({
           offset: 15,
-          closeButton: true,
+          closeButton: false,
           closeOnClick: false,
           maxWidth: "340px",
           className: "job-click-popup",
