@@ -99,7 +99,7 @@ export default function Auth() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>}
 
-              <Button type="submit" className="w-full h-11 gradient-primary text-white font-medium" disabled={isLoading}>
+              <Button type="submit" className="w-full h-11 bg-[#0f1729] hover:bg-[#1a2540] text-white font-medium" disabled={isLoading}>
                 {isLoading ? <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {isLogin ? "Signing in..." : "Creating account..."}
