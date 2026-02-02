@@ -389,53 +389,80 @@ serve(async (req) => {
     console.log("Created job:", newJob.id);
 
     // Step 5: Add line items with PriceBook item (this is the key to getting prices populated)
-    // Use the service_item_id from PriceBook to get proper pricing
-    if (newJob.id) {
+    // Parse serviceType - it may be comma-separated list of services or a single service
+    if (newJob.id && serviceType) {
+      // Split by comma and trim each service name
+      const serviceNames = serviceType.split(",").map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+      console.log("Parsed service names:", serviceNames);
+
       const lineItemsToAdd: Array<{
         service_item_id?: string;
         name?: string;
         description?: string;
         quantity: number;
+        unit_price?: number;
       }> = [];
 
-      if (priceBookItemId) {
-        // Use PriceBook item ID - this will pull in the correct price automatically
-        lineItemsToAdd.push({
-          service_item_id: priceBookItemId,
-          quantity: 1,
-        });
-        console.log("Adding PriceBook line item with service_item_id:", priceBookItemId);
-      } else {
-        // Fallback: create custom line item without price
-        // Try to find price from local hcp_services table
+      // Look up each service in hcp_services table
+      for (const serviceName of serviceNames) {
+        // First check pricebook_mapping for this service
+        const { data: mapping } = await supabase
+          .from("pricebook_mapping")
+          .select("hcp_pricebook_item_id, hcp_pricebook_item_name")
+          .eq("organization_id", organizationId)
+          .ilike("service_type", serviceName)
+          .maybeSingle();
+
+        if (mapping?.hcp_pricebook_item_id) {
+          lineItemsToAdd.push({
+            service_item_id: mapping.hcp_pricebook_item_id,
+            quantity: 1,
+          });
+          console.log(`Found PriceBook mapping for "${serviceName}":`, mapping.hcp_pricebook_item_id);
+          continue;
+        }
+
+        // Then check hcp_services table
         const { data: serviceData } = await supabase
           .from("hcp_services")
-          .select("name, price, hcp_service_id")
+          .select("hcp_service_id, name, price")
           .eq("organization_id", organizationId)
-          .ilike("name", serviceType)
+          .ilike("name", serviceName)
           .maybeSingle();
 
         if (serviceData?.hcp_service_id) {
-          // Found a service with an HCP ID, use that as service_item_id
           lineItemsToAdd.push({
             service_item_id: serviceData.hcp_service_id,
             quantity: 1,
           });
-          console.log("Adding line item with hcp_service_id:", serviceData.hcp_service_id);
-        } else {
-          // Last resort: custom line item
+          console.log(`Found hcp_service for "${serviceName}":`, serviceData.hcp_service_id);
+          continue;
+        }
+
+        // Try partial match on name (for cases like "Carpet Cleaning" matching "Carpet Cleaning - Standard")
+        const { data: partialMatch } = await supabase
+          .from("hcp_services")
+          .select("hcp_service_id, name, price")
+          .eq("organization_id", organizationId)
+          .ilike("name", `%${serviceName}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (partialMatch?.hcp_service_id) {
           lineItemsToAdd.push({
-            name: serviceType,
-            description: priceBookItemName || serviceType,
+            service_item_id: partialMatch.hcp_service_id,
             quantity: 1,
           });
-          console.log("Adding custom line item (no pricing):", serviceType);
+          console.log(`Found partial match for "${serviceName}":`, partialMatch.hcp_service_id, partialMatch.name);
+          continue;
         }
+
+        // Fallback: Add as custom line item (this may fail if HCP requires service_item_id)
+        console.warn(`No HCP service found for "${serviceName}", skipping...`);
       }
 
       if (lineItemsToAdd.length > 0) {
-        const lineItemPayload = { line_items: lineItemsToAdd };
-        console.log("Adding line items:", JSON.stringify(lineItemPayload));
+        console.log("Adding line items:", JSON.stringify({ line_items: lineItemsToAdd }, null, 2));
 
         const lineItemResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
           method: "POST",
@@ -443,7 +470,7 @@ serve(async (req) => {
             Authorization: `Token ${hcpApiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(lineItemPayload),
+          body: JSON.stringify({ line_items: lineItemsToAdd }),
         });
 
         if (!lineItemResponse.ok) {
@@ -453,6 +480,8 @@ serve(async (req) => {
           const lineItemResult = await lineItemResponse.json();
           console.log("Added line items successfully:", lineItemResult?.line_items?.length || 0, "items");
         }
+      } else {
+        console.warn("No line items to add - no matching services found in HCP");
       }
     }
 
