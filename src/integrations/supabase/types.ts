@@ -1938,6 +1938,7 @@ export type Database = {
         | "case"
         | "roll"
         | "bag"
+        | "16 oz"
       maintenance_type:
         | "repair"
         | "service"
@@ -2127,6 +2128,7 @@ export const Constants = {
         "case",
         "roll",
         "bag",
+        "16 oz",
       ],
       maintenance_type: [
         "repair",
