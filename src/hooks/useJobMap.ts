@@ -249,7 +249,8 @@ export function useServiceTypes() {
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      // First try to get services from the hcp_services catalog
+      // Primary source: hcp_services table (synced from HCP Price Book API)
+      // These are fetched from: GET https://api.housecallpro.com/api/price_book/services
       const { data: catalogServices, error: catalogError } = await supabase
         .from('hcp_services')
         .select('name')
@@ -258,10 +259,14 @@ export function useServiceTypes() {
         .order('name');
 
       if (!catalogError && catalogServices && catalogServices.length > 0) {
+        console.log(`Found ${catalogServices.length} services from hcp_services table`);
         return catalogServices.map(s => s.name);
       }
 
-      // Fall back to extracting from job services array
+      console.log('No services in hcp_services table, falling back to job line items...');
+
+      // Fallback: Extract unique service names from job line items
+      // These come from: GET /jobs/{job_id}/line_items with service_item_id
       const { data: jobsWithServices, error: servicesError } = await supabase
         .from('hcp_jobs')
         .select('services')
@@ -272,7 +277,7 @@ export function useServiceTypes() {
       if (!servicesError && jobsWithServices) {
         const serviceSet = new Set<string>();
         jobsWithServices.forEach(job => {
-          const services = job.services as { name?: string }[] | null;
+          const services = job.services as { name?: string; service_item_id?: string }[] | null;
           if (services && services.length > 0) {
             services.forEach(s => {
               if (s.name) serviceSet.add(s.name);
@@ -281,79 +286,13 @@ export function useServiceTypes() {
         });
         
         if (serviceSet.size > 0) {
+          console.log(`Found ${serviceSet.size} unique services from job line items`);
           return Array.from(serviceSet).sort();
         }
       }
 
-      // Final fallback: extract service types from notes field
-      // HCP often embeds service info in notes like "Carpet Cleaning - First 2 Rooms - $88"
-      // Notes may be a JSON array string: [{"id":"...", "content":"..."}] or a plain string
-      const { data: jobsWithNotes, error: notesError } = await supabase
-        .from('hcp_jobs')
-        .select('notes')
-        .eq('organization_id', profile.organization_id)
-        .not('notes', 'is', null)
-        .limit(500);
-
-      if (notesError) throw notesError;
-
-      const serviceSet = new Set<string>();
-      const servicePatterns = [
-        'Carpet Cleaning',
-        'Duct Cleaning',
-        'Air Duct Cleaning',
-        'Upholstery Cleaning',
-        'Tile Cleaning',
-        'Hardwood Cleaning',
-        'Pet Odor Treatment',
-        'Stain Removal',
-        'Water Damage',
-        'Dryer Vent Cleaning',
-        'Area Rug Cleaning',
-        'Mattress Cleaning',
-        'Commercial Cleaning',
-        'Single Room',
-      ];
-
-      (jobsWithNotes || []).forEach(job => {
-        if (!job.notes) return;
-        
-        // Extract the actual note content - handle JSON array string or plain string
-        let noteText = '';
-        const notesRaw = job.notes as string;
-        
-        if (notesRaw.trim().startsWith('[')) {
-          try {
-            const parsed = JSON.parse(notesRaw) as { id?: string; content?: string }[];
-            noteText = parsed
-              .filter(n => n.content)
-              .map(n => n.content)
-              .join('\n');
-          } catch {
-            noteText = notesRaw;
-          }
-        } else {
-          noteText = notesRaw;
-        }
-        
-        if (noteText) {
-          // Try to extract service type from beginning of notes
-          // Pattern: "Service Type - Details - Price"
-          const firstPart = noteText.split(' - ')[0]?.trim();
-          if (firstPart && firstPart.length > 2 && firstPart.length < 50) {
-            serviceSet.add(firstPart);
-          }
-          
-          // Also check for known service patterns anywhere in notes
-          servicePatterns.forEach(pattern => {
-            if (noteText.toLowerCase().includes(pattern.toLowerCase())) {
-              serviceSet.add(pattern);
-            }
-          });
-        }
-      });
-
-      return Array.from(serviceSet).sort();
+      console.log('No services found in jobs, returning empty list');
+      return [];
     },
     enabled: !!profile?.organization_id
   });
