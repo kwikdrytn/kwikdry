@@ -103,15 +103,56 @@ Deno.serve(async (req) => {
     let wasInvited = false;
 
     if (existingUser) {
-      // User already exists in auth - check if they have a profile in this org
+      // User already exists in auth - check if they have an ACTIVE profile in this org
       const { data: existingProfile } = await supabaseAdmin
         .from('profiles')
-        .select('id')
+        .select('id, deleted_at, is_active')
         .eq('user_id', existingUser.id)
         .eq('organization_id', requestingProfile.organization_id)
         .single();
 
       if (existingProfile) {
+        // If profile was soft-deleted, reactivate it instead of creating new
+        if (existingProfile.deleted_at !== null || existingProfile.is_active === false) {
+          const { error: reactivateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+              first_name,
+              last_name,
+              phone: phone || null,
+              role: role || 'technician',
+              custom_role_id: custom_role_id || null,
+              location_id: location_id || null,
+              address: address || null,
+              city: city || null,
+              state: state || null,
+              zip: zip || null,
+              home_lat: home_lat || null,
+              home_lng: home_lng || null,
+              is_active: true,
+              deleted_at: null,
+            })
+            .eq('id', existingProfile.id);
+
+          if (reactivateError) {
+            console.error('Reactivate error:', reactivateError);
+            return new Response(JSON.stringify({ error: reactivateError.message }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          return new Response(JSON.stringify({ 
+            success: true, 
+            profile: { id: existingProfile.id },
+            reactivated: true,
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Profile is active - truly a duplicate
         return new Response(JSON.stringify({ error: 'User already exists in this organization' }), {
           status: 409,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
