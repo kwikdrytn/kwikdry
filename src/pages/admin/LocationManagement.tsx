@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,8 @@ import {
   LocationFormData,
   TIMEZONES,
 } from "@/hooks/useLocations";
-import { Plus, MapPin, Users, Clock, Edit, Trash2 } from "lucide-react";
+import { Plus, MapPin, Users, Clock, Edit, Trash2, ArrowLeft } from "lucide-react";
+import { DashboardLayout } from "@/components/DashboardLayout";
 
 export default function LocationManagement() {
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -79,6 +80,12 @@ export default function LocationManagement() {
   return (
     <DashboardLayout title="Locations">
       <div className="space-y-6">
+        <Button variant="ghost" size="sm" asChild className="-ml-2">
+          <Link to="/settings">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Settings
+          </Link>
+        </Button>
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
