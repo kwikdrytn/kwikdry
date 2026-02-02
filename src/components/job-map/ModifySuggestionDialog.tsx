@@ -1,0 +1,244 @@
+import { useState, useEffect } from "react";
+import { format, parseISO, addDays } from "date-fns";
+import { Loader2, Calendar, Clock, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { SchedulingSuggestion, TechnicianDistance } from "@/types/scheduling";
+
+interface ModifySuggestionDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  suggestion: SchedulingSuggestion | null;
+  technicians: TechnicianDistance[];
+  onConfirm: (modified: SchedulingSuggestion) => void;
+  isLoading?: boolean;
+}
+
+const TIME_OPTIONS = [
+  "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30",
+  "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
+  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+  "18:00", "18:30", "19:00", "19:30", "20:00"
+];
+
+export function ModifySuggestionDialog({
+  open,
+  onOpenChange,
+  suggestion,
+  technicians,
+  onConfirm,
+  isLoading = false,
+}: ModifySuggestionDialogProps) {
+  const [technicianName, setTechnicianName] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  useEffect(() => {
+    if (suggestion) {
+      setTechnicianName(suggestion.technicianName || "");
+      setScheduledDate(suggestion.scheduledDate || "");
+      setScheduledTime(suggestion.scheduledTime || "");
+      setCustomerName(suggestion.customerName || "");
+      setCustomerPhone(suggestion.customerPhone || "");
+    }
+  }, [suggestion]);
+
+  const handleConfirm = () => {
+    if (!suggestion) return;
+
+    // Find technician ID from name
+    const selectedTech = technicians.find(t => t.name === technicianName);
+
+    const modified: SchedulingSuggestion = {
+      ...suggestion,
+      technicianName,
+      technicianId: selectedTech?.hcpEmployeeId,
+      scheduledDate,
+      scheduledTime,
+      customerName,
+      customerPhone,
+    };
+
+    onConfirm(modified);
+  };
+
+  // Generate date options for next 14 days
+  const dateOptions = Array.from({ length: 14 }, (_, i) => {
+    const date = addDays(new Date(), i);
+    return {
+      value: format(date, "yyyy-MM-dd"),
+      label: format(date, "EEE, MMM d"),
+    };
+  });
+
+  if (!suggestion) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" />
+            Modify Suggestion
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Service Type - Read Only */}
+          <div className="space-y-2">
+            <Label className="text-sm">Service Type</Label>
+            <div className="p-2 bg-muted rounded-md text-sm">
+              {suggestion.serviceType}
+            </div>
+          </div>
+
+          {/* Customer Name */}
+          <div className="space-y-2">
+            <Label htmlFor="customerName" className="text-sm">Customer Name</Label>
+            <Input
+              id="customerName"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Enter customer name"
+            />
+          </div>
+
+          {/* Customer Phone */}
+          <div className="space-y-2">
+            <Label htmlFor="customerPhone" className="text-sm">Customer Phone (optional)</Label>
+            <Input
+              id="customerPhone"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="(555) 123-4567"
+              type="tel"
+            />
+          </div>
+
+          {/* Address - Read Only */}
+          <div className="space-y-2">
+            <Label className="text-sm">Address</Label>
+            <div className="p-2 bg-muted rounded-md text-sm">
+              {suggestion.address}, {suggestion.city}, {suggestion.state} {suggestion.zip}
+            </div>
+          </div>
+
+          {/* Technician */}
+          <div className="space-y-2">
+            <Label className="text-sm flex items-center gap-1.5">
+              <User className="h-4 w-4" />
+              Assign To
+            </Label>
+            <Select value={technicianName} onValueChange={setTechnicianName}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select technician" />
+              </SelectTrigger>
+              <SelectContent>
+                {technicians.map((tech) => (
+                  <SelectItem key={tech.name} value={tech.name}>
+                    <div className="flex items-center justify-between w-full gap-2">
+                      <span>{tech.name}</span>
+                      {tech.drivingDistanceMiles && (
+                        <span className="text-xs text-muted-foreground">
+                          {tech.drivingDistanceMiles.toFixed(1)} mi
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Date */}
+          <div className="space-y-2">
+            <Label className="text-sm flex items-center gap-1.5">
+              <Calendar className="h-4 w-4" />
+              Date
+            </Label>
+            <Select value={scheduledDate} onValueChange={setScheduledDate}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select date" />
+              </SelectTrigger>
+              <SelectContent>
+                {dateOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Time */}
+          <div className="space-y-2">
+            <Label className="text-sm flex items-center gap-1.5">
+              <Clock className="h-4 w-4" />
+              Start Time
+            </Label>
+            <Select value={scheduledTime} onValueChange={setScheduledTime}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select time" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_OPTIONS.map((time) => (
+                  <SelectItem key={time} value={time}>
+                    {format(parseISO(`2000-01-01T${time}:00`), "h:mm a")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* AI Reasoning - Read Only */}
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">AI Reasoning</Label>
+            <div className="p-2 bg-muted/50 rounded-md text-xs text-muted-foreground">
+              {suggestion.reasoning}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={isLoading || !customerName || !scheduledDate || !scheduledTime}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Job"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
