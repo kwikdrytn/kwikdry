@@ -21,6 +21,7 @@ interface CreateJobRequest {
   technicianHcpId?: string;
   notes?: string;
   coordinates?: { lat: number; lng: number };
+  createAsDraft?: boolean; // Create as "needs scheduling" instead of scheduled
 }
 
 interface CreateJobResponse {
@@ -28,6 +29,7 @@ interface CreateJobResponse {
   jobId?: string;
   hcpJobId?: string;
   hcpJobUrl?: string;
+  customerId?: string;
   error?: string;
 }
 
@@ -107,6 +109,7 @@ serve(async (req) => {
       technicianHcpId,
       notes,
       coordinates,
+      createAsDraft = false, // Default to scheduled if not specified
     } = requestData;
 
     // Normalize state to 2-letter abbreviation
@@ -206,23 +209,43 @@ serve(async (req) => {
       console.log("Created new customer:", customerId);
     }
 
-    // Step 2: Find the service in HCP price book
-    let serviceItemId: string | null = null;
-    const servicesResponse = await fetch(`${hcpBaseUrl}/price_book/services`, {
-      headers: {
-        Authorization: `Token ${hcpApiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // Step 2: Look up PriceBook mapping for the service type
+    let priceBookItemId: string | null = null;
+    let priceBookItemName: string | null = null;
+    let mappedDuration = duration;
 
-    if (servicesResponse.ok) {
-      const servicesData = await servicesResponse.json();
-      const matchingService = servicesData.services?.find(
-        (s: any) => s.name?.toLowerCase() === serviceType.toLowerCase()
-      );
-      if (matchingService) {
-        serviceItemId = matchingService.id;
-        console.log("Found matching service:", serviceItemId);
+    // First try to find the mapping in our local pricebook_mapping table
+    const { data: mapping } = await supabase
+      .from("pricebook_mapping")
+      .select("hcp_pricebook_item_id, hcp_pricebook_item_name, default_duration_minutes")
+      .eq("organization_id", organizationId)
+      .ilike("service_type", serviceType)
+      .maybeSingle();
+
+    if (mapping) {
+      priceBookItemId = mapping.hcp_pricebook_item_id;
+      priceBookItemName = mapping.hcp_pricebook_item_name;
+      mappedDuration = mapping.default_duration_minutes || duration;
+      console.log("Found PriceBook mapping:", priceBookItemId, priceBookItemName);
+    } else {
+      // Fallback: Find the service in HCP price book directly by name
+      const servicesResponse = await fetch(`${hcpBaseUrl}/price_book/services`, {
+        headers: {
+          Authorization: `Token ${hcpApiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (servicesResponse.ok) {
+        const servicesData = await servicesResponse.json();
+        const matchingService = servicesData.services?.find(
+          (s: any) => s.name?.toLowerCase() === serviceType.toLowerCase()
+        );
+        if (matchingService) {
+          priceBookItemId = matchingService.id;
+          priceBookItemName = matchingService.name;
+          console.log("Found matching PriceBook service:", priceBookItemId, priceBookItemName);
+        }
       }
     }
 
@@ -287,73 +310,62 @@ serve(async (req) => {
     // Step 4: Create the job
     const scheduledStart = `${scheduledDate}T${scheduledTime}:00`;
     
-    // Calculate end time
+    // Calculate end time using mapped duration if available
+    const effectiveDuration = mappedDuration || duration;
     const startDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
-    const endDate = new Date(startDate.getTime() + duration * 60 * 1000);
+    const endDate = new Date(startDate.getTime() + effectiveDuration * 60 * 1000);
     const endHours = endDate.getHours().toString().padStart(2, "0");
     const endMinutes = endDate.getMinutes().toString().padStart(2, "0");
     const scheduledEnd = `${scheduledDate}T${endHours}:${endMinutes}:00`;
 
-    // Build line items array with pricing from price book if available
-    const lineItems: Array<{ name: string; description?: string; quantity: number; unit_price?: number }> = [];
-    if (serviceType) {
-      // Look up price from local database
-      const serviceNames = serviceType.split(',').map(s => s.trim());
-      for (const serviceName of serviceNames) {
-        const { data: serviceData } = await supabase
-          .from("hcp_services")
-          .select("name, price")
-          .eq("organization_id", organizationId)
-          .ilike("name", serviceName)
-          .maybeSingle();
-        
-        lineItems.push({
-          name: serviceName,
-          description: serviceName,
-          quantity: 1,
-          unit_price: serviceData?.price ? Math.round(serviceData.price * 100) : undefined, // HCP expects cents
-        });
-      }
-      
-      // If no services were found, add a generic line item
-      if (lineItems.length === 0) {
-        lineItems.push({
-          name: serviceType,
-          description: serviceType,
-          quantity: 1,
-        });
-      }
-    }
-
+    // Build the job payload
     const jobPayload: Record<string, any> = {
       customer_id: customerId,
-      schedule: {
-        scheduled_start: scheduledStart,
-        scheduled_end: scheduledEnd,
-      },
       address: {
         street: address,
         city: city,
         state: state,
         zip: zip || "",
       },
-      // Include line items directly in job creation
-      line_items: lineItems,
-      // Set as draft/unscheduled
-      work_status: "scheduled",
     };
 
-    if (notes) {
-      jobPayload.notes = notes;
+    // Set work_status based on createAsDraft flag
+    // "needs scheduling" creates an unscheduled/draft job
+    // "scheduled" creates a scheduled job
+    if (createAsDraft) {
+      jobPayload.work_status = "needs scheduling";
+      // For draft jobs, we might still want to add schedule info as a suggestion
+      if (scheduledDate && scheduledTime) {
+        jobPayload.schedule = {
+          scheduled_start: scheduledStart,
+          scheduled_end: scheduledEnd,
+        };
+      }
+    } else {
+      jobPayload.work_status = "scheduled";
+      jobPayload.schedule = {
+        scheduled_start: scheduledStart,
+        scheduled_end: scheduledEnd,
+      };
     }
 
+    // Add notes with AI suggestion tag
+    if (notes) {
+      jobPayload.notes = `[AI Suggested] ${notes}`;
+    } else {
+      jobPayload.notes = "[AI Suggested Job]";
+    }
+
+    // Assign technician
     if (employeeId) {
       jobPayload.assigned_employee_ids = [employeeId];
     }
 
     console.log("Creating job payload:", JSON.stringify(jobPayload, null, 2));
-    console.log("Service Item ID for price book:", serviceItemId);
+    console.log("PriceBook Item ID:", priceBookItemId);
+    console.log("PriceBook Item Name:", priceBookItemName);
     console.log("Employee ID for assignment:", employeeId);
+    console.log("Create as draft:", createAsDraft);
 
     const createJobResponse = await fetch(`${hcpBaseUrl}/jobs`, {
       method: "POST",
@@ -374,38 +386,78 @@ serve(async (req) => {
     }
 
     const newJob = await createJobResponse.json();
-    console.log("Created job:", newJob.id, "with", newJob.line_items?.length || 0, "line items");
+    console.log("Created job:", newJob.id);
 
-    // Step 5: If we have a price book service item, add it as a proper line item
-    if (serviceItemId && newJob.id) {
-      const lineItemPayload = {
-        line_items: [
-          {
-            service_item_id: serviceItemId,
-            quantity: 1,
-          },
-        ],
-      };
+    // Step 5: Add line items with PriceBook item (this is the key to getting prices populated)
+    // Use the service_item_id from PriceBook to get proper pricing
+    if (newJob.id) {
+      const lineItemsToAdd: Array<{
+        service_item_id?: string;
+        name?: string;
+        description?: string;
+        quantity: number;
+      }> = [];
 
-      console.log("Adding price book line item:", JSON.stringify(lineItemPayload));
-
-      const lineItemResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
-        method: "POST",
-        headers: {
-          Authorization: `Token ${hcpApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(lineItemPayload),
-      });
-
-      if (!lineItemResponse.ok) {
-        console.warn("Failed to add price book line item:", await lineItemResponse.text());
+      if (priceBookItemId) {
+        // Use PriceBook item ID - this will pull in the correct price automatically
+        lineItemsToAdd.push({
+          service_item_id: priceBookItemId,
+          quantity: 1,
+        });
+        console.log("Adding PriceBook line item with service_item_id:", priceBookItemId);
       } else {
-        console.log("Added price book line item to job");
+        // Fallback: create custom line item without price
+        // Try to find price from local hcp_services table
+        const { data: serviceData } = await supabase
+          .from("hcp_services")
+          .select("name, price, hcp_service_id")
+          .eq("organization_id", organizationId)
+          .ilike("name", serviceType)
+          .maybeSingle();
+
+        if (serviceData?.hcp_service_id) {
+          // Found a service with an HCP ID, use that as service_item_id
+          lineItemsToAdd.push({
+            service_item_id: serviceData.hcp_service_id,
+            quantity: 1,
+          });
+          console.log("Adding line item with hcp_service_id:", serviceData.hcp_service_id);
+        } else {
+          // Last resort: custom line item
+          lineItemsToAdd.push({
+            name: serviceType,
+            description: priceBookItemName || serviceType,
+            quantity: 1,
+          });
+          console.log("Adding custom line item (no pricing):", serviceType);
+        }
+      }
+
+      if (lineItemsToAdd.length > 0) {
+        const lineItemPayload = { line_items: lineItemsToAdd };
+        console.log("Adding line items:", JSON.stringify(lineItemPayload));
+
+        const lineItemResponse = await fetch(`${hcpBaseUrl}/jobs/${newJob.id}/line_items`, {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${hcpApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(lineItemPayload),
+        });
+
+        if (!lineItemResponse.ok) {
+          const lineItemError = await lineItemResponse.text();
+          console.warn("Failed to add line items:", lineItemError);
+        } else {
+          const lineItemResult = await lineItemResponse.json();
+          console.log("Added line items successfully:", lineItemResult?.line_items?.length || 0, "items");
+        }
       }
     }
 
     // Step 6: Store in local database for tracking
+    const jobStatus = createAsDraft ? "needs_scheduling" : "scheduled";
     const { error: insertError } = await supabase.from("hcp_jobs").upsert({
       organization_id: organizationId,
       hcp_job_id: newJob.id,
@@ -420,9 +472,9 @@ serve(async (req) => {
       scheduled_date: scheduledDate,
       scheduled_time: scheduledTime,
       scheduled_end: `${endHours}:${endMinutes}`,
-      status: "scheduled",
+      status: jobStatus,
       technician_hcp_id: employeeId,
-      services: serviceType ? [{ name: serviceType }] : [],
+      services: serviceType ? [{ name: serviceType, pricebook_item_id: priceBookItemId }] : [],
       notes: notes,
       synced_at: new Date().toISOString(),
     }, {
@@ -441,6 +493,7 @@ serve(async (req) => {
       jobId: newJob.id,
       hcpJobId: newJob.id,
       hcpJobUrl: hcpJobUrl,
+      customerId: customerId || undefined,
     };
 
     return new Response(JSON.stringify(response), {

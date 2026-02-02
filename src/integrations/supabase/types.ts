@@ -1448,6 +1448,47 @@ export type Database = {
         }
         Relationships: []
       }
+      pricebook_mapping: {
+        Row: {
+          created_at: string
+          default_duration_minutes: number
+          hcp_pricebook_item_id: string
+          hcp_pricebook_item_name: string | null
+          id: string
+          organization_id: string
+          service_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_duration_minutes?: number
+          hcp_pricebook_item_id: string
+          hcp_pricebook_item_name?: string | null
+          id?: string
+          organization_id: string
+          service_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_duration_minutes?: number
+          hcp_pricebook_item_id?: string
+          hcp_pricebook_item_name?: string | null
+          id?: string
+          organization_id?: string
+          service_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricebook_mapping_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address: string | null

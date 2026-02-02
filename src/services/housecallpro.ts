@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { SchedulingSuggestion, PriceBookMapping } from "@/types/scheduling";
 
 // ============================================
 // Types
@@ -22,6 +23,7 @@ export interface CreateJobParams {
   serviceType: string;
   notes?: string;
   coordinates?: { lat: number; lng: number };
+  createAsDraft?: boolean; // Create as "needs scheduling" instead of scheduled
 }
 
 export interface CreateJobResult {
@@ -29,6 +31,7 @@ export interface CreateJobResult {
   jobId?: string;
   hcpJobId?: string;
   jobUrl?: string;
+  customerId?: string;
   error?: string;
 }
 
@@ -96,6 +99,7 @@ export async function createHCPJob(params: CreateJobParams): Promise<CreateJobRe
         technicianHcpId: params.assignedEmployeeId,
         notes: params.notes,
         coordinates: params.coordinates,
+        createAsDraft: params.createAsDraft || false,
       },
     });
 
@@ -112,6 +116,7 @@ export async function createHCPJob(params: CreateJobParams): Promise<CreateJobRe
       jobId: data.jobId,
       hcpJobId: data.hcpJobId,
       jobUrl: data.hcpJobUrl,
+      customerId: data.customerId,
       error: data.error,
     };
   } catch (error) {
@@ -379,4 +384,91 @@ export function formatPhoneNumber(phone: string): string {
  */
 export function normalizePhoneNumber(phone: string): string {
   return phone.replace(/\D/g, "");
+}
+
+// ============================================
+// PriceBook Mapping
+// ============================================
+
+/**
+ * Get PriceBook mapping for a service type
+ */
+export async function getPriceBookMapping(
+  organizationId: string,
+  serviceType: string
+): Promise<PriceBookMapping | null> {
+  const { data, error } = await supabase
+    .from("pricebook_mapping")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .ilike("service_type", serviceType)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching PriceBook mapping:", error);
+    return null;
+  }
+  return data as PriceBookMapping | null;
+}
+
+/**
+ * Get all PriceBook mappings for an organization
+ */
+export async function getPriceBookMappings(
+  organizationId: string
+): Promise<PriceBookMapping[]> {
+  const { data, error } = await supabase
+    .from("pricebook_mapping")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("service_type");
+
+  if (error) {
+    console.error("Error fetching PriceBook mappings:", error);
+    return [];
+  }
+  return data as PriceBookMapping[];
+}
+
+// ============================================
+// Suggestion Helpers
+// ============================================
+
+/**
+ * Create a job from an AI scheduling suggestion
+ */
+export async function createJobFromSuggestion(
+  suggestion: SchedulingSuggestion,
+  organizationId: string,
+  overrides?: {
+    technicianId?: string;
+    date?: string;
+    time?: string;
+    createAsDraft?: boolean;
+  }
+): Promise<CreateJobResult> {
+  const techId = overrides?.technicianId || suggestion.technicianId;
+  const jobDate = overrides?.date || suggestion.scheduledDate;
+  const jobTime = overrides?.time || suggestion.scheduledTime;
+
+  // Get PriceBook mapping for duration
+  const mapping = await getPriceBookMapping(organizationId, suggestion.serviceType);
+  const duration = mapping?.default_duration_minutes || suggestion.duration || 60;
+
+  return createHCPJob({
+    organizationId,
+    customerName: suggestion.customerName,
+    customerPhone: suggestion.customerPhone,
+    address: suggestion.address,
+    city: suggestion.city,
+    state: suggestion.state,
+    zip: suggestion.zip,
+    scheduledDate: jobDate,
+    scheduledTime: jobTime,
+    duration,
+    serviceType: suggestion.serviceType,
+    assignedEmployeeId: techId,
+    notes: suggestion.reasoning,
+    createAsDraft: overrides?.createAsDraft,
+  });
 }
