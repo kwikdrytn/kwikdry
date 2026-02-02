@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
+export interface TechnicianSkillSummary {
+  service_type: string;
+  skill_level: string;
+}
+
 export interface UserProfile {
   id: string;
   user_id: string;
@@ -31,6 +36,30 @@ export interface UserProfile {
     id: string;
     name: string;
   } | null;
+  technician_skills?: TechnicianSkillSummary[];
+}
+
+// Helper function to summarize skills
+export function summarizeSkills(skills: TechnicianSkillSummary[] | undefined): { 
+  preferred: number; 
+  avoid: number; 
+  never: number;
+  hasPreferences: boolean;
+} {
+  if (!skills || skills.length === 0) {
+    return { preferred: 0, avoid: 0, never: 0, hasPreferences: false };
+  }
+  
+  const preferred = skills.filter(s => s.skill_level === 'preferred').length;
+  const avoid = skills.filter(s => s.skill_level === 'avoid').length;
+  const never = skills.filter(s => s.skill_level === 'never').length;
+  
+  return {
+    preferred,
+    avoid,
+    never,
+    hasPreferences: preferred > 0 || avoid > 0 || never > 0,
+  };
 }
 
 export interface UserFormData {
@@ -47,7 +76,11 @@ export interface UserFormData {
   zip?: string;
 }
 
-export function useUsers(filters?: { locationId?: string | null; role?: string | null }) {
+export function useUsers(filters?: { 
+  locationId?: string | null; 
+  role?: string | null;
+  hasSkillPreferences?: boolean;
+}) {
   const { profile } = useAuth();
 
   return useQuery({
@@ -84,6 +117,10 @@ export function useUsers(filters?: { locationId?: string | null; role?: string |
           custom_roles:custom_role_id (
             id,
             name
+          ),
+          technician_skills (
+            service_type,
+            skill_level
           )
         `)
         .eq('organization_id', profile.organization_id)
@@ -102,11 +139,23 @@ export function useUsers(filters?: { locationId?: string | null; role?: string |
 
       if (error) throw error;
 
-      return data.map((user: any) => ({
+      let users = data.map((user: any) => ({
         ...user,
         location: user.locations,
         custom_role: user.custom_roles,
+        technician_skills: user.technician_skills || [],
       })) as UserProfile[];
+
+      // Filter by skill preferences if requested
+      if (filters?.hasSkillPreferences) {
+        users = users.filter(user => {
+          if (user.role !== 'technician') return false;
+          const summary = summarizeSkills(user.technician_skills);
+          return summary.hasPreferences;
+        });
+      }
+
+      return users;
     },
     enabled: !!profile?.organization_id,
   });
