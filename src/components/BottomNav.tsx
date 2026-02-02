@@ -19,7 +19,7 @@ export function BottomNav() {
   const isActive = (url: string) => location.pathname === url || location.pathname.startsWith(url + '/');
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-sidebar-border bg-sidebar safe-area-bottom">
       <div className="flex h-16 items-center justify-around px-2">
         {navItems.map((item) => (
           <Link
@@ -28,11 +28,11 @@ export function BottomNav() {
             className={cn(
               "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
               isActive(item.url)
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
+                ? "text-sidebar-primary"
+                : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
             )}
           >
-            <item.icon className={cn("h-5 w-5", isActive(item.url) && "text-primary")} />
+            <item.icon className={cn("h-5 w-5", isActive(item.url) && "text-sidebar-primary")} />
             <span className="truncate max-w-[64px]">{item.title}</span>
           </Link>
         ))}
@@ -41,11 +41,11 @@ export function BottomNav() {
           className={cn(
             "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
             isActive('/settings')
-              ? "text-primary"
-              : "text-muted-foreground hover:text-foreground"
+              ? "text-sidebar-primary"
+              : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
           )}
         >
-          <Settings className={cn("h-5 w-5", isActive('/settings') && "text-primary")} />
+          <Settings className={cn("h-5 w-5", isActive('/settings') && "text-sidebar-primary")} />
           <span>Settings</span>
         </Link>
       </div>
