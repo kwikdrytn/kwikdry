@@ -243,11 +243,16 @@ export function BookingSuggestionPanel({ searchedLocation, onClose, onCollapseFi
           }
         }
         
+        // Use selected services, or fallback to first available service from price book
+        const effectiveServices = selectedServices.length > 0 
+          ? selectedServices.join(", ")
+          : (serviceTypes.length > 0 ? serviceTypes[0] : "");
+        
         return {
           id: `suggestion-${idx}-${Date.now()}`,
           technicianName: s.suggestedTechnician || "Unassigned",
           technicianId: techId,
-          serviceType: selectedServices.join(", ") || "General Service",
+          serviceType: effectiveServices,
           customerName: customerName || "New Customer",
           address: addressParts.address,
           city: addressParts.city,
