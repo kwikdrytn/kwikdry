@@ -94,7 +94,7 @@ export function AppSidebar() {
         {/* Profile Button */}
         <Link 
           to="/settings" 
-          className="flex items-center gap-3 px-2 py-3 rounded-md hover:bg-sidebar-accent transition-colors"
+          className="group flex items-center gap-3 px-2 py-3 rounded-md hover:bg-sidebar-accent transition-colors"
         >
           <Avatar className="h-8 w-8">
             <AvatarImage src={profile?.avatar_url ?? undefined} />
@@ -104,10 +104,10 @@ export function AppSidebar() {
           </Avatar>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-sidebar-foreground">
+              <span className="text-sm font-medium text-sidebar-foreground group-hover:text-sidebar-accent-foreground transition-colors">
                 {getFullName(profile?.first_name, profile?.last_name)}
               </span>
-              <span className="text-xs text-sidebar-foreground/70 capitalize">
+              <span className="text-xs text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground transition-colors capitalize">
                 {profile?.role?.replace('_', ' ')}
               </span>
             </div>
