@@ -1,28 +1,33 @@
-# Plan: HCP Services Flow - COMPLETED ✓
 
-## Summary
+# Fix Sidebar Hover Background Color
 
-Fixed services not flowing to HouseCall Pro with prices by:
+## Problem
+The sidebar buttons currently use `--sidebar-accent` for hover states, but this CSS variable is set to `228 66% 61%` - a lighter blue color. You want the hover background to match the primary color (`230 50% 41%` / `#35479e`).
 
-1. **Always including `name` field** in line item requests (HCP API requires it)
-2. **Added fallback to custom line items** when no matching service ID found
-3. **Enhanced logging** in sync function to debug ID extraction
+## Solution
+Update the `--sidebar-accent` CSS variable in `src/index.css` to match the primary color value.
 
-## Changes Made
+## Changes
 
-### `create-hcp-job/index.ts`
-- Made `name` required in `lineItemsToAdd` type definition
-- Added `name` field to all line item additions (pricebook mapping, hcp_services, partial match)
-- Added custom line item fallback when no service ID is found
+### File: `src/index.css`
 
-### `sync-hcp-data/index.ts`
-- Added detailed logging of first service item structure
-- Added per-service logging during sync for debugging
+**Line 54** - Update the light theme sidebar accent:
+```css
+/* Before */
+--sidebar-accent: 228 66% 61%;
 
-## Testing
+/* After */
+--sidebar-accent: 230 50% 41%;
+```
 
-1. Re-sync HCP data from Settings → Integration Settings
-2. Create a job with services selected
-3. Check edge function logs to verify line items are added with names
-4. Verify services appear in HCP with pricing
+This single change will ensure that all sidebar button hover states use the same color as the primary color (`#35479e`), giving you a solid, consistent hover background without any transparency or lightness issues.
 
+---
+
+## Technical Details
+
+| Token | Current Value | New Value | Color |
+|-------|--------------|-----------|-------|
+| `--sidebar-accent` | `228 66% 61%` | `230 50% 41%` | `#35479e` |
+
+The sidebar buttons already use `hover:bg-sidebar-accent` via the `sidebarMenuButtonVariants` in `src/components/ui/sidebar.tsx`. By updating the CSS variable, all hover states will automatically use the correct primary color.
