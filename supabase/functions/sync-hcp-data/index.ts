@@ -777,26 +777,58 @@ Deno.serve(async (req) => {
           // HCP returns times in ISO format with timezone (e.g., "2026-02-02T13:00:00-05:00")
           // We need to extract the LOCAL time as shown in HCP, not convert to UTC
           // Parse the ISO string and extract the date/time components before timezone conversion
+          
+          // Match ISO format: YYYY-MM-DDTHH:MM:SS with optional milliseconds and timezone
           const isoMatch = scheduledStart.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
           if (isoMatch) {
             scheduledDate = isoMatch[1]; // YYYY-MM-DD
-            scheduledTime = isoMatch[2]; // HH:MM:SS
+            scheduledTime = isoMatch[2]; // HH:MM:SS (local time from HCP)
+            console.log(`Parsed start time: ${scheduledStart} -> date: ${scheduledDate}, time: ${scheduledTime}`);
           } else {
-            // Fallback for non-standard formats
-            const startDate = new Date(scheduledStart);
-            scheduledDate = startDate.toISOString().split('T')[0];
-            scheduledTime = startDate.toISOString().split('T')[1].substring(0, 8);
+            // Fallback: try to extract time from other formats
+            // IMPORTANT: Do NOT use new Date().toISOString() as it converts to UTC
+            // Instead, try to parse the string directly
+            console.log(`Non-standard start format, attempting fallback: ${scheduledStart}`);
+            
+            // Try MM/DD/YYYY HH:MM format
+            const usMatch = scheduledStart.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+            if (usMatch) {
+              const [, month, day, year, hours, minutes] = usMatch;
+              scheduledDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              scheduledTime = `${hours.padStart(2, '0')}:${minutes}:00`;
+            } else {
+              // Last resort: just store the raw value
+              console.log(`Could not parse start time format: ${scheduledStart}`);
+              scheduledDate = null;
+              scheduledTime = null;
+            }
           }
         }
 
         if (scheduledEnd) {
-          // Same approach - extract local time from ISO string
+          // Same approach - extract local time from ISO string without UTC conversion
           const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
           if (isoMatch) {
-            scheduledEndTime = isoMatch[2]; // HH:MM:SS
+            scheduledEndTime = isoMatch[2]; // HH:MM:SS (local time from HCP)
+            console.log(`Parsed end time: ${scheduledEnd} -> time: ${scheduledEndTime}`);
           } else {
-            const endDate = new Date(scheduledEnd);
-            scheduledEndTime = endDate.toISOString().split('T')[1].substring(0, 8);
+            // Fallback for other formats
+            console.log(`Non-standard end format: ${scheduledEnd}`);
+            
+            const usMatch = scheduledEnd.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+            if (usMatch) {
+              const [, , , , hours, minutes] = usMatch;
+              scheduledEndTime = `${hours.padStart(2, '0')}:${minutes}:00`;
+            } else {
+              // Try to extract just time portion if present
+              const timeOnlyMatch = scheduledEnd.match(/(\d{1,2}):(\d{2})/);
+              if (timeOnlyMatch) {
+                scheduledEndTime = `${timeOnlyMatch[1].padStart(2, '0')}:${timeOnlyMatch[2]}:00`;
+              } else {
+                console.log(`Could not parse end time format: ${scheduledEnd}`);
+                scheduledEndTime = null;
+              }
+            }
           }
         }
 
