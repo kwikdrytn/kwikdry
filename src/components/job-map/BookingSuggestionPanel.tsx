@@ -448,7 +448,7 @@ export function BookingSuggestionPanel({ searchedLocation, onClose }: BookingSug
       <Card
         className={cn(
           "absolute bottom-4 left-4 right-4 z-10 shadow-lg !flex !flex-col overflow-hidden transition-all duration-200",
-          showAdvanced ? "max-h-72" : "max-h-44"
+          hasResults ? "max-h-[50vh]" : showAdvanced ? "max-h-72" : "max-h-44"
         )}
         onWheelCapture={(e) => e.stopPropagation()}
         onTouchStartCapture={(e) => e.stopPropagation()}
