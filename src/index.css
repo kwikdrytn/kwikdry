@@ -47,13 +47,13 @@ All colors MUST be HSL.
     --radius: 0.75rem;
 
     /* Sidebar tokens */
-    --sidebar-background: 227 40% 87%;
+    --sidebar-background: 235 28% 78%;
     --sidebar-foreground: 222 40% 18%;
     --sidebar-primary: 116 44% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 40% 18%;
+    --sidebar-accent: 232 41% 70%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 222 40% 18%;
+    --sidebar-border: 232 41% 70%;
     --sidebar-ring: 116 44% 50%;
 
     /* Custom gradient tokens - KwikDry brand colors */
