@@ -2,8 +2,10 @@ import { useLocation, Link } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { getNavItemsForRole } from "@/config/navigation";
+import { useIncompleteTrainingCount } from "@/hooks/useIncompleteTrainingCount";
 import { Settings, PanelLeft } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +16,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuBadge,
   useSidebar,
 } from "@/components/ui/sidebar";
 import kwikDryLogo from "@/assets/KwikDryLogo.png";
@@ -23,6 +26,7 @@ export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const location = useLocation();
   const isCollapsed = state === "collapsed";
+  const { data: incompleteTrainingCount = 0 } = useIncompleteTrainingCount();
 
   // Filter out Settings from nav items since we're placing it separately
   const navItems = getNavItemsForRole(profile?.role ?? null).filter(
@@ -61,24 +65,32 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location.pathname === item.url}
-                    tooltip={item.title}
-                  >
-                    <NavLink 
-                      to={item.url} 
-                      className="flex items-center gap-3"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+              {navItems.map((item) => {
+                const showBadge = item.url === '/training' && incompleteTrainingCount > 0;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location.pathname === item.url || location.pathname.startsWith(item.url + '/')}
+                      tooltip={item.title}
                     >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                      <NavLink 
+                        to={item.url} 
+                        className="flex items-center gap-3"
+                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                    {showBadge && (
+                      <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
+                        {incompleteTrainingCount}
+                      </SidebarMenuBadge>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

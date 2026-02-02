@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,9 @@ import {
 import { useDebounce } from "@/hooks/useDebounce";
 
 export default function TrainingManagement() {
-  const [activeTab, setActiveTab] = useState("videos");
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "videos";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   
