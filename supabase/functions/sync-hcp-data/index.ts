@@ -10,6 +10,11 @@ const HCP_BASE_URL = 'https://api.housecallpro.com';
 const MAPBOX_GEOCODE_BASE_URL = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
 const CENSUS_API_BASE = 'https://api.censusreporter.org/1.0/geo/tiger2023';
 
+interface HCPJobNote {
+  id?: string;
+  content?: string;
+}
+
 interface HCPJob {
   id: string;
   customer?: {
@@ -37,7 +42,7 @@ interface HCPJob {
   total_amount?: number;
   invoice_number?: string;
   lead_source?: string;
-  notes?: string;
+  notes?: string | HCPJobNote[];
   description?: string;
   work_order_notes?: string;
   assigned_employees?: Array<{
@@ -49,6 +54,14 @@ interface HCPJob {
     name?: string;
     description?: string;
     unit_price?: number;
+    price?: number;
+    quantity?: number;
+  }>;
+  total_items?: Array<{
+    name?: string;
+    description?: string;
+    unit_price?: number;
+    price?: number;
     quantity?: number;
   }>;
   location?: {
@@ -708,12 +721,15 @@ Deno.serve(async (req) => {
         }
 
         const assignedEmployee = job.assigned_employees?.[0];
-        const services = job.line_items?.map(item => ({
+        
+        // Prefer total_items if available, fall back to line_items
+        const lineItemsSource = job.total_items || job.line_items || [];
+        const services = lineItemsSource.map(item => ({
           name: item.name,
           description: item.description,
-          price: item.unit_price,
+          price: item.unit_price || item.price,
           quantity: item.quantity,
-        })) || [];
+        }));
 
         const extracted = extractLatLngFromJob(job);
         let lat: number | null = extracted?.lat ?? null;
@@ -739,11 +755,27 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Combine all possible note fields from HCP (ensure they are strings)
-        const noteFields = [job.notes, job.description, job.work_order_notes]
-          .filter(n => typeof n === 'string' && n.trim().length > 0)
-          .map(n => (n as string).trim());
-        const jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
+        // Handle notes - can be string, array of {id, content}, or other fields
+        let jobNotes: string | object | null = null;
+        
+        if (job.notes) {
+          if (Array.isArray(job.notes)) {
+            // Notes is an array of {id, content} objects - store as JSON
+            jobNotes = job.notes;
+          } else if (typeof job.notes === 'string') {
+            // Combine with other string note fields
+            const noteFields = [job.notes, job.description, job.work_order_notes]
+              .filter(n => typeof n === 'string' && n.trim().length > 0)
+              .map(n => (n as string).trim());
+            jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
+          }
+        } else {
+          // No main notes, check other fields
+          const noteFields = [job.description, job.work_order_notes]
+            .filter(n => typeof n === 'string' && n.trim().length > 0)
+            .map(n => (n as string).trim());
+          jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
+        }
 
         const record = {
           organization_id,
