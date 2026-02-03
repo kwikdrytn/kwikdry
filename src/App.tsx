@@ -48,22 +48,24 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             
-            {/* Dashboard - All roles */}
+            {/* Dashboard - All roles with permission */}
             <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <RoleGuard requiredPermission="dashboard.view">
+                    <Dashboard />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
             
-            {/* Inventory - Admin and Technicians */}
+            {/* Inventory - Users with inventory.view permission */}
             <Route
               path="/inventory"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                  <RoleGuard requiredPermission="inventory.view">
                     <InventoryManagement />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -73,20 +75,19 @@ const App = () => (
               path="/inventory/:id"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                  <RoleGuard requiredPermission="inventory.view">
                     <InventoryDetail />
                   </RoleGuard>
                 </ProtectedRoute>
               }
             />
-            {/* Legacy route redirects are handled by the main routes above */}
             
             {/* Checklists - Role-based tabs within page */}
             <Route
               path="/checklists"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin', 'technician']}>
+                  <RoleGuard requiredPermission="checklists.submit">
                     <Checklists />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -96,7 +97,7 @@ const App = () => (
               path="/checklists/:submissionId"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="checklists.view_submissions">
                     <ChecklistSubmissionDetail />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -106,12 +107,12 @@ const App = () => (
             <Route path="/admin/checklists" element={<Navigate to="/checklists" replace />} />
             <Route path="/admin/checklists/:submissionId" element={<Navigate to="/checklists/:submissionId" replace />} />
             
-            {/* Equipment - Admin only */}
+            {/* Equipment - Users with equipment.view permission */}
             <Route
               path="/equipment"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="equipment.view">
                     <Equipment />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -121,19 +122,19 @@ const App = () => (
               path="/equipment/:id"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="equipment.view">
                     <EquipmentDetail />
                   </RoleGuard>
                 </ProtectedRoute>
               }
             />
             
-            {/* Calls - Admin and Call Staff */}
+            {/* Calls - Users with calls.view permission */}
             <Route
               path="/calls"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin', 'call_staff']}>
+                  <RoleGuard requiredPermission="calls.view">
                     <CallLog />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -143,7 +144,7 @@ const App = () => (
               path="/calls/metrics"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="calls.view_metrics">
                     <CallMetrics />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -153,24 +154,26 @@ const App = () => (
             <Route path="/admin/calls" element={<Navigate to="/calls" replace />} />
             <Route path="/admin/calls/metrics" element={<Navigate to="/calls/metrics" replace />} />
             
-            {/* Job Map - Admin and Call Staff */}
+            {/* Job Map - Users with job_map.view permission */}
             <Route
               path="/job-map"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin', 'call_staff']}>
+                  <RoleGuard requiredPermission="job_map.view">
                     <JobMap />
                   </RoleGuard>
                 </ProtectedRoute>
               }
             />
             
-            {/* Training - All roles */}
+            {/* Training - Users with training.view permission */}
             <Route
               path="/training"
               element={
                 <ProtectedRoute>
-                  <Training />
+                  <RoleGuard requiredPermission="training.view">
+                    <Training />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
@@ -178,29 +181,31 @@ const App = () => (
               path="/training/video/:id"
               element={
                 <ProtectedRoute>
-                  <TrainingVideo />
+                  <RoleGuard requiredPermission="training.view">
+                    <TrainingVideo />
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
 
-            {/* Training Management - Admin only */}
+            {/* Training Management - Users with training.manage permission */}
             <Route
               path="/admin/training"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="training.manage">
                     <TrainingManagement />
                   </RoleGuard>
                 </ProtectedRoute>
               }
             />
             
-            {/* Users - Admin only */}
+            {/* Users - Users with users.manage permission */}
             <Route
               path="/users"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="users.manage">
                     <UserManagement />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -209,24 +214,24 @@ const App = () => (
             {/* Legacy route redirect */}
             <Route path="/admin/users" element={<Navigate to="/users" replace />} />
             
-            {/* Locations - Admin only */}
+            {/* Locations - Users with locations.manage permission */}
             <Route
               path="/locations"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="locations.manage">
                     <LocationManagement />
                   </RoleGuard>
                 </ProtectedRoute>
               }
             />
             
-            {/* Settings - Admin only */}
+            {/* Settings - All roles can view their profile */}
             <Route
               path="/settings"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="settings.view">
                     <Settings />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -236,7 +241,7 @@ const App = () => (
               path="/settings/integrations"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="settings.manage_integrations">
                     <IntegrationSettings />
                   </RoleGuard>
                 </ProtectedRoute>
@@ -246,7 +251,7 @@ const App = () => (
               path="/settings/pricebook"
               element={
                 <ProtectedRoute>
-                  <RoleGuard allowedRoles={['admin']}>
+                  <RoleGuard requiredPermission="settings.manage_integrations">
                     <PriceBookMapping />
                   </RoleGuard>
                 </ProtectedRoute>

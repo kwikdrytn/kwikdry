@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getNavItemsForRole } from "@/config/navigation";
+import { getNavItemsForPermissions } from "@/config/navigation";
+import { useUserPermissions } from "@/hooks/useRoles";
 import { Settings, MoreHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,11 +13,23 @@ export function BottomNav() {
   const { profile } = useAuth();
   const location = useLocation();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const { data: permissions } = useUserPermissions();
 
-  // Get all nav items for role
-  const allNavItems = getNavItemsForRole(profile?.role ?? null).filter(
-    item => item.url !== '/settings'
-  );
+  const isAdmin = profile?.role === 'admin';
+
+  // Get all nav items based on permissions
+  const allNavItems = getNavItemsForPermissions(
+    profile?.role ?? null, 
+    permissions,
+    isAdmin
+  ).filter(item => item.url !== '/settings');
+  
+  // Check if user has settings access
+  const hasSettingsAccess = getNavItemsForPermissions(
+    profile?.role ?? null, 
+    permissions,
+    isAdmin
+  ).some(item => item.url === '/settings');
   
   // Split into main nav items and overflow items
   const mainNavItems = allNavItems.filter(item => MAIN_NAV_URLS.includes(item.url));
@@ -25,7 +38,10 @@ export function BottomNav() {
   const isActive = (url: string) => location.pathname === url || location.pathname.startsWith(url + '/');
 
   // Check if any overflow item is active
-  const isOverflowActive = overflowItems.some(item => isActive(item.url)) || isActive('/settings');
+  const isOverflowActive = overflowItems.some(item => isActive(item.url)) || (hasSettingsAccess && isActive('/settings'));
+
+  // Only show More button if there are overflow items or settings access
+  const showMoreButton = overflowItems.length > 0 || hasSettingsAccess;
 
   return (
     <>
@@ -57,19 +73,21 @@ export function BottomNav() {
                 <span className="truncate max-w-[64px]">{item.title}</span>
               </Link>
             ))}
-            <Link
-              to="/settings"
-              onClick={() => setIsMoreOpen(false)}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg text-xs transition-colors",
-                isActive('/settings')
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-primary"
-              )}
-            >
-              <Settings className={cn("h-5 w-5", isActive('/settings') && "text-primary")} />
-              <span>Settings</span>
-            </Link>
+            {hasSettingsAccess && (
+              <Link
+                to="/settings"
+                onClick={() => setIsMoreOpen(false)}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg text-xs transition-colors",
+                  isActive('/settings')
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-primary"
+                )}
+              >
+                <Settings className={cn("h-5 w-5", isActive('/settings') && "text-primary")} />
+                <span>Settings</span>
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -94,23 +112,25 @@ export function BottomNav() {
             </Link>
           ))}
           
-          {/* More button */}
-          <button
-            onClick={() => setIsMoreOpen(!isMoreOpen)}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
-              isMoreOpen || isOverflowActive
-                ? "text-primary"
-                : "text-muted-foreground hover:text-primary"
-            )}
-          >
-            {isMoreOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <MoreHorizontal className={cn("h-5 w-5", isOverflowActive && "text-primary")} />
-            )}
-            <span>More</span>
-          </button>
+          {/* More button - only show if there are overflow items */}
+          {showMoreButton && (
+            <button
+              onClick={() => setIsMoreOpen(!isMoreOpen)}
+              className={cn(
+                "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs transition-colors",
+                isMoreOpen || isOverflowActive
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-primary"
+              )}
+            >
+              {isMoreOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <MoreHorizontal className={cn("h-5 w-5", isOverflowActive && "text-primary")} />
+              )}
+              <span>More</span>
+            </button>
+          )}
         </div>
       </nav>
     </>

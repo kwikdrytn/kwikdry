@@ -1,11 +1,11 @@
 import { useLocation, Link } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
-import { getNavItemsForRole } from "@/config/navigation";
+import { getNavItemsForPermissions } from "@/config/navigation";
+import { useUserPermissions } from "@/hooks/useRoles";
 import { useIncompleteTrainingCount } from "@/hooks/useIncompleteTrainingCount";
-import { Settings, PanelLeft } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -27,10 +27,15 @@ export function AppSidebar() {
   const location = useLocation();
   const isCollapsed = state === "collapsed";
   const { data: incompleteTrainingCount = 0 } = useIncompleteTrainingCount();
+  const { data: permissions } = useUserPermissions();
 
-  // Filter out Settings from nav items since we're placing it separately
-  const navItems = getNavItemsForRole(profile?.role ?? null).filter(
-    item => item.url !== '/settings'
+  const isAdmin = profile?.role === 'admin';
+  
+  // Get nav items based on permissions
+  const navItems = getNavItemsForPermissions(
+    profile?.role ?? null, 
+    permissions,
+    isAdmin
   );
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
@@ -59,32 +64,34 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
-                const showBadge = item.url === '/training' && incompleteTrainingCount > 0;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={location.pathname === item.url || location.pathname.startsWith(item.url + '/')}
-                      tooltip={item.title}
-                    >
-                      <NavLink 
-                        to={item.url} 
-                        className="flex items-center gap-3"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+              {navItems
+                .filter(item => item.url !== '/settings') // Settings shown in footer
+                .map((item) => {
+                  const showBadge = item.url === '/training' && incompleteTrainingCount > 0;
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={location.pathname === item.url || location.pathname.startsWith(item.url + '/')}
+                        tooltip={item.title}
                       >
-                        <item.icon className="h-5 w-5" />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                    {showBadge && (
-                      <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
-                        {incompleteTrainingCount}
-                      </SidebarMenuBadge>
-                    )}
-                  </SidebarMenuItem>
-                );
-              })}
+                        <NavLink 
+                          to={item.url} 
+                          className="flex items-center gap-3"
+                          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                        >
+                          <item.icon className="h-5 w-5" />
+                          <span>{item.title}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                      {showBadge && (
+                        <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
+                          {incompleteTrainingCount}
+                        </SidebarMenuBadge>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -114,36 +121,58 @@ export function AppSidebar() {
           )}
         </Link>
 
-        {/* Settings Button */}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              asChild 
-              isActive={location.pathname === '/settings'}
-              tooltip="Settings"
-            >
-              <NavLink 
-                to="/settings" 
-                className="flex items-center gap-3"
-                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+        {/* Settings Button - only show if user has access */}
+        {navItems.some(item => item.url === '/settings') && (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton 
+                asChild 
+                isActive={location.pathname === '/settings'}
+                tooltip="Settings"
               >
-                <Settings className="h-5 w-5" />
-                <span>Settings</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+                <NavLink 
+                  to="/settings" 
+                  className="flex items-center gap-3"
+                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                >
+                  {navItems.find(item => item.url === '/settings')?.icon && (
+                    (() => {
+                      const SettingsIcon = navItems.find(item => item.url === '/settings')!.icon;
+                      return <SettingsIcon className="h-5 w-5" />;
+                    })()
+                  )}
+                  <span>Settings</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
 
-          {/* Collapse/Expand Button */}
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              onClick={toggleSidebar}
-              tooltip="Collapse"
-            >
-              <PanelLeft className="h-5 w-5" />
-              <span>Collapse</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+            {/* Collapse/Expand Button */}
+            <SidebarMenuItem>
+              <SidebarMenuButton 
+                onClick={toggleSidebar}
+                tooltip="Collapse"
+              >
+                <PanelLeft className="h-5 w-5" />
+                <span>Collapse</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
+        
+        {/* If no settings access, still show collapse button */}
+        {!navItems.some(item => item.url === '/settings') && (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton 
+                onClick={toggleSidebar}
+                tooltip="Collapse"
+              >
+                <PanelLeft className="h-5 w-5" />
+                <span>Collapse</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
