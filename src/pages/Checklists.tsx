@@ -616,10 +616,26 @@ function AdminChecklists() {
 export default function Checklists() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  const isTechnician = profile?.role === 'technician';
 
   return (
     <DashboardLayout title="Checklists">
-      {isAdmin ? <AdminChecklists /> : <TechnicianChecklists />}
+      {isAdmin ? (
+        <AdminChecklists />
+      ) : isTechnician ? (
+        <TechnicianChecklists />
+      ) : (
+        <Card className="mx-auto max-w-lg">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+              <ClipboardCheck className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground">
+              Checklists are only available for technicians.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </DashboardLayout>
   );
 }
