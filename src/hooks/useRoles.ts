@@ -115,6 +115,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     'calls.manage',
     'job_map.view',
     'job_map.use_ai_suggestions',
+    'training.view',
+    'settings.view',
   ],
   technician: [
     'dashboard.view',
@@ -122,6 +124,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     'inventory.adjust_stock',
     'checklists.submit',
     'training.view',
+    'settings.view',
   ],
 };
 
