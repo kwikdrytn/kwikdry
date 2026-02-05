@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
           last_name,
           full_name: `${first_name} ${last_name}`,
         },
-        redirectTo: `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/auth`,
+        redirectTo: 'https://kwikdry.lovable.app/auth',
       });
 
       if (inviteError) {
