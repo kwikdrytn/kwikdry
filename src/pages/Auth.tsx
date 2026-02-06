@@ -33,7 +33,7 @@ export default function Auth() {
     try {
       if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: 'https://kwikdry.lovable.app/reset-password',
         });
 
         if (error) {
