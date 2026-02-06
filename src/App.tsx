@@ -21,7 +21,7 @@ import InventoryDetail from "./pages/admin/InventoryDetail";
 import ChecklistSubmissionDetail from "./pages/admin/ChecklistSubmissionDetail";
 import LocationManagement from "./pages/admin/LocationManagement";
 import IntegrationSettings from "./pages/admin/IntegrationSettings";
-import PriceBookMapping from "./pages/admin/PriceBookMapping";
+
 import CallLog from "./pages/admin/CallLog";
 import CallMetrics from "./pages/admin/CallMetrics";
 import Training from "./pages/Training";
@@ -247,19 +247,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/settings/pricebook"
-              element={
-                <ProtectedRoute>
-                  <RoleGuard requiredPermission="settings.manage_integrations">
-                    <PriceBookMapping />
-                  </RoleGuard>
-                </ProtectedRoute>
-              }
-            />
             {/* Legacy route redirect */}
             <Route path="/admin/settings/integrations" element={<Navigate to="/settings/integrations" replace />} />
-            <Route path="/admin/settings/pricebook" element={<Navigate to="/settings/pricebook" replace />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

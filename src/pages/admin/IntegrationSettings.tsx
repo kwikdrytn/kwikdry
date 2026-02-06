@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { SyncResult, SyncProgress } from "@/lib/housecallpro";
 import { RCSyncResult, RCSyncProgress } from "@/lib/ringcentral";
 import { EmployeeLinking } from "@/components/integrations/EmployeeLinking";
+import { ServiceMappingsSection } from "@/components/integrations/ServiceMappingsSection";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -874,6 +875,11 @@ export default function IntegrationSettings() {
 
                 {/* Employee Linking */}
                 <EmployeeLinking />
+
+                <Separator />
+
+                {/* Service Mappings */}
+                <ServiceMappingsSection />
               </CardContent>
             </Card>
 
