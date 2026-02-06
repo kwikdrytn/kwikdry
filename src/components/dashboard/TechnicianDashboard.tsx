@@ -13,12 +13,9 @@ import {
   Package, 
   Wrench, 
   AlertTriangle,
-  ChevronRight,
-  GraduationCap 
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
-import { useTrainingStatus } from "@/hooks/useIncompleteTrainingCount";
 
 export function TechnicianDashboard() {
   const { profile } = useAuth();
@@ -26,8 +23,6 @@ export function TechnicianDashboard() {
   const firstName = profile?.first_name || "User";
   const today = new Date();
   
-  // Fetch training status
-  const { data: trainingStatus, isLoading: trainingLoading } = useTrainingStatus();
   
   // Fetch daily checklist status
   const { data: dailyStatus, isLoading: dailyLoading } = useQuery({
@@ -230,75 +225,6 @@ export function TechnicianDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Training Status Card */}
-      <Card className={cn(
-        trainingStatus && trainingStatus.incompleteCount > 0 
-          ? "border-warning/50" 
-          : "border-primary/30"
-      )}>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <GraduationCap className={cn(
-              "h-5 w-5",
-              trainingStatus && trainingStatus.incompleteCount > 0 
-                ? "text-warning" 
-                : "text-primary"
-            )} />
-            Training Status
-          </CardTitle>
-          <CardDescription>Required training progress</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {trainingLoading ? (
-            <Skeleton className="h-20 w-full" />
-          ) : trainingStatus && trainingStatus.incompleteCount > 0 ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 rounded-lg bg-warning/10 p-4">
-                <AlertTriangle className="h-8 w-8 text-warning" />
-                <div className="flex-1">
-                  <p className="font-medium text-warning">
-                    {trainingStatus.incompleteCount} required training video{trainingStatus.incompleteCount !== 1 ? 's' : ''} to complete
-                  </p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Progress value={trainingStatus.progressPercent} className="h-2 flex-1" />
-                    <span className="text-sm text-muted-foreground">
-                      {trainingStatus.progressPercent}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <Button 
-                className="w-full h-12"
-                onClick={() => navigate('/training')}
-              >
-                Go to Training
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 rounded-lg bg-primary/10 p-4">
-                <CheckCircle2 className="h-8 w-8 text-primary" />
-                <div>
-                  <p className="font-medium text-primary">All required training complete! ✓</p>
-                  <p className="text-sm text-muted-foreground">
-                    Great job staying up to date
-                  </p>
-                </div>
-              </div>
-              <Button 
-                variant="outline"
-                className="w-full h-12"
-                onClick={() => navigate('/training')}
-              >
-                Browse more videos
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Inventory & Equipment Row */}
       <div className="grid gap-4 md:grid-cols-2">
