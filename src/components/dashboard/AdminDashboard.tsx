@@ -18,12 +18,10 @@ import {
   AlertTriangle,
   Activity,
   ChevronRight,
-  Wrench,
-  GraduationCap
+  Wrench
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEquipmentNeedingMaintenance } from "@/hooks/useEquipment";
-import { useTeamTrainingStats } from "@/hooks/useIncompleteTrainingCount";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -42,8 +40,6 @@ export function AdminDashboard() {
   // Get equipment needing maintenance
   const { data: equipmentNeedingMaintenance = [], isLoading: maintenanceLoading } = useEquipmentNeedingMaintenance();
   
-  // Get team training stats
-  const { data: teamTrainingStats, isLoading: trainingStatsLoading } = useTeamTrainingStats();
 
   // Fetch today's jobs count (placeholder - will integrate HCP later)
   const { data: jobsCount, isLoading: jobsLoading } = useQuery({
@@ -325,48 +321,6 @@ export function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* Team Training Card */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              Team Training
-            </CardTitle>
-            <CardDescription>Required training completion</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {trainingStatsLoading ? (
-            <Skeleton className="h-20 w-full" />
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="text-3xl font-bold">{teamTrainingStats?.completionRate || 100}%</span>
-                <span className="text-muted-foreground">of required training completed</span>
-              </div>
-              
-              {teamTrainingStats && teamTrainingStats.membersNeedingAttention > 0 && (
-                <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                  <span className="text-warning font-medium">
-                    {teamTrainingStats.membersNeedingAttention} team member{teamTrainingStats.membersNeedingAttention !== 1 ? 's' : ''} need{teamTrainingStats.membersNeedingAttention === 1 ? 's' : ''} attention
-                  </span>
-                </div>
-              )}
-              
-              <Button 
-                variant="outline" 
-                className="w-full h-12"
-                onClick={() => navigate('/admin/training?tab=progress')}
-              >
-                View Training Report
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Alerts & Activity Row */}
       <div className="grid gap-6 lg:grid-cols-2">
