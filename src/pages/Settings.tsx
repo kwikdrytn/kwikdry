@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
-import { Users, MapPin, Plug, ChevronRight, Camera, Loader2, GraduationCap, Bell, BookOpen } from "lucide-react";
+import { Users, MapPin, Plug, ChevronRight, Camera, Loader2, GraduationCap, Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvatarCropDialog } from "@/components/settings/AvatarCropDialog";
@@ -136,7 +136,6 @@ export default function Settings() {
     { title: "Locations", description: "Manage business locations", icon: MapPin, url: "/locations" },
     { title: "Training", description: "Manage training videos and categories", icon: GraduationCap, url: "/admin/training" },
     { title: "Integrations", description: "Connect external services", icon: Plug, url: "/settings/integrations" },
-    { title: "PriceBook Mapping", description: "Map services to HCP PriceBook items", icon: BookOpen, url: "/settings/pricebook" },
   ];
 
   const isAdmin = profile?.role === 'admin';
