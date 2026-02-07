@@ -8,6 +8,7 @@ import { MapFilters } from "./MapFilters";
 import { MapLegend } from "./MapLegend";
 import { AddressSearch } from "./AddressSearch";
 import { BookingSuggestionPanel } from "./BookingSuggestionPanel";
+import { EditJobDialog } from "./EditJobDialog";
 import { 
   useJobsForDateRange, 
   useServiceZones, 
@@ -190,8 +191,15 @@ function createClickContent(
   
   return `
     <div style="min-width: 280px; max-width: 360px; font-family: system-ui, sans-serif; max-height: 400px; overflow-y: auto;">
-      <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px; color: #0f172a;">
-        ${job.customer_name || 'Unknown Customer'}
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+        <div style="font-weight: 600; font-size: 15px; color: #0f172a;">
+          ${job.customer_name || 'Unknown Customer'}
+        </div>
+        <button data-edit-job="${job.id}" style="
+          background: #6366f1; color: white; border: none; border-radius: 6px;
+          padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
+          white-space: nowrap; flex-shrink: 0; margin-left: 8px;
+        ">Edit</button>
       </div>
       <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;">
         ${[job.address, job.city, job.state, job.zip].filter(Boolean).join(', ')}
@@ -352,6 +360,7 @@ export function JobMapView() {
   const searchedLocationRef = useRef<{ coords: [number, number]; name: string } | null>(null);
   const clickPopupRef = useRef<mapboxgl.Popup | null>(null);
   const initialFiltersApplied = useRef(false);
+  const jobsRef = useRef<HCPJob[]>([]);
 
   // Initialize filters from URL params
   const [filters, setFilters] = useState<MapFiltersType>(() => {
@@ -363,6 +372,7 @@ export function JobMapView() {
   const [searchedLocation, setSearchedLocation] = useState<{ coords: [number, number]; name: string } | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [legendExpanded, setLegendExpanded] = useState(true);
+  const [editingJob, setEditingJob] = useState<HCPJob | null>(null);
   
   // Keep ref in sync with state for use in event handlers
   useEffect(() => {
@@ -383,6 +393,30 @@ export function JobMapView() {
   const { data: zones } = useServiceZones();
   const { data: firstLocation } = useFirstLocation();
   const { data: technicianLocations } = useTechnicianLocations();
+
+  // Keep jobs ref in sync for popup click handlers
+  useEffect(() => {
+    jobsRef.current = jobs || [];
+  }, [jobs]);
+
+  // Global delegated click handler for edit buttons inside popups
+  useEffect(() => {
+    const handleEditClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const editBtn = target.closest('[data-edit-job]') as HTMLElement | null;
+      if (!editBtn) return;
+      const jobId = editBtn.getAttribute('data-edit-job');
+      if (!jobId) return;
+      const found = jobsRef.current.find(j => j.id === jobId);
+      if (found) {
+        clickPopupRef.current?.remove();
+        clickPopupRef.current = null;
+        setEditingJob(found);
+      }
+    };
+    document.addEventListener('click', handleEditClick);
+    return () => document.removeEventListener('click', handleEditClick);
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -938,6 +972,12 @@ export function JobMapView() {
           </div>
         </div>
       )}
+
+      <EditJobDialog
+        job={editingJob}
+        open={!!editingJob}
+        onOpenChange={(open) => { if (!open) setEditingJob(null); }}
+      />
     </div>
   );
 }
