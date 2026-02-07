@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.create-hcp-job]
 verify_jwt = false
+
+[functions.update-hcp-job]
+verify_jwt = false
