@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
           const appUrl = 'https://kwikdry.lovable.app';
           try {
             await resend.emails.send({
-              from: 'KwikDry <onboarding@resend.dev>',
+              from: 'KwikDry <notifications@kwikdrydealer.com>',
               to: [email],
               subject: `Welcome back to ${organizationName}`,
               html: `
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
       
       try {
         const { error: emailError } = await resend.emails.send({
-          from: 'KwikDry <onboarding@resend.dev>',
+          from: 'KwikDry <notifications@kwikdrydealer.com>',
           to: [email],
           subject: `You've been invited to join ${organizationName}`,
           html: `
