@@ -631,34 +631,22 @@ async function fetchJobLineItems(apiKey: string, jobId: string): Promise<HCPLine
   }
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+// Core sync logic extracted so it can be called per-org
+async function syncOrganization(
+  organization_id: string,
+  api_key: string,
+  location_id: string | null,
+  supabase: any,
+  mapboxToken: string | null,
+) {
+  console.log(`Starting HCP sync for organization: ${organization_id}`);
 
-  try {
-    const { organization_id, api_key, location_id } = await req.json();
-
-    if (!organization_id || !api_key) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Organization ID and API key are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Starting HCP sync for organization: ${organization_id}`);
-
-    // Calculate date range (next 30 days)
-    const today = new Date();
-    const dateFrom = today.toISOString().split('T')[0];
-    const futureDate = new Date(today);
-    futureDate.setDate(futureDate.getDate() + 30);
-    const dateTo = futureDate.toISOString().split('T')[0];
-
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  // Calculate date range (next 30 days)
+  const today = new Date();
+  const dateFrom = today.toISOString().split('T')[0];
+  const futureDate = new Date(today);
+  futureDate.setDate(futureDate.getDate() + 30);
+  const dateTo = futureDate.toISOString().split('T')[0];
 
     // Fetch data from HCP
     console.log('Fetching jobs from HCP...');
@@ -797,7 +785,7 @@ Deno.serve(async (req) => {
 
     // Upsert jobs
     if (jobs.length > 0) {
-      const mapboxToken = Deno.env.get('VITE_MAPBOX_TOKEN') || '';
+      const effectiveMapboxToken = mapboxToken || '';
       const geocodeCache = new Map<string, { lat: number; lng: number }>();
       let geocodedCount = 0;
       const GEOCODE_LIMIT = 75; // safety cap per sync
@@ -921,13 +909,13 @@ Deno.serve(async (req) => {
           .filter(Boolean)
           .join(', ');
 
-        if ((lat === null || lng === null) && mapboxToken && addressParts && geocodedCount < GEOCODE_LIMIT) {
+        if ((lat === null || lng === null) && effectiveMapboxToken && addressParts && geocodedCount < GEOCODE_LIMIT) {
           const cached = geocodeCache.get(addressParts);
           if (cached) {
             lat = cached.lat;
             lng = cached.lng;
           } else {
-            const geocoded = await geocodeAddress(addressParts, mapboxToken);
+            const geocoded = await geocodeAddress(addressParts, effectiveMapboxToken);
             if (geocoded) {
               lat = geocoded.lat;
               lng = geocoded.lng;
@@ -1000,32 +988,78 @@ Deno.serve(async (req) => {
 
     console.log(`Sync complete: ${jobsSynced} jobs, ${customersSynced} customers, ${employeesSynced} employees, ${servicesSynced} services, ${zonesSynced} zones`);
 
+    return {
+      success: true,
+      synced: { jobs: jobsSynced, customers: customersSynced, employees: employeesSynced, services: servicesSynced, serviceZones: zonesSynced },
+      fetched: { jobs: jobs.length, customers: customers.length, employees: employees.length, services: services.length, serviceZones: serviceZones.length },
+    };
+}
+
+// ── Deno.serve handler ──
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const mapboxToken = Deno.env.get('VITE_MAPBOX_TOKEN') || null;
+
+    let body: any = {};
+    try { body = await req.json(); } catch { /* empty body is fine for cron */ }
+
+    const { organization_id, api_key, location_id, syncAll } = body;
+
+    // ── Mode 1: Specific org (manual trigger from UI) ──
+    if (organization_id && api_key) {
+      const result = await syncOrganization(organization_id, api_key, location_id || null, supabase, mapboxToken);
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── Mode 2: Sync all orgs with HCP API keys (cron / syncAll) ──
+    console.log('Running sync-all mode: discovering organizations with HCP API keys...');
+    const { data: orgs, error: orgsError } = await supabase
+      .from('organizations')
+      .select('id, hcp_api_key')
+      .not('hcp_api_key', 'is', null)
+      .neq('hcp_api_key', '');
+
+    if (orgsError || !orgs || orgs.length === 0) {
+      console.log('No organizations with HCP API keys found:', orgsError);
+      return new Response(
+        JSON.stringify({ success: true, message: 'No organizations configured for HCP sync' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Found ${orgs.length} organizations to sync`);
+    const results: Array<{ org: string; success: boolean; error?: string }> = [];
+
+    for (const org of orgs) {
+      try {
+        const result = await syncOrganization(org.id, org.hcp_api_key, null, supabase, mapboxToken);
+        results.push({ org: org.id, success: result.success });
+        console.log(`Org ${org.id} sync: ${result.success ? 'OK' : 'FAILED'}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        results.push({ org: org.id, success: false, error: msg });
+        console.error(`Org ${org.id} sync error:`, msg);
+      }
+    }
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        synced: {
-          jobs: jobsSynced,
-          customers: customersSynced,
-          employees: employeesSynced,
-          services: servicesSynced,
-          serviceZones: zonesSynced,
-        },
-        fetched: {
-          jobs: jobs.length,
-          customers: customers.length,
-          employees: employees.length,
-          services: services.length,
-          serviceZones: serviceZones.length,
-        },
-      }),
+      JSON.stringify({ success: true, organizations: results }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Sync error:', error);
-    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
