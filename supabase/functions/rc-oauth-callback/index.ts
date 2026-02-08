@@ -45,18 +45,47 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { code, organization_id } = await req.json();
+    // Auth check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseAuthUrl = Deno.env.get('SUPABASE_URL')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    const userClient = createClient(supabaseAuthUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: authProfile } = await userClient
+      .from('profiles')
+      .select('organization_id, role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!authProfile || authProfile.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const organization_id = authProfile.organization_id;
+
+    const { code } = await req.json();
 
     if (!code) {
       return new Response(
         JSON.stringify({ success: false, error: 'Authorization code is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!organization_id) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Organization ID is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

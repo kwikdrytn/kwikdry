@@ -254,54 +254,84 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: authProfile } = await userClient
+      .from('profiles')
+      .select('organization_id, role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!authProfile || authProfile.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const organization_id = authProfile.organization_id;
+
     const { 
-      organization_id, 
       location_id,
-      refresh_token,
-      days_back = 1, // Default to 1 day, can go much higher
+      days_back = 1,
     } = await req.json();
 
-    // Use environment variables for client credentials (same as OAuth callback)
+    // Use environment variables for client credentials
     const clientId = Deno.env.get('RC_CLIENT_ID');
     const clientSecret = Deno.env.get('RC_CLIENT_SECRET');
 
     if (!clientId || !clientSecret) {
       console.error('Missing RC_CLIENT_ID or RC_CLIENT_SECRET environment variables');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'RingCentral not configured on server' 
-        }),
+        JSON.stringify({ success: false, error: 'RingCentral not configured on server' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!organization_id || !refresh_token) {
+    // Fetch refresh_token from org record instead of request body
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('rc_refresh_token')
+      .eq('id', organization_id)
+      .single();
+
+    const refresh_token = orgData?.rc_refresh_token;
+    if (!refresh_token) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Missing required credentials' 
-        }),
+        JSON.stringify({ success: false, error: 'RingCentral not connected. Please reconnect in Integration Settings.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (!location_id) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Location ID is required' 
-        }),
+        JSON.stringify({ success: false, error: 'Location ID is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log(`Starting RC call sync for organization: ${organization_id}, days_back: ${days_back}`);
-
-    // Create Supabase client early so we can save new refresh token
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get access token (this also gives us a new refresh token)
     const tokenResult = await getAccessToken(clientId, clientSecret, refresh_token);
