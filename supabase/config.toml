@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.update-hcp-job]
 verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false
