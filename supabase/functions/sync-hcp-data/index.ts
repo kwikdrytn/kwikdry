@@ -1004,17 +1004,55 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const mapboxToken = Deno.env.get('VITE_MAPBOX_TOKEN') || null;
 
     let body: any = {};
     try { body = await req.json(); } catch { /* empty body is fine for cron */ }
 
-    const { organization_id, api_key, location_id, syncAll } = body;
+    const { location_id } = body;
 
-    // ── Mode 1: Specific org (manual trigger from UI) ──
-    if (organization_id && api_key) {
-      const result = await syncOrganization(organization_id, api_key, location_id || null, supabase, mapboxToken);
+    // ── Mode 1: Manual trigger from UI (requires auth) ──
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid token' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: authProfile } = await userClient
+        .from('profiles')
+        .select('organization_id, role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!authProfile || authProfile.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'Admin access required' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Fetch org's HCP API key from DB instead of request body
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('hcp_api_key')
+        .eq('id', authProfile.organization_id)
+        .single();
+
+      if (!org?.hcp_api_key) {
+        return new Response(JSON.stringify({ success: false, error: 'HCP API key not configured' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const result = await syncOrganization(authProfile.organization_id, org.hcp_api_key, location_id || null, supabase, mapboxToken);
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
