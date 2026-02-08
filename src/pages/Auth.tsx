@@ -32,12 +32,14 @@ export default function Auth() {
 
     try {
       if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: 'https://kwikdry.lovable.app/reset-password',
+        const { data, error } = await supabase.functions.invoke('send-password-reset', {
+          body: { email },
         });
 
         if (error) {
-          setError(error.message);
+          setError('Failed to send reset email. Please try again.');
+        } else if (data?.error) {
+          setError(data.error);
         } else {
           setResetEmailSent(true);
         }
