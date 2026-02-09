@@ -220,30 +220,36 @@ Deno.serve(async (req) => {
 
       userId = existingUser.id;
     } else {
-      // Create new auth user with invite
-      const { data: newUser, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: {
-          first_name,
-          last_name,
-          full_name: `${first_name} ${last_name}`,
+      // Create new auth user with invite and generate the confirmation link
+      const { data: linkData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: {
+          data: {
+            first_name,
+            last_name,
+            full_name: `${first_name} ${last_name}`,
+          },
+          redirectTo: 'https://kwikdry.lovable.app/reset-password',
         },
-        redirectTo: 'https://kwikdry.lovable.app/auth',
       });
 
-      if (inviteError) {
+      if (inviteError || !linkData) {
         console.error('Invite error:', inviteError);
-        return new Response(JSON.stringify({ error: inviteError.message }), {
+        return new Response(JSON.stringify({ error: inviteError?.message || 'Failed to generate invite link' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      userId = newUser.user.id;
+      userId = linkData.user.id;
       wasInvited = true;
 
-      // Send custom invitation email via Resend
-      const appUrl = 'https://kwikdry.lovable.app';
-      
+      // Build the confirmation URL that Supabase will process
+      // The hashed_token from generateLink is used with the verify endpoint
+      const confirmationUrl = `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=invite&redirect_to=https://kwikdry.lovable.app/reset-password`;
+
+      // Send custom invitation email via Resend with the actual confirmation link
       try {
         const { error: emailError } = await resend.emails.send({
           from: 'KwikDry <notifications@kwikdrydealer.com>',
@@ -275,7 +281,7 @@ Deno.serve(async (req) => {
                 </p>
                 
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${appUrl}/auth" 
+                  <a href="${confirmationUrl}" 
                      style="background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%); 
                             color: white; 
                             padding: 14px 32px; 
@@ -285,7 +291,7 @@ Deno.serve(async (req) => {
                             font-size: 16px;
                             display: inline-block;
                             box-shadow: 0 4px 6px rgba(14, 165, 233, 0.3);">
-                    Accept Invitation
+                    Set Up Your Password
                   </a>
                 </div>
                 
@@ -306,13 +312,11 @@ Deno.serve(async (req) => {
 
         if (emailError) {
           console.error('Resend email error:', emailError);
-          // Don't fail the whole request if email fails - user is still created
         } else {
           console.log('Invitation email sent successfully to:', email);
         }
       } catch (emailErr) {
         console.error('Failed to send email via Resend:', emailErr);
-        // Continue - user is created even if email fails
       }
     }
 
