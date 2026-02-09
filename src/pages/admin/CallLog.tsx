@@ -189,21 +189,10 @@ export default function CallLog() {
         throw new Error("Missing organization or location");
       }
 
-      // Fetch organization credentials
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .select("rc_refresh_token")
-        .eq("id", profile.organization_id)
-        .single();
-
-      if (orgError || !org) throw new Error("Failed to fetch organization");
-      if (!org.rc_refresh_token) throw new Error("RingCentral not connected. Please connect in Integration Settings.");
-
+      // Call sync edge function - credentials are handled server-side
       const { data, error } = await supabase.functions.invoke("sync-rc-calls", {
         body: {
-          organization_id: profile.organization_id,
           location_id: profile.location_id,
-          refresh_token: org.rc_refresh_token,
           days_back: daysBack,
         },
       });
