@@ -304,7 +304,7 @@ export function AdminDashboard() {
             <Button 
               variant="outline" 
               className="h-14 justify-start gap-3"
-              onClick={() => navigate('/admin/inventory')}
+              onClick={() => navigate('/inventory')}
             >
               <Boxes className="h-5 w-5 text-primary" />
               <span>Manage Inventory</span>
