@@ -2,12 +2,13 @@ import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Upload, Pencil, X, CheckSquare, Trash2 } from "lucide-react";
+import { Plus, Package, Upload, Pencil, X, CheckSquare, Trash2, Minus } from "lucide-react";
 import { InventoryTable } from "@/components/inventory/InventoryTable";
 import { InventoryFilters } from "@/components/inventory/InventoryFilters";
 import { InventoryFormDialog } from "@/components/inventory/InventoryFormDialog";
 import { CsvImportDialog } from "@/components/inventory/CsvImportDialog";
 import { BulkEditDialog, BulkEditUpdates } from "@/components/inventory/BulkEditDialog";
+import { QuickUseDialog } from "@/components/inventory/QuickUseDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,7 @@ export default function InventoryManagement() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isQuickUseOpen, setIsQuickUseOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
@@ -197,6 +199,17 @@ export default function InventoryManagement() {
             <div className="flex gap-2 flex-wrap">
               {!selectionMode && (
                 <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsQuickUseOpen(true)}
+                    className="gap-2"
+                    disabled={items.length === 0}
+                    size="sm"
+                  >
+                    <Minus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Used a Bottle</span>
+                    <span className="sm:hidden">Used</span>
+                  </Button>
                   <Button 
                     variant="outline" 
                     onClick={() => setSelectionMode(true)} 
@@ -281,6 +294,12 @@ export default function InventoryManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QuickUseDialog
+        open={isQuickUseOpen}
+        onOpenChange={setIsQuickUseOpen}
+        items={items}
+      />
     </DashboardLayout>
   );
 }
