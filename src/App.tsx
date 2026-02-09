@@ -48,14 +48,12 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             
-            {/* Dashboard - All roles with permission */}
+            {/* Dashboard - All authenticated users */}
             <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <RoleGuard requiredPermission="dashboard.view">
-                    <Dashboard />
-                  </RoleGuard>
+                  <Dashboard />
                 </ProtectedRoute>
               }
             />
