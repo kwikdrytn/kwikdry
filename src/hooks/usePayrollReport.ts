@@ -63,7 +63,7 @@ export function usePayrollReport({ startDate, endDate }: UsePayrollReportOptions
         .eq("organization_id", profile!.organization_id)
         .gte("scheduled_date", format(startDate, "yyyy-MM-dd"))
         .lte("scheduled_date", format(endDate, "yyyy-MM-dd"))
-        .in("status", ["completed", "paid", "pro forma"])
+        .in("status", ["complete rated", "complete unrated"])
         .order("scheduled_date", { ascending: true });
 
       if (error) throw error;
