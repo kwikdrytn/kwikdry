@@ -1,48 +1,85 @@
 
 
-## Merge PriceBook Mapping into Integration Settings
+# Payroll Reports Feature
 
-The PriceBook Mapping page will be folded into the existing HouseCall Pro section on the Integration Settings page as a collapsible section. The standalone page and its route will be removed, but all the backend logic (used by AI Scheduling and Job Creation) stays untouched.
+## Overview
+Add an admin-only Payroll Reports page that shows revenue, tips, and credit card fees per technician, pulled from HouseCall Pro. Admins can filter by weekly pay period or custom date range, and view summary totals with expandable job-level detail.
 
-### What stays the same
-- The `pricebook_mapping` database table and all RLS policies
-- The `getPriceBookMapping` / `getPriceBookMappings` functions in `src/services/housecallpro.ts`
-- The `PriceBookMapping` type in `src/types/scheduling.ts`
-- The `create-hcp-job` edge function's PriceBook lookup logic
-- The `createJobFromSuggestion` function that reads mappings for duration
+## What's Needed
 
-### Changes
+### 1. Database Schema Updates
+The current `hcp_jobs` table only stores `total_amount`. We need additional columns to track financial details from HCP:
 
-**1. Move PriceBook Mapping UI into IntegrationSettings.tsx**
-- Add a new "Service Mappings" section inside the HouseCall Pro card (after the Employee Linking section)
-- Use a `Collapsible` component so it doesn't clutter the page by default
-- Include the same table with service type dropdowns, duration selectors, and save buttons from the current PriceBook page
-- Only show this section when HCP is connected (API key is configured)
+- `tip_amount` (numeric) -- tip collected on the job
+- `cc_fee_amount` (numeric) -- credit card processing fee
+- `payment_method` (text) -- e.g., "credit_card", "cash", "check"
+- `invoice_paid_at` (timestamptz) -- when the invoice was actually paid
 
-**2. Remove the standalone PriceBook Mapping page**
-- Delete `src/pages/admin/PriceBookMapping.tsx`
-- Remove the `/settings/pricebook` route and its legacy redirect from `src/App.tsx`
-- Remove the `PriceBookMapping` import from `App.tsx`
+### 2. Update HCP Sync Edge Function
+Modify `sync-hcp-data/index.ts` to pull the additional financial fields from the HCP API response when syncing jobs. The HCP job object includes `total_amount`, `tip`, and payment-related data that we're currently ignoring.
 
-**3. Update Settings page admin links**
-- Remove the "PriceBook Mapping" entry from the `adminLinks` array in `src/pages/Settings.tsx`
-- Remove the unused `BookOpen` icon import
+### 3. New Page: Payroll Reports
+Create `src/pages/admin/PayrollReports.tsx` with:
 
-### Technical Details
+- **Date selectors**: A weekly pay period picker (previous/next week navigation) plus a toggle to switch to custom date range with calendar pickers
+- **Summary table**: One row per technician showing:
+  - Technician name
+  - Number of completed jobs
+  - Total revenue
+  - Total tips
+  - Total CC fees
+  - Net revenue (revenue - CC fees)
+- **Expandable rows**: Click a technician to see each individual job with date, customer, service, amount, tip, CC fee, and payment method
+- **Totals row**: Grand totals across all technicians at the bottom
 
-The Integration Settings page (`src/pages/admin/IntegrationSettings.tsx`) will gain:
-- New state variables for PriceBook mappings (same as current `PriceBookMapping` page)
-- Two new queries: existing mappings and HCP services (from `hcp_services` table)
-- A save mutation using `supabase.from("pricebook_mapping").upsert()`
-- A collapsible section rendered after the `<EmployeeLinking />` component with the mapping table
+### 4. Navigation and Routing
+- Add route `/payroll` in `App.tsx` with admin-only `RoleGuard`
+- Add a new permission key `payroll.view` for granular access control
+- Add "Payroll" nav item in `src/config/navigation.ts` with a DollarSign icon
 
-The section will have a header like "Service Mappings" with a count badge showing mapped/total, and will expand to show the same table UI currently on the standalone page (service type, HCP PriceBook item dropdown, default duration, status badge, save button).
+### 5. Data Hook
+Create `src/hooks/usePayrollReport.ts` to query `hcp_jobs` filtered by:
+- Organization ID
+- Date range (scheduled_date between start and end)
+- Status = "completed" (only completed jobs count toward payroll)
 
-Files modified:
-- `src/pages/admin/IntegrationSettings.tsx` -- add PriceBook mapping section
-- `src/App.tsx` -- remove route and import
-- `src/pages/Settings.tsx` -- remove admin link
+Group results by `technician_name` / `technician_hcp_id`.
 
-Files deleted:
-- `src/pages/admin/PriceBookMapping.tsx`
+## Technical Details
+
+### Database Migration
+```sql
+ALTER TABLE hcp_jobs
+  ADD COLUMN IF NOT EXISTS tip_amount numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cc_fee_amount numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS payment_method text,
+  ADD COLUMN IF NOT EXISTS invoice_paid_at timestamptz;
+```
+
+### Permission Key Addition
+Add `'payroll.view'` to the `permission_key` enum and to the `PermissionKey` type in `useRoles.ts`.
+
+### Sync Function Changes
+In the job upsert within `sync-hcp-data`, map additional HCP fields:
+- `job.tip` or `job.tip_amount` to `tip_amount`
+- Credit card fee data (from HCP invoice/payment data) to `cc_fee_amount`
+- `job.payment_type` or similar to `payment_method`
+
+### Page Layout
+- Uses `DashboardLayout` wrapper (consistent with other admin pages)
+- Summary uses the existing `Table` component with `Card` wrappers
+- Expandable detail uses `Collapsible` from Radix
+- Date pickers use existing `Calendar` and `Popover` components
+- Charts: optional bar chart showing revenue by tech using `recharts` (already installed)
+
+### File Changes Summary
+| File | Action |
+|------|--------|
+| `supabase/functions/sync-hcp-data/index.ts` | Edit -- add tip/fee/payment fields to job upsert |
+| `src/pages/admin/PayrollReports.tsx` | Create -- new payroll report page |
+| `src/hooks/usePayrollReport.ts` | Create -- data fetching hook |
+| `src/App.tsx` | Edit -- add `/payroll` route |
+| `src/config/navigation.ts` | Edit -- add Payroll nav item |
+| `src/hooks/useRoles.ts` | Edit -- add `payroll.view` permission key |
+| DB migration | Add columns to `hcp_jobs` + enum value |
 
