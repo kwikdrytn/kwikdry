@@ -850,16 +850,19 @@ export type Database = {
       hcp_jobs: {
         Row: {
           address: string | null
+          cc_fee_amount: number | null
           city: string | null
           customer_hcp_id: string | null
           customer_name: string | null
           hcp_job_id: string
           id: string
+          invoice_paid_at: string | null
           lat: number | null
           lng: number | null
           location_id: string | null
           notes: string | null
           organization_id: string
+          payment_method: string | null
           scheduled_date: string | null
           scheduled_end: string | null
           scheduled_time: string | null
@@ -869,21 +872,25 @@ export type Database = {
           synced_at: string | null
           technician_hcp_id: string | null
           technician_name: string | null
+          tip_amount: number | null
           total_amount: number | null
           zip: string | null
         }
         Insert: {
           address?: string | null
+          cc_fee_amount?: number | null
           city?: string | null
           customer_hcp_id?: string | null
           customer_name?: string | null
           hcp_job_id: string
           id?: string
+          invoice_paid_at?: string | null
           lat?: number | null
           lng?: number | null
           location_id?: string | null
           notes?: string | null
           organization_id: string
+          payment_method?: string | null
           scheduled_date?: string | null
           scheduled_end?: string | null
           scheduled_time?: string | null
@@ -893,21 +900,25 @@ export type Database = {
           synced_at?: string | null
           technician_hcp_id?: string | null
           technician_name?: string | null
+          tip_amount?: number | null
           total_amount?: number | null
           zip?: string | null
         }
         Update: {
           address?: string | null
+          cc_fee_amount?: number | null
           city?: string | null
           customer_hcp_id?: string | null
           customer_name?: string | null
           hcp_job_id?: string
           id?: string
+          invoice_paid_at?: string | null
           lat?: number | null
           lng?: number | null
           location_id?: string | null
           notes?: string | null
           organization_id?: string
+          payment_method?: string | null
           scheduled_date?: string | null
           scheduled_end?: string | null
           scheduled_time?: string | null
@@ -917,6 +928,7 @@ export type Database = {
           synced_at?: string | null
           technician_hcp_id?: string | null
           technician_name?: string | null
+          tip_amount?: number | null
           total_amount?: number | null
           zip?: string | null
         }
@@ -2129,6 +2141,7 @@ export type Database = {
         | "settings.manage_integrations"
         | "training.view"
         | "training.manage"
+        | "payroll.view"
       processing_status: "pending" | "processing" | "completed" | "failed"
       transaction_type:
         | "restock"
@@ -2323,6 +2336,7 @@ export const Constants = {
         "settings.manage_integrations",
         "training.view",
         "training.manage",
+        "payroll.view",
       ],
       processing_status: ["pending", "processing", "completed", "failed"],
       transaction_type: ["restock", "usage", "transfer", "adjustment", "count"],

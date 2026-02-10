@@ -27,6 +27,7 @@ import CallMetrics from "./pages/admin/CallMetrics";
 import Training from "./pages/Training";
 import TrainingVideo from "./pages/TrainingVideo";
 import TrainingManagement from "./pages/admin/TrainingManagement";
+import PayrollReports from "./pages/admin/PayrollReports";
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -197,8 +198,19 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+
+            {/* Payroll Reports - Users with payroll.view permission */}
+            <Route
+              path="/payroll"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard requiredPermission="payroll.view">
+                    <PayrollReports />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
             
-            {/* Users - Users with users.manage permission */}
             <Route
               path="/users"
               element={
