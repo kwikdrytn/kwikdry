@@ -17,15 +17,18 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('Received background message:', payload);
 
-  const notificationTitle = payload.notification?.title || 'Checklist Reminder';
+  const notificationType = payload.data?.type || '';
+  const isInventory = notificationType.includes('stock') || notificationType.includes('inventory');
+
+  const notificationTitle = payload.notification?.title || 'New Notification';
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a checklist to complete',
+    body: payload.notification?.body || 'You have a new notification',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: payload.data?.type || 'checklist-reminder',
-    data: payload.data,
+    tag: notificationType || 'general',
+    data: { ...payload.data, clickUrl: isInventory ? '/inventory' : '/checklists' },
     actions: [
-      { action: 'open', title: 'Open Checklists' },
+      { action: 'open', title: isInventory ? 'View Inventory' : 'Open Checklists' },
       { action: 'dismiss', title: 'Dismiss' }
     ]
   };
@@ -38,19 +41,17 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   if (event.action === 'open' || !event.action) {
-    const urlToOpen = '/checklists';
+    const urlToOpen = event.notification.data?.clickUrl || '/dashboard';
     
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true })
         .then((clientList) => {
-          // Check if there's already a window open
           for (const client of clientList) {
             if (client.url.includes(self.location.origin) && 'focus' in client) {
               client.navigate(urlToOpen);
               return client.focus();
             }
           }
-          // Open a new window if none exists
           if (clients.openWindow) {
             return clients.openWindow(urlToOpen);
           }
