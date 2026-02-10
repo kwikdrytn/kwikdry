@@ -238,8 +238,8 @@ export default function Settings() {
           </Card>
         )}
 
-        {/* Notifications Card - Show for technicians */}
-        {profile?.role === 'technician' && (
+        {/* Notifications Card - Show for technicians and admins */}
+        {(profile?.role === 'technician' || profile?.role === 'admin') && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -253,7 +253,9 @@ export default function Settings() {
                 <div className="space-y-0.5">
                   <Label htmlFor="push-notifications">Push Notifications</Label>
                   <p className="text-sm text-muted-foreground">
-                    Receive reminders for daily and weekly checklists at 5 PM
+                    {profile?.role === 'technician'
+                      ? 'Receive reminders for daily and weekly checklists at 5 PM'
+                      : 'Receive low stock alerts and inventory notifications'}
                   </p>
                 </div>
                 <Switch
