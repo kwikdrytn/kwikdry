@@ -661,9 +661,11 @@ async function syncOrganization(
 ) {
   console.log(`Starting HCP sync for organization: ${organization_id}`);
 
-  // Calculate date range (next 30 days)
+  // Calculate date range: 90 days back (for completed/paid jobs) + 30 days forward
   const today = new Date();
-  const dateFrom = today.toISOString().split('T')[0];
+  const pastDate = new Date(today);
+  pastDate.setDate(pastDate.getDate() - 90);
+  const dateFrom = pastDate.toISOString().split('T')[0];
   const futureDate = new Date(today);
   futureDate.setDate(futureDate.getDate() + 30);
   const dateTo = futureDate.toISOString().split('T')[0];
