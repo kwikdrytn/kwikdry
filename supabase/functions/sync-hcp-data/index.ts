@@ -77,6 +77,8 @@ interface HCPJob {
   };
   work_status?: string;
   total_amount?: number;
+  tip_amount?: number;
+  tip?: number;
   invoice_number?: string;
   lead_source?: string;
   notes?: string | HCPJobNote[];
@@ -105,6 +107,24 @@ interface HCPJob {
     lat?: number;
     lng?: number;
   };
+  invoice?: {
+    paid_at?: string;
+    payment_method?: string;
+    payments?: Array<{
+      payment_type?: string;
+      transaction_fees?: number;
+      processing_fee?: number;
+    }>;
+  };
+  payments?: Array<{
+    payment_type?: string;
+    transaction_fees?: number;
+    processing_fee?: number;
+    paid_at?: string;
+  }>;
+  payment_type?: string;
+  cc_fee?: number;
+  processing_fee?: number;
 }
 
 interface HCPCustomer {
@@ -947,6 +967,31 @@ async function syncOrganization(
           jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
         }
 
+        // Extract financial details for payroll
+        const tipAmount = job.tip_amount ?? job.tip ?? null;
+        
+        // CC fee: check multiple possible locations in the HCP response
+        let ccFeeAmount: number | null = null;
+        if (job.cc_fee != null) {
+          ccFeeAmount = job.cc_fee;
+        } else if (job.processing_fee != null) {
+          ccFeeAmount = job.processing_fee;
+        } else if (job.invoice?.payments?.length) {
+          ccFeeAmount = job.invoice.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0);
+        } else if (job.payments?.length) {
+          ccFeeAmount = job.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0);
+        }
+        
+        // Payment method
+        const paymentMethod = job.payment_type 
+          ?? job.invoice?.payment_method 
+          ?? job.invoice?.payments?.[0]?.payment_type 
+          ?? job.payments?.[0]?.payment_type 
+          ?? null;
+        
+        // Invoice paid date
+        const invoicePaidAt = job.invoice?.paid_at ?? job.payments?.[0]?.paid_at ?? null;
+
         const record = {
           organization_id,
           location_id: location_id || null,
@@ -969,6 +1014,10 @@ async function syncOrganization(
             [assignedEmployee.first_name, assignedEmployee.last_name].filter(Boolean).join(' ') : null,
           status: job.work_status || null,
           total_amount: job.total_amount || null,
+          tip_amount: tipAmount,
+          cc_fee_amount: ccFeeAmount,
+          payment_method: paymentMethod,
+          invoice_paid_at: invoicePaidAt,
           services,
           notes: jobNotes,
           synced_at: now,
