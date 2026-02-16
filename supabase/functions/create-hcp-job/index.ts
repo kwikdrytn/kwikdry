@@ -345,11 +345,20 @@ serve(async (req) => {
     
     // Calculate end time using mapped duration if available
     const effectiveDuration = mappedDuration || duration;
-    const startDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
-    const endDate = new Date(startDate.getTime() + effectiveDuration * 60 * 1000);
-    const endHours = endDate.getHours().toString().padStart(2, "0");
-    const endMinutes = endDate.getMinutes().toString().padStart(2, "0");
-    const scheduledEnd = `${scheduledDate}T${endHours}:${endMinutes}:00`;
+    // Parse start time manually to avoid timezone issues in Deno
+    const [startHour, startMin] = scheduledTime.split(":").map(Number);
+    const totalMinutes = startHour * 60 + startMin + effectiveDuration;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    // If duration pushes past midnight, advance the date
+    const endDays = Math.floor(totalMinutes / (24 * 60));
+    let endDateStr = scheduledDate;
+    if (endDays > 0) {
+      const d = new Date(scheduledDate + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + endDays);
+      endDateStr = d.toISOString().split("T")[0];
+    }
+    const scheduledEnd = `${endDateStr}T${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}:00`;
 
     // Build the job payload
     const jobPayload: Record<string, any> = {
