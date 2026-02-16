@@ -1420,6 +1420,7 @@ export type Database = {
           created_at: string | null
           hcp_api_key: string | null
           hcp_company_id: string | null
+          hcp_configured: boolean | null
           id: string
           name: string
           rc_account_id: string | null
@@ -1434,6 +1435,7 @@ export type Database = {
           created_at?: string | null
           hcp_api_key?: string | null
           hcp_company_id?: string | null
+          hcp_configured?: boolean | null
           id?: string
           name: string
           rc_account_id?: string | null
@@ -1448,6 +1450,7 @@ export type Database = {
           created_at?: string | null
           hcp_api_key?: string | null
           hcp_company_id?: string | null
+          hcp_configured?: boolean | null
           id?: string
           name?: string
           rc_account_id?: string | null
