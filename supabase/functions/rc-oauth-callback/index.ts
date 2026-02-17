@@ -112,13 +112,13 @@ Deno.serve(async (req) => {
     tokenBody.append('code', code);
     tokenBody.append('redirect_uri', REDIRECT_URI);
     
-    const authHeader = btoa(`${clientId}:${clientSecret}`);
+    const basicAuth = btoa(`${clientId}:${clientSecret}`);
     
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${authHeader}`,
+        'Authorization': `Basic ${basicAuth}`,
       },
       body: tokenBody.toString(),
     });
