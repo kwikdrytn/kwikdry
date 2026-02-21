@@ -413,7 +413,13 @@ serve(async (req) => {
           if (!j.lat || !j.lng) return false;
           return haversineDistance(coordinates.lat, coordinates.lng, j.lat, j.lng) < 15;
         });
-        return `${dayName} ${date}: ${jobs.length} total jobs, ${nearbyJobs.length} within 15 miles of target location`;
+        const jobDetails = jobs.map((j) => {
+          const timeRange = j.scheduled_end 
+            ? `${j.scheduled_time || "TBD"}-${j.scheduled_end}` 
+            : `${j.scheduled_time || "TBD"}`;
+          return `${timeRange} (${j.technician_name || "unassigned"})`;
+        }).join(", ");
+        return `${dayName} ${date}: ${jobs.length} total jobs, ${nearbyJobs.length} within 15 miles. Schedule: ${jobDetails}`;
       })
       .join("\n");
 
@@ -424,7 +430,12 @@ serve(async (req) => {
         const jobList = jobs
           .sort((a, b) => a.distanceFromNew - b.distanceFromNew)
           .slice(0, 5)
-          .map((j) => `  - ${j.scheduled_time || "TBD"}: ${j.city || "Unknown"} (${j.distanceFromNew.toFixed(1)} mi away, ${j.technician_name || "unassigned"})`)
+          .map((j) => {
+            const timeRange = j.scheduled_end 
+              ? `${j.scheduled_time || "TBD"}-${j.scheduled_end}` 
+              : `${j.scheduled_time || "TBD"}`;
+            return `  - ${timeRange}: ${j.city || "Unknown"} (${j.distanceFromNew.toFixed(1)} mi away, ${j.technician_name || "unassigned"})`;
+          })
           .join("\n");
         return `${dayName} ${date}:\n${jobList}`;
       })
@@ -487,8 +498,9 @@ const systemPrompt = `You are a job scheduling assistant for Kwik Dry Total Clea
 4. Cluster jobs geographically - suggest times adjacent to nearby existing appointments
 5. Consider technician home locations for first/last appointments of the day
 6. Consider scheduling notes for each technician (time preferences, speed, restrictions)
-7. Avoid scheduling conflicts
-8. Balance workload across days
+7. **RESPECT END TIMES**: When scheduling, always check the scheduled_end time of existing jobs. Never suggest a time that overlaps with an existing job's start-to-end window for the same technician. Schedule AFTER the end time plus reasonable travel time.
+8. Avoid scheduling conflicts - ensure the new job starts after the previous job's end time (not its start time)
+9. Balance workload across days
 
 Respond with a JSON object containing:
 {
