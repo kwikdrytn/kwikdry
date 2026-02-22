@@ -637,8 +637,8 @@ serve(async (req) => {
               }
             }
             
-            // Longer delay between requests to avoid rate limiting (500ms)
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Longer delay between requests to avoid rate limiting (1500ms)
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
           
           console.log(`Line items result: ${addedCount}/${lineItemsToAdd.length} added successfully`);
