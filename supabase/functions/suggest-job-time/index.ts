@@ -639,10 +639,8 @@ IMPORTANT: Your TOP suggestion should be on the same day as the closest existing
       straightLineDistance: tech.distanceFromJob,
     }));
 
-    // Add estimated duration if calculated
-    if (estimatedDurationMinutes) {
-      suggestions.estimatedDurationMinutes = estimatedDurationMinutes;
-    }
+    // Always use the user-selected duration, not the historical estimate
+    suggestions.estimatedDurationMinutes = jobDurationMinutes;
 
     console.log("Generated suggestions:", suggestions);
 
