@@ -541,14 +541,15 @@ REMEMBER: timeSlot MUST use standard blocks (08:00, 11:00, 14:00) and the end ti
 Provide 3-5 suggestions, ranked by skill match and proximity to existing jobs.`;
 
     const servicesDisplay = allServices.length > 0 ? allServices.join(", ") : "General service";
-    const durationDisplay = estimatedDurationMinutes || jobDurationMinutes;
+    // Always use the user-selected duration as authoritative
+    const durationDisplay = jobDurationMinutes;
     
     const userPrompt = `Please suggest the best times to schedule a new job with these details:
 
 NEW JOB DETAILS:
 - Address: ${address}
 - Service Zone: ${matchingZone?.name || "Unknown zone"}
-- Estimated Duration: ${durationDisplay} minutes${estimatedDurationMinutes ? " (estimated from historical data)" : ""}
+- Duration: ${durationDisplay} minutes (USE THIS EXACT DURATION - do not change it)
 - Service Type(s): ${servicesDisplay}
 ${preferredDays?.length ? `- Preferred Days: ${preferredDays.join(", ")}` : ""}
 ${preferredTimeStart ? `- Preferred Time Window: ${preferredTimeStart} to ${preferredTimeEnd || "17:00"}` : ""}
