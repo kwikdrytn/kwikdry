@@ -485,6 +485,20 @@ IMPORTANT: Prioritize scheduling the new job on the SAME DAY and NEAR THE SAME T
 
 const systemPrompt = `You are a job scheduling assistant for Kwik Dry Total Cleaning. Analyze the existing job schedule and suggest optimal times for a new job.
 
+## STANDARD TIME BLOCKS (MANDATORY):
+Jobs MUST be scheduled at these start times ONLY:
+- **8:00 AM** (Morning block: 8:00 AM - 11:00 AM for 3-hour jobs)
+- **11:00 AM** (Midday block: 11:00 AM - 2:00 PM for 3-hour jobs)
+- **2:00 PM** (Afternoon block: 2:00 PM - 5:00 PM for 3-hour jobs)
+
+Do NOT adjust start times for drive time. The start time is when the technician arrives at the job.
+Do NOT suggest times like 8:30, 9:00, 11:30, etc. Only use 08:00, 11:00, or 14:00.
+
+## DURATION RULES (MANDATORY):
+- Use the EXACT duration provided in the job details. Do NOT change or estimate a different duration.
+- The end time = start time + exact duration. For example, a 3-hour (180 min) job starting at 08:00 ends at 11:00.
+- The timeSlot in your response must reflect the exact duration: "08:00-11:00" for 180 min, "08:00-10:00" for 120 min, etc.
+
 ## TECHNICIAN SKILL LEVELS (must follow strictly):
 - **PREFERRED**: Prioritize assigning this job type to this technician when possible
 - **STANDARD**: Normal assignment, no special preference (default if not specified)
@@ -493,14 +507,15 @@ const systemPrompt = `You are a job scheduling assistant for Kwik Dry Total Clea
 
 ## PRIORITY FACTORS (in order of importance):
 1. **RESPECT SKILL RESTRICTIONS**: Never assign a job to a technician with "NEVER" for that service type
-2. **CLOSEST EXISTING JOB**: Schedule near the closest booked job to minimize travel time
-3. **SKILL PREFERENCES**: Prioritize technicians with "PREFERRED" skill level for the service type
-4. Cluster jobs geographically - suggest times adjacent to nearby existing appointments
-5. Consider technician home locations for first/last appointments of the day
-6. Consider scheduling notes for each technician (time preferences, speed, restrictions)
-7. **RESPECT END TIMES**: When scheduling, always check the scheduled_end time of existing jobs. Never suggest a time that overlaps with an existing job's start-to-end window for the same technician. Schedule AFTER the end time plus reasonable travel time.
-8. Avoid scheduling conflicts - ensure the new job starts after the previous job's end time (not its start time)
-9. Balance workload across days
+2. **USE STANDARD TIME BLOCKS ONLY**: 08:00, 11:00, or 14:00 start times
+3. **USE EXACT DURATION**: Calculate end time from start time + provided duration
+4. **CLOSEST EXISTING JOB**: Schedule near the closest booked job to minimize travel time
+5. **SKILL PREFERENCES**: Prioritize technicians with "PREFERRED" skill level for the service type
+6. Cluster jobs geographically - suggest times adjacent to nearby existing appointments
+7. Consider technician home locations for first/last appointments of the day
+8. Consider scheduling notes for each technician (time preferences, speed, restrictions)
+9. **RESPECT END TIMES**: Never suggest a time block that overlaps with an existing job's time window for the same technician
+10. Balance workload across days
 
 Respond with a JSON object containing:
 {
@@ -508,7 +523,7 @@ Respond with a JSON object containing:
     {
       "date": "YYYY-MM-DD",
       "dayName": "Monday",
-      "timeSlot": "09:00-11:00",
+      "timeSlot": "08:00-11:00",
       "reason": "Brief explanation - mention skill match and nearby job this clusters with",
       "confidence": "high" | "medium" | "low",
       "nearbyJobsCount": 3,
@@ -520,6 +535,8 @@ Respond with a JSON object containing:
   "analysis": "Brief overall analysis emphasizing routing efficiency, job clustering, and skill matching",
   "warnings": ["Any potential issues, conflicts, or skill mismatches to flag"]
 }
+
+REMEMBER: timeSlot MUST use standard blocks (08:00, 11:00, 14:00) and the end time must equal start time + the exact duration provided. Most jobs are 3 hours (180 minutes).
 
 Provide 3-5 suggestions, ranked by skill match and proximity to existing jobs.`;
 
