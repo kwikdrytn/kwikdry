@@ -581,7 +581,10 @@ serve(async (req) => {
               console.log(`Successfully added line item: ${item.name}`);
             } else {
               const errorText = await lineItemResponse.text();
-              console.warn(`Failed to add line item "${item.name}" with root-level payload:`, errorText);
+              console.warn(`Failed to add line item "${item.name}" with root-level payload:`, lineItemResponse.status, errorText);
+              
+              // Wait before retry to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 2000));
               
               // Fallback: Try with array wrapper (some HCP API versions may expect this)
               console.log(`Retrying "${item.name}" with array wrapper...`);
@@ -602,7 +605,10 @@ serve(async (req) => {
                 console.log(`Added "${item.name}" via array format fallback`);
               } else {
                 const retryError = await retryResponse.text();
-                console.warn(`Array format also failed for "${item.name}":`, retryError);
+                console.warn(`Array format also failed for "${item.name}":`, retryResponse.status, retryError);
+                
+                // Wait before final retry
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 // Final fallback: Try without service_item_id (custom line item)
                 if (item.service_item_id) {
@@ -628,7 +634,7 @@ serve(async (req) => {
                     console.log(`Added "${item.name}" as custom line item`);
                   } else {
                     const finalError = await finalResponse.text();
-                    console.error(`All attempts failed for "${item.name}":`, finalError);
+                    console.error(`All attempts failed for "${item.name}":`, finalResponse.status, finalError);
                     failedItems.push(item.name);
                   }
                 } else {
@@ -637,8 +643,8 @@ serve(async (req) => {
               }
             }
             
-            // Longer delay between requests to avoid rate limiting (1500ms)
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Delay between line items to avoid rate limiting (2500ms)
+            await new Promise(resolve => setTimeout(resolve, 2500));
           }
           
           console.log(`Line items result: ${addedCount}/${lineItemsToAdd.length} added successfully`);
