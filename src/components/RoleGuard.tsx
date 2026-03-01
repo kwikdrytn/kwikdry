@@ -11,9 +11,10 @@ interface RoleGuardProps {
 
 export function RoleGuard({ children, allowedRoles, requiredPermission }: RoleGuardProps) {
   const { profile, isLoading } = useAuth();
-  const { data: permissions, isLoading: permissionsLoading } = useUserPermissions();
+  const { data: permissions, isLoading: permissionsLoading, isFetching: permissionsFetching } = useUserPermissions();
 
-  if (isLoading || permissionsLoading) {
+  // Show loading while auth or permissions are still resolving
+  if (isLoading || permissionsLoading || (requiredPermission && permissions === undefined && permissionsFetching)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
