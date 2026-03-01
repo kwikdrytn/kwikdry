@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,9 +48,11 @@ type FrequencyFilter = "all" | "daily" | "weekly";
 
 // Technician view component
 function TechnicianChecklists() {
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewType = searchParams.get("type") || "daily";
   
   const { data: dailyTemplates, isLoading: dailyLoading } = useChecklistTemplates("daily");
+  const { data: weeklyTemplates, isLoading: weeklyLoading } = useChecklistTemplates("weekly");
   const { data: dailySubmission, isLoading: dailySubLoading } = useDailySubmission();
   const { data: weeklySubmission, isLoading: weeklySubLoading } = useWeeklySubmission();
   const submitChecklist = useSubmitChecklist();
@@ -60,7 +62,8 @@ function TechnicianChecklists() {
   const today = format(new Date(), "MMMM d, yyyy");
 
   const dailyTemplate = dailyTemplates?.[0];
-  const isLoading = dailyLoading || dailySubLoading || weeklySubLoading;
+  const weeklyTemplate = weeklyTemplates?.[0];
+  const isLoading = dailyLoading || weeklyLoading || dailySubLoading || weeklySubLoading;
 
   const handleDailySubmit = async (
     responses: Record<string, { value: string; image_url?: string; notes?: string }>,
@@ -73,6 +76,20 @@ function TechnicianChecklists() {
       responses,
       notes,
       periodDate: new Date(),
+    });
+  };
+
+  const handleWeeklySubmit = async (
+    responses: Record<string, { value: string; image_url?: string; notes?: string }>,
+    notes?: string
+  ) => {
+    if (!weeklyTemplate) return;
+
+    await submitChecklist.mutateAsync({
+      templateId: weeklyTemplate.id,
+      responses,
+      notes,
+      periodDate: monday,
     });
   };
 
@@ -120,7 +137,7 @@ function TechnicianChecklists() {
         {/* Weekly Status Card */}
         <Card 
           className={`cursor-pointer transition-shadow hover:shadow-md ${weeklySubmission ? "border-success/50 bg-success/5" : ""}`}
-          onClick={() => navigate("/checklists/weekly")}
+          onClick={() => setSearchParams({ type: "weekly" })}
         >
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -153,8 +170,15 @@ function TechnicianChecklists() {
         </Card>
       </div>
 
+      {/* Back button when viewing weekly */}
+      {viewType === "weekly" && (
+        <Button variant="ghost" className="mb-2" onClick={() => setSearchParams({})}>
+          ← Back to daily
+        </Button>
+      )}
+
       {/* Daily Checklist Form */}
-      {!dailySubmission && dailyTemplate && (
+      {viewType === "daily" && !dailySubmission && dailyTemplate && (
         <Card>
           <CardHeader>
             <CardTitle>{dailyTemplate.name}</CardTitle>
@@ -173,7 +197,7 @@ function TechnicianChecklists() {
       )}
 
       {/* Already submitted daily */}
-      {dailySubmission && (
+      {viewType === "daily" && dailySubmission && (
         <CompletedChecklistCard
           submittedAt={dailySubmission.submitted_at}
           status={dailySubmission.status || "complete"}
@@ -182,8 +206,8 @@ function TechnicianChecklists() {
         />
       )}
 
-      {/* No template configured */}
-      {!dailySubmission && !dailyTemplate && (
+      {/* No daily template configured */}
+      {viewType === "daily" && !dailySubmission && !dailyTemplate && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
@@ -191,6 +215,52 @@ function TechnicianChecklists() {
             </div>
             <p className="text-muted-foreground">
               No daily checklist template has been configured.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Please contact your administrator.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Weekly Checklist Form */}
+      {viewType === "weekly" && !weeklySubmission && weeklyTemplate && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{weeklyTemplate.name}</CardTitle>
+            <CardDescription>
+              {weeklyTemplate.description || `Week of ${weekRange}`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChecklistForm
+              items={weeklyTemplate.items_json}
+              onSubmit={handleWeeklySubmit}
+              isSubmitting={submitChecklist.isPending}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Already submitted weekly */}
+      {viewType === "weekly" && weeklySubmission && (
+        <CompletedChecklistCard
+          submittedAt={weeklySubmission.submitted_at}
+          status={weeklySubmission.status || "complete"}
+          notes={weeklySubmission.notes}
+          periodLabel={weekRange}
+        />
+      )}
+
+      {/* No weekly template configured */}
+      {viewType === "weekly" && !weeklySubmission && !weeklyTemplate && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
+              <ClipboardCheck className="h-8 w-8 text-accent-foreground" />
+            </div>
+            <p className="text-muted-foreground">
+              No weekly checklist template has been configured.
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
               Please contact your administrator.
