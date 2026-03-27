@@ -18,7 +18,10 @@ import {
   AlertTriangle,
   Activity,
   ChevronRight,
-  Wrench
+  Wrench,
+  XCircle,
+  CalendarClock,
+  UserRoundX
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEquipmentNeedingMaintenance } from "@/hooks/useEquipment";
