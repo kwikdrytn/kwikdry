@@ -178,16 +178,16 @@ export default function PayrollReports() {
                     <Collapsible key={tech.technician_hcp_id} open={expandedTech === tech.technician_hcp_id} onOpenChange={(open) => setExpandedTech(open ? tech.technician_hcp_id : null)}>
                       <CollapsibleTrigger asChild>
                         <TableRow className="cursor-pointer hover:bg-muted/50">
-                          <TableCell className="font-medium">{tech.technician_name}</TableCell>
-                          <TableCell className="text-center">{tech.jobCount}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(tech.grossRevenue)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(tech.totalTips)}</TableCell>
-                          <TableCell className="text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</TableCell>
-                          <TableCell className="text-right font-semibold">{formatCurrency(tech.netPay)}</TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="w-[20%] font-medium">{tech.technician_name}</TableCell>
+                          <TableCell className="w-[8%] text-center">{tech.jobCount}</TableCell>
+                          <TableCell className="w-[14%] text-right">{formatCurrency(tech.grossRevenue)}</TableCell>
+                          <TableCell className="w-[12%] text-right">{formatCurrency(tech.totalTips)}</TableCell>
+                          <TableCell className="w-[12%] text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</TableCell>
+                          <TableCell className="w-[14%] text-right font-semibold">{formatCurrency(tech.netPay)}</TableCell>
+                          <TableCell className="w-[12%] text-center">
                             <Badge variant="outline" className="text-xs capitalize">{tech.payModel}</Badge>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-[8%]">
                             {expandedTech === tech.technician_hcp_id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </TableCell>
                         </TableRow>
