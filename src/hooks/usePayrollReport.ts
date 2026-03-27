@@ -20,6 +20,7 @@ export interface PayrollJob {
   scheduled_date: string | null;
   total_amount: number | null;
   tip_amount: number | null;
+  cc_fee_amount: number | null;
   payment_method: string | null;
   status: string | null;
   services: any;
