@@ -980,8 +980,8 @@ async function syncOrganization(
         const isCompletedJob = ['complete unrated', 'complete rated', 'completed', 'paid']
           .includes(newStatus || '');
 
-        // If payment details are missing and job is completed, fetch invoice details from HCP
-        if ((!paymentMethod || !invoicePaidAt) && isCompletedJob) {
+        // If payment details or tip/cc are missing and job is completed, fetch invoice details from HCP
+        if (isCompletedJob && (!paymentMethod || !invoicePaidAt || tipAmount == null || ccFeeAmount == null)) {
           try {
             const invoiceRes = await fetchWithRetry(`${HCP_BASE_URL}/jobs/${job.id}/invoices`, api_key);
             const invoiceData = await invoiceRes.json();
