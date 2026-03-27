@@ -975,8 +975,10 @@ async function syncOrganization(
 
         let invoicePaidAt = job.invoice?.paid_at ?? job.payments?.[0]?.paid_at ?? null;
 
+        const statusSource = job.work_status ?? job.status ?? null;
+        const newStatus = typeof statusSource === 'string' ? statusSource.toLowerCase() : null;
         const isCompletedJob = ['complete unrated', 'complete rated', 'completed', 'paid']
-          .includes((job.work_status || '').toLowerCase());
+          .includes(newStatus || '');
 
         // If payment details are missing and job is completed, fetch invoice details from HCP
         if ((!paymentMethod || !invoicePaidAt) && isCompletedJob) {
@@ -1060,7 +1062,8 @@ async function syncOrganization(
         const existing = existingJobMap.get(job.id);
         if (existing) {
           // Cancellation
-          if (existing.status && existing.status !== 'canceled' && existing.status !== 'cancelled' &&
+          const previousStatus = typeof existing.status === 'string' ? existing.status.toLowerCase() : '';
+          if (previousStatus && previousStatus !== 'canceled' && previousStatus !== 'cancelled' &&
               (newStatus === 'canceled' || newStatus === 'cancelled')) {
             changeEvents.push({
               hcp_job_id: job.id,
