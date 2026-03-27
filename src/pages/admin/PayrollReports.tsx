@@ -179,7 +179,7 @@ export default function PayrollReports() {
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
               <div className="overflow-x-auto">
-              <table className="w-full text-sm caption-bottom" style={{tableLayout: 'fixed'}}>
+              <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
                 <colgroup>
                   <col style={{width: '20%'}} />
                   <col style={{width: '8%'}} />
@@ -190,36 +190,36 @@ export default function PayrollReports() {
                   <col style={{width: '12%'}} />
                   <col style={{width: '8%'}} />
                 </colgroup>
-                <TableHeader>
-                  <TableRow className="border-b">
-                    <TableHead className="text-left">Technician</TableHead>
-                    <TableHead className="text-center">Jobs</TableHead>
-                    <TableHead className="text-right">Revenue</TableHead>
-                    <TableHead className="text-right">Tips</TableHead>
-                    <TableHead className="text-right">CC Fees</TableHead>
-                    <TableHead className="text-right">Net Pay</TableHead>
-                    <TableHead className="text-center">Model</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                <thead>
+                  <tr className="border-b">
+                    <th className="py-3 px-3 text-left text-xs font-medium text-muted-foreground">Technician</th>
+                    <th className="py-3 px-3 text-center text-xs font-medium text-muted-foreground">Jobs</th>
+                    <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Revenue</th>
+                    <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Tips</th>
+                    <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">CC Fees</th>
+                    <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Net Pay</th>
+                    <th className="py-3 px-3 text-center text-xs font-medium text-muted-foreground">Model</th>
+                    <th className="py-3 px-3" />
+                  </tr>
+                </thead>
+                <tbody>
                   {payrollData.map(tech => (
                     <Collapsible key={tech.technician_hcp_id} open={expandedTech === tech.technician_hcp_id} onOpenChange={(open) => setExpandedTech(open ? tech.technician_hcp_id : null)}>
                       <CollapsibleTrigger asChild>
-                        <TableRow className="cursor-pointer hover:bg-muted/50">
-                          <TableCell className="font-medium">{tech.technician_name}</TableCell>
-                          <TableCell className="text-center">{tech.jobCount}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(tech.grossRevenue)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(tech.totalTips)}</TableCell>
-                          <TableCell className="text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</TableCell>
-                          <TableCell className="text-right font-semibold">{formatCurrency(tech.netPay)}</TableCell>
-                          <TableCell className="text-center">
+                        <tr className="border-b cursor-pointer hover:bg-muted/50">
+                          <td className="py-3 px-3 font-medium">{tech.technician_name}</td>
+                          <td className="py-3 px-3 text-center">{tech.jobCount}</td>
+                          <td className="py-3 px-3 text-right">{formatCurrency(tech.grossRevenue)}</td>
+                          <td className="py-3 px-3 text-right">{formatCurrency(tech.totalTips)}</td>
+                          <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
+                          <td className="py-3 px-3 text-right font-semibold">{formatCurrency(tech.netPay)}</td>
+                          <td className="py-3 px-3 text-center">
                             <Badge variant="outline" className="text-xs capitalize">{tech.payModel}</Badge>
-                          </TableCell>
-                          <TableCell>
+                          </td>
+                          <td className="py-3 px-3">
                             {expandedTech === tech.technician_hcp_id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       </CollapsibleTrigger>
                       <CollapsibleContent asChild>
                         <tr>
@@ -271,18 +271,18 @@ export default function PayrollReports() {
                       </CollapsibleContent>
                     </Collapsible>
                   ))}
-                </TableBody>
-                <TableFooter>
-                  <TableRow className="font-bold">
-                    <TableCell>Totals</TableCell>
-                    <TableCell className="text-center">{totals.jobs}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.tips)}</TableCell>
-                    <TableCell className="text-right text-destructive">-{formatCurrency(totals.ccFees)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.netPay)}</TableCell>
-                    <TableCell colSpan={2} />
-                  </TableRow>
-                </TableFooter>
+                </tbody>
+                <tfoot className="border-t bg-muted/50">
+                  <tr className="font-bold">
+                    <td className="py-3 px-3">Totals</td>
+                    <td className="py-3 px-3 text-center">{totals.jobs}</td>
+                    <td className="py-3 px-3 text-right">{formatCurrency(totals.revenue)}</td>
+                    <td className="py-3 px-3 text-right">{formatCurrency(totals.tips)}</td>
+                    <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(totals.ccFees)}</td>
+                    <td className="py-3 px-3 text-right">{formatCurrency(totals.netPay)}</td>
+                    <td className="py-3 px-3" colSpan={2} />
+                  </tr>
+                </tfoot>
               </table>
               </div>
             )}
