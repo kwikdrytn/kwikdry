@@ -160,7 +160,7 @@ export default function PayrollReports() {
             ) : !payrollData?.length ? (
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[20%]">Technician</TableHead>
