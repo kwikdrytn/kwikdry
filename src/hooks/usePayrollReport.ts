@@ -47,6 +47,13 @@ function isCardPayment(method: string | null): boolean {
   return lower.includes('card') || lower.includes('credit') || lower.includes('debit') || lower.includes('stripe');
 }
 
+function getBaseJobAmount(totalAmount: number | null, tipAmount: number | null): number {
+  const total = Number(totalAmount) || 0;
+  const tip = Number(tipAmount) || 0;
+  if (tip <= 0) return total;
+  return Math.max(total - tip, 0);
+}
+
 export function usePayrollReport(startDate: string, endDate: string) {
   const { profile } = useAuth();
 
@@ -127,7 +134,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
         let ccFeesOnTips = 0;
 
         data.jobs.forEach(job => {
-          const amount = Number(job.total_amount) || 0;
+          const amount = getBaseJobAmount(job.total_amount, job.tip_amount);
           const tip = Number(job.tip_amount) || 0;
           const isCard = isCardPayment(job.payment_method);
 
