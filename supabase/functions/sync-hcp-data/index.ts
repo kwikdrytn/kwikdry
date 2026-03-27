@@ -1040,7 +1040,7 @@ async function syncOrganization(
           technician_hcp_id: newTechHcpId,
           technician_name: newTechName,
           status: newStatus,
-          total_amount: job.total_amount || null,
+          total_amount: totalAmountDollars,
           tip_amount: tipAmount,
           cc_fee_amount: ccFeeAmount,
           payment_method: paymentMethod,
