@@ -70,7 +70,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
         .eq('organization_id', profile.organization_id)
         .gte('scheduled_date', startDate)
         .lte('scheduled_date', endDate)
-        .in('status', ['completed', 'paid']);
+        .in('status', ['complete unrated', 'complete rated', 'completed', 'paid']);
 
       if (jobsError) throw jobsError;
 
