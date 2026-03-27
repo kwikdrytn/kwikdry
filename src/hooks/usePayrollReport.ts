@@ -61,7 +61,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
         .eq('id', profile.organization_id)
         .single();
 
-      const ccFeePercent = (org?.settings as any)?.cc_fee_percent ?? 3;
+      const ccFeePercent = (org?.settings as any)?.cc_fee_percent ?? 3.49;
 
       // Fetch completed jobs in date range
       const { data: jobs, error: jobsError } = await supabase
