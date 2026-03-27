@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, DollarSign, Settings2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, DollarSign, Settings2, RefreshCw } from "lucide-react";
 import { usePayrollReport, usePayConfigs, useUpsertPayConfig, useCcFeePercent, useUpdateCcFeePercent, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { useUsers } from "@/hooks/useUsers";
 import { cn } from "@/lib/utils";
