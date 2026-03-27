@@ -202,25 +202,25 @@ export default function PayrollReports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {payrollData.map(tech => (
-                    <Collapsible key={tech.technician_hcp_id} open={expandedTech === tech.technician_hcp_id} onOpenChange={(open) => setExpandedTech(open ? tech.technician_hcp_id : null)}>
-                      <CollapsibleTrigger asChild>
-                        <tr className="border-b cursor-pointer hover:bg-muted/50">
-                          <td className="py-3 px-3 font-medium">{tech.technician_name}</td>
-                          <td className="py-3 px-3 text-center">{tech.jobCount}</td>
-                          <td className="py-3 px-3 text-right">{formatCurrency(tech.grossRevenue)}</td>
-                          <td className="py-3 px-3 text-right">{formatCurrency(tech.totalTips)}</td>
-                          <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
-                          <td className="py-3 px-3 text-right font-semibold">{formatCurrency(tech.netPay)}</td>
-                          <td className="py-3 px-3 text-center">
-                            <Badge variant="outline" className="text-xs capitalize">{tech.payModel}</Badge>
-                          </td>
-                          <td className="py-3 px-3">
-                            {expandedTech === tech.technician_hcp_id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </td>
-                        </tr>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent asChild>
+                  {payrollData.map(tech => {
+                    const isExpanded = expandedTech === tech.technician_hcp_id;
+                    return (
+                    <Fragment key={tech.technician_hcp_id}>
+                      <tr className="border-b cursor-pointer hover:bg-muted/50" onClick={() => setExpandedTech(isExpanded ? null : tech.technician_hcp_id)}>
+                        <td className="py-3 px-3 font-medium">{tech.technician_name}</td>
+                        <td className="py-3 px-3 text-center">{tech.jobCount}</td>
+                        <td className="py-3 px-3 text-right">{formatCurrency(tech.grossRevenue)}</td>
+                        <td className="py-3 px-3 text-right">{formatCurrency(tech.totalTips)}</td>
+                        <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
+                        <td className="py-3 px-3 text-right font-semibold">{formatCurrency(tech.netPay)}</td>
+                        <td className="py-3 px-3 text-center">
+                          <Badge variant="outline" className="text-xs capitalize">{tech.payModel}</Badge>
+                        </td>
+                        <td className="py-3 px-3">
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </td>
+                      </tr>
+                      {isExpanded && (
                         <tr>
                           <td colSpan={8} className="p-0">
                             <div className="bg-muted/30 px-6 py-3 overflow-x-auto">
@@ -267,9 +267,10 @@ export default function PayrollReports() {
                             </div>
                           </td>
                         </tr>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ))}
+                      )}
+                    </Fragment>
+                    );
+                  })}
                 </tbody>
                 <tfoot className="border-t bg-muted/50">
                   <tr className="font-bold">
