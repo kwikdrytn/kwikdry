@@ -440,6 +440,9 @@ export function AdminDashboard() {
         {/* Recent Activity - Job Changes */}
         <RecentActivityCard />
       </div>
+
+      {/* Checklist Compliance Heatmap */}
+      <ChecklistComplianceHeatmap />
     </div>
   );
 }

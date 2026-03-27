@@ -347,6 +347,9 @@ export default function PayrollReports() {
             )}
           </CardContent>
         </Card>
+
+        {/* YTD Summary */}
+        <PayrollYTDSummary />
       </div>
 
       <PaySettingsDialog open={configDialogOpen} onOpenChange={setConfigDialogOpen} />
