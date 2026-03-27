@@ -16,6 +16,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MyPayCard } from "@/components/dashboard/MyPayCard";
 
 export function TechnicianDashboard() {
   const { profile } = useAuth();
