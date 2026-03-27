@@ -442,25 +442,52 @@ export function AdminDashboard() {
 
 function RecentActivityCard() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { data: events, isLoading } = useQuery({
-    queryKey: ['dashboard-recent-activity'],
+    queryKey: ['dashboard-recent-activity', profile?.organization_id],
     queryFn: async () => {
+      if (!profile?.organization_id) return [];
       const { data, error } = await supabase
         .from('job_change_events' as any)
         .select('*')
+        .eq('organization_id', profile.organization_id)
         .order('detected_at', { ascending: false })
         .limit(5);
       if (error) throw error;
       return (data as any[]) || [];
     },
+    enabled: !!profile?.organization_id,
+    refetchInterval: 60000,
   });
 
   const unreadCount = events?.filter((e: any) => !e.is_read).length || 0;
 
-  const changeIcons: Record<string, string> = {
-    cancelled: '❌',
-    rescheduled: '📅',
-    reassigned: '👤',
+  const getEventDescription = (event: any) => {
+    switch (event.change_type) {
+      case 'cancelled':
+        return `Job for ${event.customer_name || 'Unknown'} was cancelled`;
+      case 'rescheduled': {
+        const oldDate = event.old_value?.scheduled_date;
+        const newDate = event.new_value?.scheduled_date;
+        if (oldDate && newDate && oldDate !== newDate) {
+          return `${event.customer_name || 'Unknown'} rescheduled: ${oldDate} → ${newDate}`;
+        }
+        return `Job for ${event.customer_name || 'Unknown'} was rescheduled`;
+      }
+      case 'reassigned': {
+        const oldTech = event.old_value?.technician_name || 'Unknown';
+        const newTech = event.new_value?.technician_name || 'Unknown';
+        return `${event.customer_name || 'Unknown'} reassigned: ${oldTech} → ${newTech}`;
+      }
+      default:
+        return `Job for ${event.customer_name || 'Unknown'} changed`;
+    }
+  };
+
+  const changeTypeStyles: Record<string, { icon: typeof XCircle; color: string }> = {
+    cancelled: { icon: XCircle, color: 'text-destructive' },
+    rescheduled: { icon: CalendarClock, color: 'text-warning' },
+    reassigned: { icon: UserRoundX, color: 'text-primary' },
   };
 
   return (
@@ -478,12 +505,12 @@ function RecentActivityCard() {
             View All <ChevronRight className="ml-1 h-3 w-3" />
           </Button>
         </div>
-        <CardDescription>Job changes detected from HCP</CardDescription>
+        <CardDescription>Job cancellations, reschedules & reassignments from HCP</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="space-y-2">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
           </div>
         ) : !events?.length ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -491,25 +518,36 @@ function RecentActivityCard() {
               <Activity className="h-6 w-6 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">No job changes detected yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Changes will appear after the next HCP sync</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {events.map((event: any) => (
-              <div
-                key={event.id}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer hover:bg-muted/50",
-                  !event.is_read && "bg-primary/5 border-primary/20"
-                )}
-                onClick={() => navigate('/activity')}
-              >
-                <span>{changeIcons[event.change_type] || '🔔'}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{event.customer_name || 'Unknown'}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{event.change_type}</p>
+            {events.map((event: any) => {
+              const config = changeTypeStyles[event.change_type] || changeTypeStyles.cancelled;
+              const Icon = config.icon;
+              return (
+                <div
+                  key={event.id}
+                  className={cn(
+                    "flex items-start gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-colors hover:bg-muted/50",
+                    !event.is_read && "bg-primary/5 border-primary/20"
+                  )}
+                  onClick={() => navigate('/activity')}
+                >
+                  <Icon className={cn("h-4 w-4 mt-0.5 shrink-0", config.color)} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm leading-snug">{getEventDescription(event)}</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <span className="capitalize">{event.change_type}</span>
+                      {event.technician_name && <span>• {event.technician_name}</span>}
+                      {event.detected_at && (
+                        <span>• {formatDistanceToNow(new Date(event.detected_at), { addSuffix: true })}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
