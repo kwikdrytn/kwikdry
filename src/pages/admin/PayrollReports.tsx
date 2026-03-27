@@ -195,38 +195,38 @@ export default function PayrollReports() {
                       <CollapsibleContent asChild>
                         <tr>
                           <td colSpan={8} className="p-0">
-                            <div className="bg-muted/30 px-6 py-3">
+                            <div className="bg-muted/30 px-6 py-3 overflow-x-auto">
                               <p className="text-xs font-medium text-muted-foreground mb-2">
                                 {tech.payModel === 'salary' && `Weekly Salary: ${formatCurrency(tech.weeklySalary)} + Tips - CC Fees on Tips`}
                                 {tech.payModel === 'commission' && `${tech.commissionPercent}% Commission - CC Fees + Tips - CC Fees on Tips`}
                                 {tech.payModel === 'none' && 'No pay model configured'}
                               </p>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs">Date</TableHead>
-                                    <TableHead className="text-xs">Customer</TableHead>
-                                    <TableHead className="text-xs">Service</TableHead>
-                                    <TableHead className="text-xs text-right">Amount</TableHead>
-                                    <TableHead className="text-xs text-right">Tip</TableHead>
-                                    <TableHead className="text-xs">Payment</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b">
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[15%]">Date</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[20%]">Customer</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[25%]">Service</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[13%]">Amount</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[12%]">Tip</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 w-[15%]">Payment</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
                                   {tech.jobs.map(job => (
-                                    <TableRow key={job.id} className="text-xs">
-                                      <TableCell>{job.scheduled_date ? format(new Date(job.scheduled_date + 'T12:00:00'), 'MMM d') : '-'}</TableCell>
-                                      <TableCell>{job.customer_name || '-'}</TableCell>
-                                      <TableCell className="max-w-[150px] truncate">
+                                    <tr key={job.id} className="border-b last:border-0 text-xs">
+                                      <td className="py-2 pr-4">{job.scheduled_date ? format(new Date(job.scheduled_date + 'T12:00:00'), 'MMM d') : '-'}</td>
+                                      <td className="py-2 pr-4">{job.customer_name || '-'}</td>
+                                      <td className="py-2 pr-4 max-w-[200px] truncate">
                                         {Array.isArray(job.services) ? job.services.map((s: any) => s.name).filter(Boolean).join(', ') : '-'}
-                                      </TableCell>
-                                      <TableCell className="text-right">{formatCurrency(Number(job.total_amount) || 0)}</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(Number(job.tip_amount) || 0)}</TableCell>
-                                      <TableCell>{job.payment_method || '-'}</TableCell>
-                                    </TableRow>
+                                      </td>
+                                      <td className="py-2 pr-4 text-right">{formatCurrency(Number(job.total_amount) || 0)}</td>
+                                      <td className="py-2 pr-4 text-right">{formatCurrency(Number(job.tip_amount) || 0)}</td>
+                                      <td className="py-2">{job.payment_method || '-'}</td>
+                                    </tr>
                                   ))}
-                                </TableBody>
-                              </Table>
+                                </tbody>
+                              </table>
                             </div>
                           </td>
                         </tr>
