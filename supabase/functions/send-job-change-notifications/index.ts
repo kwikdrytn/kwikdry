@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
         type: 'job_change',
         title,
         body: summary,
-        click_action: '/activity',
+        click_action: clickAction,
         delivered: sent > 0,
       });
     }
