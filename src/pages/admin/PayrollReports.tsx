@@ -178,17 +178,18 @@ export default function PayrollReports() {
             ) : !payrollData?.length ? (
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
-              <Table className="table-fixed">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm caption-bottom">
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[20%]">Technician</TableHead>
-                    <TableHead className="w-[8%] text-center">Jobs</TableHead>
-                    <TableHead className="w-[14%] text-right">Revenue</TableHead>
-                    <TableHead className="w-[12%] text-right">Tips</TableHead>
-                    <TableHead className="w-[12%] text-right">CC Fees</TableHead>
-                    <TableHead className="w-[14%] text-right">Net Pay</TableHead>
-                    <TableHead className="w-[12%] text-center">Model</TableHead>
-                    <TableHead className="w-[8%]" />
+                  <TableRow className="border-b">
+                    <TableHead className="text-left" style={{width: '20%'}}>Technician</TableHead>
+                    <TableHead className="text-center" style={{width: '8%'}}>Jobs</TableHead>
+                    <TableHead className="text-right" style={{width: '14%'}}>Revenue</TableHead>
+                    <TableHead className="text-right" style={{width: '12%'}}>Tips</TableHead>
+                    <TableHead className="text-right" style={{width: '12%'}}>CC Fees</TableHead>
+                    <TableHead className="text-right" style={{width: '14%'}}>Net Pay</TableHead>
+                    <TableHead className="text-center" style={{width: '12%'}}>Model</TableHead>
+                    <TableHead style={{width: '8%'}} />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -196,16 +197,16 @@ export default function PayrollReports() {
                     <Collapsible key={tech.technician_hcp_id} open={expandedTech === tech.technician_hcp_id} onOpenChange={(open) => setExpandedTech(open ? tech.technician_hcp_id : null)}>
                       <CollapsibleTrigger asChild>
                         <TableRow className="cursor-pointer hover:bg-muted/50">
-                          <TableCell className="w-[20%] font-medium">{tech.technician_name}</TableCell>
-                          <TableCell className="w-[8%] text-center">{tech.jobCount}</TableCell>
-                          <TableCell className="w-[14%] text-right">{formatCurrency(tech.grossRevenue)}</TableCell>
-                          <TableCell className="w-[12%] text-right">{formatCurrency(tech.totalTips)}</TableCell>
-                          <TableCell className="w-[12%] text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</TableCell>
-                          <TableCell className="w-[14%] text-right font-semibold">{formatCurrency(tech.netPay)}</TableCell>
-                          <TableCell className="w-[12%] text-center">
+                          <TableCell className="font-medium" style={{width: '20%'}}>{tech.technician_name}</TableCell>
+                          <TableCell className="text-center" style={{width: '8%'}}>{tech.jobCount}</TableCell>
+                          <TableCell className="text-right" style={{width: '14%'}}>{formatCurrency(tech.grossRevenue)}</TableCell>
+                          <TableCell className="text-right" style={{width: '12%'}}>{formatCurrency(tech.totalTips)}</TableCell>
+                          <TableCell className="text-right text-destructive" style={{width: '12%'}}>-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</TableCell>
+                          <TableCell className="text-right font-semibold" style={{width: '14%'}}>{formatCurrency(tech.netPay)}</TableCell>
+                          <TableCell className="text-center" style={{width: '12%'}}>
                             <Badge variant="outline" className="text-xs capitalize">{tech.payModel}</Badge>
                           </TableCell>
-                          <TableCell className="w-[8%]">
+                          <TableCell style={{width: '8%'}}>
                             {expandedTech === tech.technician_hcp_id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </TableCell>
                         </TableRow>
@@ -247,7 +248,7 @@ export default function PayrollReports() {
                                       </td>
                                       <td className="py-2 pr-4 text-right">{formatCurrency(jobAmount)}</td>
                                       <td className="py-2 pr-4 text-right">{jobTip ? formatCurrency(jobTip) : '-'}</td>
-                                      <td className="py-2 pr-4 text-right">{jobCcFee ? formatCurrency(jobCcFee) : '-'}</td>
+                                      <td className="py-2 pr-4 text-right text-destructive">{jobCcFee ? `-${formatCurrency(jobCcFee)}` : '-'}</td>
                                       <td className="py-2">{formatPaymentMethod(job.payment_method)}</td>
                                     </tr>
                                     );
@@ -263,16 +264,17 @@ export default function PayrollReports() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="font-bold">
-                    <TableCell className="w-[20%]">Totals</TableCell>
-                    <TableCell className="w-[8%] text-center">{totals.jobs}</TableCell>
-                    <TableCell className="w-[14%] text-right">{formatCurrency(totals.revenue)}</TableCell>
-                    <TableCell className="w-[12%] text-right">{formatCurrency(totals.tips)}</TableCell>
-                    <TableCell className="w-[12%] text-right text-destructive">-{formatCurrency(totals.ccFees)}</TableCell>
-                    <TableCell className="w-[14%] text-right">{formatCurrency(totals.netPay)}</TableCell>
-                    <TableCell className="w-[20%]" colSpan={2} />
+                    <TableCell style={{width: '20%'}}>Totals</TableCell>
+                    <TableCell className="text-center" style={{width: '8%'}}>{totals.jobs}</TableCell>
+                    <TableCell className="text-right" style={{width: '14%'}}>{formatCurrency(totals.revenue)}</TableCell>
+                    <TableCell className="text-right" style={{width: '12%'}}>{formatCurrency(totals.tips)}</TableCell>
+                    <TableCell className="text-right text-destructive" style={{width: '12%'}}>-{formatCurrency(totals.ccFees)}</TableCell>
+                    <TableCell className="text-right" style={{width: '14%'}}>{formatCurrency(totals.netPay)}</TableCell>
+                    <TableCell colSpan={2} style={{width: '20%'}} />
                   </TableRow>
                 </TableFooter>
-              </Table>
+              </table>
+              </div>
             )}
           </CardContent>
         </Card>
