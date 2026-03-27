@@ -227,7 +227,7 @@ export function useCcFeePercent() {
   return useQuery({
     queryKey: ['cc-fee-percent', profile?.organization_id],
     queryFn: async () => {
-      if (!profile?.organization_id) return 3;
+      if (!profile?.organization_id) return 3.49;
       const { data } = await supabase
         .from('organizations')
         .select('settings')
