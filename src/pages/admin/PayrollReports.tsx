@@ -163,14 +163,14 @@ export default function PayrollReports() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Technician</TableHead>
-                    <TableHead className="text-center">Jobs</TableHead>
-                    <TableHead className="text-right">Revenue</TableHead>
-                    <TableHead className="text-right">Tips</TableHead>
-                    <TableHead className="text-right">CC Fees</TableHead>
-                    <TableHead className="text-right">Net Pay</TableHead>
-                    <TableHead className="text-center">Model</TableHead>
-                    <TableHead className="w-8" />
+                    <TableHead className="w-[20%]">Technician</TableHead>
+                    <TableHead className="w-[8%] text-center">Jobs</TableHead>
+                    <TableHead className="w-[14%] text-right">Revenue</TableHead>
+                    <TableHead className="w-[12%] text-right">Tips</TableHead>
+                    <TableHead className="w-[12%] text-right">CC Fees</TableHead>
+                    <TableHead className="w-[14%] text-right">Net Pay</TableHead>
+                    <TableHead className="w-[12%] text-center">Model</TableHead>
+                    <TableHead className="w-[8%]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
