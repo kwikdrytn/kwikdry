@@ -131,6 +131,10 @@ export default function PayrollReports() {
               <Download className="mr-2 h-4 w-4" />
               CSV
             </Button>
+            <Button variant="outline" size="sm" disabled={!payrollData?.length} onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              PDF
+            </Button>
             <Button variant="outline" size="sm" disabled={syncing} onClick={async () => {
               setSyncing(true);
               try {
