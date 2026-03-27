@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Activity, XCircle, CalendarClock, UserRoundX, Check, CheckCheck } from "lucide-react";
+import { Activity, XCircle, CalendarClock, UserRoundX, Check, CheckCheck, ExternalLink } from "lucide-react";
 import { useActivityFeed, useMarkAsRead, useMarkAllAsRead, JobChangeEvent } from "@/hooks/useActivityFeed";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
