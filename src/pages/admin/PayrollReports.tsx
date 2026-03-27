@@ -31,6 +31,7 @@ export default function PayrollReports() {
   const [customEnd, setCustomEnd] = useState<Date | undefined>();
   const [expandedTech, setExpandedTech] = useState<string | null>(null);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(weekAnchor, { weekStartsOn: 1 });
