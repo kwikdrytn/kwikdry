@@ -233,7 +233,7 @@ export function useCcFeePercent() {
         .select('settings')
         .eq('id', profile.organization_id)
         .single();
-      return (data?.settings as any)?.cc_fee_percent ?? 3;
+      return (data?.settings as any)?.cc_fee_percent ?? 3.49;
     },
     enabled: !!profile?.organization_id,
   });
