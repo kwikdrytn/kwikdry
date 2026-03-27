@@ -1091,6 +1091,35 @@ async function syncOrganization(
                 if (parsedTips.length > 0) {
                   tipAmount = Math.max(...parsedTips);
                   console.log(`Found tip for job ${job.id}: $${tipAmount}`);
+                } else if (totalAmountDollars != null) {
+                  const subtotalCandidates = [
+                    invoiceObj?.subtotal,
+                    invoiceObj?.subtotal_amount,
+                    invoiceObj?.sub_total,
+                    invoiceObj?.amount_subtotal,
+                    invoiceObj?.amount_before_tip,
+                    invoiceObj?.line_items_total,
+                    invoiceObj?.service_total,
+                    invoiceObj?.job_total,
+                    firstEntry?.subtotal,
+                    firstEntry?.subtotal_amount,
+                    firstEntry?.sub_total,
+                    firstEntry?.amount_subtotal,
+                    firstEntry?.amount_before_tip,
+                  ];
+
+                  const parsedSubtotals = subtotalCandidates
+                    .map(raw => normalizeInvoiceMoney(raw, totalAmountDollars))
+                    .filter((value): value is number => value != null && value >= 0);
+
+                  if (parsedSubtotals.length > 0) {
+                    const bestSubtotal = Math.max(...parsedSubtotals);
+                    const derivedTip = Number((totalAmountDollars - bestSubtotal).toFixed(2));
+                    if (derivedTip > 0.01) {
+                      tipAmount = derivedTip;
+                      console.log(`Derived tip for job ${job.id} from totals: $${tipAmount}`);
+                    }
+                  }
                 }
               }
 
