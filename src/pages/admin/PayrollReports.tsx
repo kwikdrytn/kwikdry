@@ -16,6 +16,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Settin
 import { useQueryClient } from "@tanstack/react-query";
 import { usePayrollReport, useOrgPaySettings, useUpdateOrgPaySettings, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { cn } from "@/lib/utils";
+import { PayrollYTDSummary } from "@/components/payroll/PayrollYTDSummary";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
