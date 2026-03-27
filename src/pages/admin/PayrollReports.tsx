@@ -235,19 +235,20 @@ export default function PayrollReports() {
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
               <div className="overflow-x-auto">
-              <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
+              <table className="w-full text-sm border-collapse" style={{tableLayout: 'fixed'}}>
                 <colgroup>
+                  <col style={{width: '4%'}} />
                   <col style={{width: '18%'}} />
                   <col style={{width: '8%'}} />
                   <col style={{width: '14%'}} />
                   <col style={{width: '12%'}} />
                   <col style={{width: '12%'}} />
                   <col style={{width: '14%'}} />
-                  <col style={{width: '14%'}} />
-                  <col style={{width: '8%'}} />
+                  <col style={{width: '18%'}} />
                 </colgroup>
                 <thead>
                   <tr className="border-b">
+                    <th className="py-3 px-2" />
                     <th className="py-3 px-3 text-left text-xs font-medium text-muted-foreground">Technician</th>
                     <th className="py-3 px-3 text-center text-xs font-medium text-muted-foreground">Jobs</th>
                     <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Revenue</th>
@@ -255,7 +256,6 @@ export default function PayrollReports() {
                     <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">CC Fees</th>
                     <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Net Pay</th>
                     <th className="py-3 px-3 text-center text-xs font-medium text-muted-foreground">Pay Type</th>
-                    <th className="py-3 px-3" />
                   </tr>
                 </thead>
                 <tbody>
