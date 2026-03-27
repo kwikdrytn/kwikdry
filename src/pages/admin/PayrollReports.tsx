@@ -61,10 +61,27 @@ export default function PayrollReports() {
             <h1 className="text-2xl font-bold">Payroll Reports</h1>
             <p className="text-muted-foreground text-sm">Revenue, tips, and CC fees by technician</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setConfigDialogOpen(true)}>
-            <Settings2 className="mr-2 h-4 w-4" />
-            Pay Settings
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={syncing} onClick={async () => {
+              setSyncing(true);
+              try {
+                const { error } = await supabase.functions.invoke('sync-hcp-data');
+                if (error) throw error;
+                toast.success('HCP data synced successfully');
+              } catch (e: any) {
+                toast.error('Sync failed: ' + (e.message || 'Unknown error'));
+              } finally {
+                setSyncing(false);
+              }
+            }}>
+              <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
+              {syncing ? 'Syncing…' : 'Sync HCP'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setConfigDialogOpen(true)}>
+              <Settings2 className="mr-2 h-4 w-4" />
+              Pay Settings
+            </Button>
+          </div>
         </div>
 
         {/* Date Controls */}
