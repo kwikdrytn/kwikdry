@@ -54,20 +54,23 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'open' || !event.action) {
     const urlToOpen = event.notification.data?.clickUrl || '/dashboard';
+    const isExternal = urlToOpen.startsWith('http');
     
     event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          for (const client of clientList) {
-            if (client.url.includes(self.location.origin) && 'focus' in client) {
-              client.navigate(urlToOpen);
-              return client.focus();
-            }
-          }
-          if (clients.openWindow) {
-            return clients.openWindow(urlToOpen);
-          }
-        })
+      isExternal
+        ? clients.openWindow(urlToOpen)
+        : clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((clientList) => {
+              for (const client of clientList) {
+                if (client.url.includes(self.location.origin) && 'focus' in client) {
+                  client.navigate(urlToOpen);
+                  return client.focus();
+                }
+              }
+              if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+              }
+            })
     );
   }
 });
