@@ -1028,9 +1028,12 @@ async function syncOrganization(
               }
 
               if (tipAmount == null) {
-                const invoiceTipRaw = invoiceObj?.tip_amount ?? firstEntry?.tip_amount ?? null;
-                if (typeof invoiceTipRaw === 'number') {
+                const invoiceTipRaw = invoiceObj?.tip_amount ?? invoiceObj?.tip
+                  ?? firstEntry?.tip_amount ?? firstEntry?.tip
+                  ?? firstPayment?.tip_amount ?? firstPayment?.tip ?? null;
+                if (typeof invoiceTipRaw === 'number' && invoiceTipRaw > 0) {
                   tipAmount = invoiceTipRaw / 100;
+                  console.log(`Found tip for job ${job.id}: ${invoiceTipRaw} cents -> $${tipAmount}`);
                 }
               }
 
