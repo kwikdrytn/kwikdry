@@ -91,7 +91,45 @@ export default function PayrollReports() {
               {orgSettings ? `${orgSettings.commission_percent}% Commission (min ${formatCurrency(orgSettings.weekly_minimum)}/week) + Tips - CC Fees` : 'Revenue, tips, and CC fees by technician'}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" disabled={!payrollData?.length} onClick={() => {
+              if (!payrollData?.length) return;
+              const rows = [['Technician', 'Jobs', 'Revenue', 'Tips', 'CC Fees', 'Base Pay', 'Net Pay', 'Pay Type']];
+              payrollData.forEach(t => {
+                rows.push([
+                  t.technician_name,
+                  String(t.jobCount),
+                  t.grossRevenue.toFixed(2),
+                  t.totalTips.toFixed(2),
+                  (t.ccFeesOnRevenue + t.ccFeesOnTips).toFixed(2),
+                  t.basePay.toFixed(2),
+                  t.netPay.toFixed(2),
+                  getPayModelLabel(t),
+                ]);
+              });
+              rows.push([
+                'TOTALS',
+                String(totals.jobs),
+                totals.revenue.toFixed(2),
+                totals.tips.toFixed(2),
+                totals.ccFees.toFixed(2),
+                '',
+                totals.netPay.toFixed(2),
+                '',
+              ]);
+              const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `payroll_${startDate}_to_${endDate}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+              toast.success('CSV downloaded');
+            }}>
+              <Download className="mr-2 h-4 w-4" />
+              CSV
+            </Button>
             <Button variant="outline" size="sm" disabled={syncing} onClick={async () => {
               setSyncing(true);
               try {
