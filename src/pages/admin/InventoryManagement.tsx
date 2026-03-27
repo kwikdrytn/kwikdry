@@ -9,6 +9,8 @@ import { InventoryFormDialog } from "@/components/inventory/InventoryFormDialog"
 import { CsvImportDialog } from "@/components/inventory/CsvImportDialog";
 import { BulkEditDialog, BulkEditUpdates } from "@/components/inventory/BulkEditDialog";
 import { QuickUseDialog } from "@/components/inventory/QuickUseDialog";
+import { TechnicianInventoryView } from "@/components/inventory/TechnicianInventoryView";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +33,17 @@ import {
 import { useDebounce } from "@/hooks/useDebounce";
 
 export default function InventoryManagement() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
+  if (!isAdmin) {
+    return <TechnicianInventoryView />;
+  }
+
+  return <AdminInventoryView />;
+}
+
+function AdminInventoryView() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
