@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Fragment } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, DollarSign, Settings2, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Settings2, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePayrollReport, usePayConfigs, useUpsertPayConfig, useCcFeePercent, useUpdateCcFeePercent, TechnicianPayroll } from "@/hooks/usePayrollReport";
-import { useUsers } from "@/hooks/useUsers";
+import { usePayrollReport, useOrgPaySettings, useUpdateOrgPaySettings, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -39,6 +38,19 @@ function getDisplayJobAmount(totalAmount: number | null, tipAmount: number | nul
   return Math.max(total - tip, 0);
 }
 
+function getPayModelLabel(tech: TechnicianPayroll): string {
+  if (tech.guaranteeWeeks > 0 && tech.commissionWeeks > 0) {
+    return 'Mixed';
+  }
+  if (tech.guaranteeWeeks > 0) return 'Guarantee';
+  return 'Commission';
+}
+
+function getPayModelVariant(tech: TechnicianPayroll): 'default' | 'secondary' | 'outline' {
+  if (tech.guaranteeWeeks > 0 && tech.commissionWeeks === 0) return 'secondary';
+  return 'outline';
+}
+
 export default function PayrollReports() {
   const [mode, setMode] = useState<'weekly' | 'custom'>('weekly');
   const [weekAnchor, setWeekAnchor] = useState(new Date());
@@ -56,7 +68,7 @@ export default function PayrollReports() {
   const endDate = mode === 'weekly' ? format(weekEnd, 'yyyy-MM-dd') : (customEnd ? format(customEnd, 'yyyy-MM-dd') : '');
 
   const { data: payrollData, isLoading } = usePayrollReport(startDate, endDate);
-  const { data: ccFeePercent } = useCcFeePercent();
+  const { data: orgSettings } = useOrgPaySettings();
 
   const totals = useMemo(() => {
     if (!payrollData) return { jobs: 0, revenue: 0, tips: 0, ccFees: 0, netPay: 0 };
@@ -75,7 +87,9 @@ export default function PayrollReports() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Payroll Reports</h1>
-            <p className="text-muted-foreground text-sm">Revenue, tips, and CC fees by technician</p>
+            <p className="text-muted-foreground text-sm">
+              {orgSettings ? `${orgSettings.commission_percent}% Commission (min ${formatCurrency(orgSettings.weekly_minimum)}/week) + Tips - CC Fees` : 'Revenue, tips, and CC fees by technician'}
+            </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={syncing} onClick={async () => {
@@ -155,7 +169,7 @@ export default function PayrollReports() {
               )}
 
               <Badge variant="secondary" className="ml-auto text-xs">
-                CC Fee: {ccFeePercent ?? 3}%
+                CC Fee: {orgSettings?.cc_fee_percent ?? 3.49}%
               </Badge>
             </div>
           </CardContent>
@@ -180,13 +194,13 @@ export default function PayrollReports() {
               <div className="overflow-x-auto">
               <table className="w-full text-sm" style={{tableLayout: 'fixed'}}>
                 <colgroup>
-                  <col style={{width: '20%'}} />
+                  <col style={{width: '18%'}} />
                   <col style={{width: '8%'}} />
                   <col style={{width: '14%'}} />
                   <col style={{width: '12%'}} />
                   <col style={{width: '12%'}} />
                   <col style={{width: '14%'}} />
-                  <col style={{width: '12%'}} />
+                  <col style={{width: '14%'}} />
                   <col style={{width: '8%'}} />
                 </colgroup>
                 <thead>
@@ -197,7 +211,7 @@ export default function PayrollReports() {
                     <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Tips</th>
                     <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">CC Fees</th>
                     <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Net Pay</th>
-                    <th className="py-3 px-3 text-center text-xs font-medium text-muted-foreground">Model</th>
+                    <th className="py-3 px-3 text-center text-xs font-medium text-muted-foreground">Pay Type</th>
                     <th className="py-3 px-3" />
                   </tr>
                 </thead>
@@ -214,7 +228,9 @@ export default function PayrollReports() {
                         <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
                         <td className="py-3 px-3 text-right font-semibold">{formatCurrency(tech.netPay)}</td>
                         <td className="py-3 px-3 text-center">
-                          <Badge variant="outline" className="text-xs capitalize">{tech.payModel}</Badge>
+                          <Badge variant={getPayModelVariant(tech)} className="text-xs">
+                            {getPayModelLabel(tech)}
+                          </Badge>
                         </td>
                         <td className="py-3 px-3">
                           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -225,9 +241,13 @@ export default function PayrollReports() {
                           <td colSpan={8} className="p-0">
                             <div className="bg-muted/30 px-6 py-3 overflow-x-auto">
                               <p className="text-xs font-medium text-muted-foreground mb-2">
-                                {tech.payModel === 'salary' && `Weekly Salary: ${formatCurrency(tech.weeklySalary)} + Tips - CC Fees on Tips`}
-                                {tech.payModel === 'commission' && `${tech.commissionPercent}% Commission - CC Fees + Tips - CC Fees on Tips`}
-                                {tech.payModel === 'none' && 'No pay model configured'}
+                                {tech.commissionPercent}% Commission (min {formatCurrency(tech.weeklyMinimum)}/week) + Tips - CC Fees on Tips
+                                {tech.guaranteeWeeks > 0 && tech.commissionWeeks > 0 && (
+                                  <span className="ml-2">
+                                    ({tech.guaranteeWeeks} guarantee wk{tech.guaranteeWeeks !== 1 ? 's' : ''}, {tech.commissionWeeks} commission wk{tech.commissionWeeks !== 1 ? 's' : ''})
+                                  </span>
+                                )}
+                                <span className="ml-2">• Base Pay: {formatCurrency(tech.basePay)}</span>
                               </p>
                               <table className="w-full text-sm">
                                 <thead>
@@ -247,7 +267,7 @@ export default function PayrollReports() {
                                     const jobTip = Number(job.tip_amount) || 0;
                                     const jobAmount = getDisplayJobAmount(rawTotal, jobTip);
                                     const isCard = job.payment_method?.toLowerCase().includes('credit') || job.payment_method === 'credit_card';
-                                    const jobCcFee = Number(job.cc_fee_amount) || (isCard ? (rawTotal || (jobAmount + jobTip)) * ((ccFeePercent ?? 3.49) / 100) : 0);
+                                    const jobCcFee = Number(job.cc_fee_amount) || (isCard ? (rawTotal || (jobAmount + jobTip)) * ((orgSettings?.cc_fee_percent ?? 3.49) / 100) : 0);
                                     return (
                                     <tr key={job.id} className="border-b last:border-0 text-xs">
                                       <td className="py-2 pr-4">{job.scheduled_date ? format(new Date(job.scheduled_date + 'T12:00:00'), 'MMM d') : '-'}</td>
@@ -296,113 +316,66 @@ export default function PayrollReports() {
 }
 
 function PaySettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { data: users } = useUsers();
-  const { data: configs } = usePayConfigs();
-  const { data: ccFee } = useCcFeePercent();
-  const upsertPay = useUpsertPayConfig();
-  const updateCcFee = useUpdateCcFeePercent();
+  const { data: settings } = useOrgPaySettings();
+  const updateSettings = useUpdateOrgPaySettings();
 
-  const [selectedProfile, setSelectedProfile] = useState('');
-  const [payModel, setPayModel] = useState<'salary' | 'commission'>('salary');
-  const [salary, setSalary] = useState('1000');
-  const [commission, setCommission] = useState('40');
-  const [localCcFee, setLocalCcFee] = useState(String(ccFee ?? 3));
+  const [ccFee, setCcFee] = useState('');
+  const [minimum, setMinimum] = useState('');
+  const [commission, setCommission] = useState('');
 
-  const technicians = users?.filter(u => u.role === 'technician' && u.is_active) || [];
+  // Sync local state when settings load
+  const initialized = useState(false);
+  if (settings && !initialized[0]) {
+    setCcFee(String(settings.cc_fee_percent));
+    setMinimum(String(settings.weekly_minimum));
+    setCommission(String(settings.commission_percent));
+    initialized[1](true);
+  }
 
-  // When a tech is selected, load their current config
-  const handleSelectTech = (profileId: string) => {
-    setSelectedProfile(profileId);
-    const existing = (configs as any[])?.find((c: any) => c.profile_id === profileId);
-    if (existing) {
-      setPayModel(existing.pay_model);
-      setSalary(String(existing.weekly_salary || 0));
-      setCommission(String(existing.commission_percent || 0));
-    } else {
-      setPayModel('salary');
-      setSalary('1000');
-      setCommission('40');
+  // Also update when dialog opens with fresh data
+  const handleOpenChange = (v: boolean) => {
+    if (v && settings) {
+      setCcFee(String(settings.cc_fee_percent));
+      setMinimum(String(settings.weekly_minimum));
+      setCommission(String(settings.commission_percent));
     }
+    onOpenChange(v);
   };
 
-  const handleSavePay = () => {
-    if (!selectedProfile) return;
-    upsertPay.mutate({
-      profile_id: selectedProfile,
-      pay_model: payModel,
-      weekly_salary: Number(salary) || 0,
-      commission_percent: Number(commission) || 0,
-      effective_date: format(new Date(), 'yyyy-MM-dd'),
+  const handleSave = () => {
+    updateSettings.mutate({
+      cc_fee_percent: Number(ccFee) || 3.49,
+      weekly_minimum: Number(minimum) || 1000,
+      commission_percent: Number(commission) || 40,
     });
-  };
-
-  const handleSaveCcFee = () => {
-    updateCcFee.mutate(Number(localCcFee) || 3);
+    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Pay Settings</DialogTitle>
         </DialogHeader>
-        <div className="space-y-6">
-          {/* CC Fee */}
-          <div className="space-y-2">
-            <Label>CC Fee Percentage (org-wide)</Label>
-            <div className="flex gap-2">
-              <Input type="number" value={localCcFee} onChange={e => setLocalCcFee(e.target.value)} className="w-24" step="0.1" min="0" max="10" />
-              <span className="flex items-center text-sm text-muted-foreground">%</span>
-              <Button size="sm" onClick={handleSaveCcFee} disabled={updateCcFee.isPending}>Save</Button>
-            </div>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label className="text-sm">Commission Rate (%)</Label>
+            <Input type="number" value={commission} onChange={e => setCommission(e.target.value)} step="1" min="0" max="100" />
+            <p className="text-xs text-muted-foreground">Applied to job revenue each week</p>
           </div>
-
-          {/* Tech Pay Config */}
-          <div className="space-y-3">
-            <Label>Technician Pay Model</Label>
-            <Select value={selectedProfile} onValueChange={handleSelectTech}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select technician" />
-              </SelectTrigger>
-              <SelectContent>
-                {technicians.map(t => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {[t.first_name, t.last_name].filter(Boolean).join(' ')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {selectedProfile && (
-              <>
-                <Select value={payModel} onValueChange={(v) => setPayModel(v as 'salary' | 'commission')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="salary">Salary + Tips</SelectItem>
-                    <SelectItem value="commission">Commission</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {payModel === 'salary' ? (
-                  <div>
-                    <Label className="text-xs">Weekly Salary ($)</Label>
-                    <Input type="number" value={salary} onChange={e => setSalary(e.target.value)} />
-                  </div>
-                ) : (
-                  <div>
-                    <Label className="text-xs">Commission (%)</Label>
-                    <Input type="number" value={commission} onChange={e => setCommission(e.target.value)} step="1" min="0" max="100" />
-                  </div>
-                )}
-
-                <Button onClick={handleSavePay} disabled={upsertPay.isPending} className="w-full">
-                  Save Pay Config
-                </Button>
-              </>
-            )}
+          <div className="space-y-1">
+            <Label className="text-sm">Weekly Minimum ($)</Label>
+            <Input type="number" value={minimum} onChange={e => setMinimum(e.target.value)} step="50" min="0" />
+            <p className="text-xs text-muted-foreground">Guaranteed minimum base pay per week</p>
           </div>
+          <div className="space-y-1">
+            <Label className="text-sm">CC Fee (%)</Label>
+            <Input type="number" value={ccFee} onChange={e => setCcFee(e.target.value)} step="0.1" min="0" max="10" />
+            <p className="text-xs text-muted-foreground">Deducted from tips on card payments</p>
+          </div>
+          <Button onClick={handleSave} disabled={updateSettings.isPending} className="w-full">
+            Save Settings
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

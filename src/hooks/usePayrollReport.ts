@@ -1,17 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { startOfWeek, endOfWeek, addWeeks, isBefore, format, parseISO } from "date-fns";
 import { toast } from "sonner";
-
-export interface PayConfig {
-  id: string;
-  profile_id: string;
-  organization_id: string;
-  pay_model: 'salary' | 'commission';
-  weekly_salary: number;
-  commission_percent: number;
-  effective_date: string;
-}
 
 export interface PayrollJob {
   id: string;
@@ -36,8 +27,10 @@ export interface TechnicianPayroll {
   ccFeesOnRevenue: number;
   ccFeesOnTips: number;
   netPay: number;
-  payModel: 'salary' | 'commission' | 'none';
-  weeklySalary: number;
+  basePay: number;
+  guaranteeWeeks: number;
+  commissionWeeks: number;
+  weeklyMinimum: number;
   commissionPercent: number;
 }
 
@@ -54,6 +47,22 @@ function getBaseJobAmount(totalAmount: number | null, tipAmount: number | null):
   return Math.max(total - tip, 0);
 }
 
+/** Get all Mon-Sun week boundaries that overlap [rangeStart, rangeEnd] */
+function getWeekBoundaries(rangeStart: string, rangeEnd: string): { weekStart: Date; weekEnd: Date }[] {
+  const start = parseISO(rangeStart);
+  const end = parseISO(rangeEnd);
+  const weeks: { weekStart: Date; weekEnd: Date }[] = [];
+
+  let current = startOfWeek(start, { weekStartsOn: 1 });
+  while (isBefore(current, end) || format(current, 'yyyy-MM-dd') === format(end, 'yyyy-MM-dd')) {
+    const ws = current;
+    const we = endOfWeek(current, { weekStartsOn: 1 });
+    weeks.push({ weekStart: ws, weekEnd: we });
+    current = addWeeks(current, 1);
+  }
+  return weeks;
+}
+
 export function usePayrollReport(startDate: string, endDate: string) {
   const { profile } = useAuth();
 
@@ -62,14 +71,17 @@ export function usePayrollReport(startDate: string, endDate: string) {
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      // Fetch org settings for cc_fee_percent
+      // Fetch org settings
       const { data: org } = await supabase
         .from('organizations')
         .select('settings')
         .eq('id', profile.organization_id)
         .single();
 
-      const ccFeePercent = (org?.settings as any)?.cc_fee_percent ?? 3.49;
+      const settings = (org?.settings as any) || {};
+      const ccFeePercent = settings.cc_fee_percent ?? 3.49;
+      const weeklyMinimum = settings.weekly_minimum ?? 1000;
+      const commissionPercent = settings.commission_percent ?? 40;
 
       // Fetch completed jobs in date range
       const { data: jobs, error: jobsError } = await supabase
@@ -82,35 +94,6 @@ export function usePayrollReport(startDate: string, endDate: string) {
 
       if (jobsError) throw jobsError;
 
-      // Fetch pay configs for all technicians
-      const { data: payConfigs, error: payError } = await supabase
-        .from('technician_pay_config' as any)
-        .select('*')
-        .eq('organization_id', profile.organization_id)
-        .lte('effective_date', endDate)
-        .order('effective_date', { ascending: false });
-
-      if (payError) throw payError;
-
-      // Link HCP employees to pay configs via profile
-      const { data: hcpEmployees } = await supabase
-        .from('hcp_employees')
-        .select('hcp_employee_id, linked_user_id')
-        .eq('organization_id', profile.organization_id);
-
-      // Build a map: hcp_employee_id -> most recent pay config
-      const hcpToProfile = new Map<string, string>();
-      (hcpEmployees || []).forEach(e => {
-        if (e.linked_user_id) hcpToProfile.set(e.hcp_employee_id, e.linked_user_id);
-      });
-
-      const profilePayConfig = new Map<string, PayConfig>();
-      ((payConfigs as any[]) || []).forEach((pc: any) => {
-        if (!profilePayConfig.has(pc.profile_id)) {
-          profilePayConfig.set(pc.profile_id, pc);
-        }
-      });
-
       // Group jobs by technician
       const techMap = new Map<string, { name: string; jobs: PayrollJob[] }>();
       (jobs || []).forEach(job => {
@@ -122,12 +105,11 @@ export function usePayrollReport(startDate: string, endDate: string) {
         techMap.get(techId)!.jobs.push(job as PayrollJob);
       });
 
-      // Calculate payroll per technician
+      const weeks = getWeekBoundaries(startDate, endDate);
+
+      // Calculate payroll per technician using hybrid model
       const results: TechnicianPayroll[] = [];
       techMap.forEach((data, techId) => {
-        const profileId = hcpToProfile.get(techId);
-        const config = profileId ? profilePayConfig.get(profileId) : undefined;
-
         let grossRevenue = 0;
         let totalTips = 0;
         let ccFeesOnRevenue = 0;
@@ -146,22 +128,37 @@ export function usePayrollReport(startDate: string, endDate: string) {
           }
         });
 
-        let netPay = 0;
-        const payModel = config?.pay_model || 'none';
-        const weeklySalary = Number(config?.weekly_salary) || 0;
-        const commissionPercent = Number(config?.commission_percent) || 0;
+        // Per-week hybrid calculation
+        let basePay = 0;
+        let guaranteeWeeks = 0;
+        let commissionWeeks = 0;
 
-        if (payModel === 'salary') {
-          // Weekly salary + tips - cc fees on tips
-          // Note: salary is fixed per week, but here we show for the selected period
-          netPay = weeklySalary + totalTips - ccFeesOnTips;
-        } else if (payModel === 'commission') {
-          // commission% * revenue - cc fees on revenue + tips - cc fees on tips
-          netPay = (grossRevenue * commissionPercent / 100) - ccFeesOnRevenue + totalTips - ccFeesOnTips;
-        } else {
-          // No config - just show raw numbers
-          netPay = grossRevenue + totalTips;
-        }
+        weeks.forEach(({ weekStart, weekEnd }) => {
+          const wsStr = format(weekStart, 'yyyy-MM-dd');
+          const weStr = format(weekEnd, 'yyyy-MM-dd');
+
+          // Revenue for this week only
+          let weekRevenue = 0;
+          data.jobs.forEach(job => {
+            if (job.scheduled_date && job.scheduled_date >= wsStr && job.scheduled_date <= weStr) {
+              weekRevenue += getBaseJobAmount(job.total_amount, job.tip_amount);
+            }
+          });
+
+          // Only count weeks where the tech had jobs (or if it's a single-week view)
+          if (weekRevenue > 0 || weeks.length === 1) {
+            const commPay = weekRevenue * commissionPercent / 100;
+            if (commPay >= weeklyMinimum) {
+              basePay += commPay;
+              commissionWeeks++;
+            } else {
+              basePay += weeklyMinimum;
+              guaranteeWeeks++;
+            }
+          }
+        });
+
+        const netPay = basePay + totalTips - ccFeesOnTips;
 
         results.push({
           technician_hcp_id: techId,
@@ -173,8 +170,10 @@ export function usePayrollReport(startDate: string, endDate: string) {
           ccFeesOnRevenue,
           ccFeesOnTips,
           netPay,
-          payModel,
-          weeklySalary,
+          basePay,
+          guaranteeWeeks,
+          commissionWeeks,
+          weeklyMinimum,
           commissionPercent,
         });
       });
@@ -183,49 +182,6 @@ export function usePayrollReport(startDate: string, endDate: string) {
       return results;
     },
     enabled: !!profile?.organization_id && !!startDate && !!endDate,
-  });
-}
-
-export function usePayConfigs() {
-  const { profile } = useAuth();
-
-  return useQuery({
-    queryKey: ['pay-configs', profile?.organization_id],
-    queryFn: async () => {
-      if (!profile?.organization_id) return [];
-      const { data, error } = await supabase
-        .from('technician_pay_config' as any)
-        .select('*')
-        .eq('organization_id', profile.organization_id)
-        .order('effective_date', { ascending: false });
-      if (error) throw error;
-      return (data as any[]) || [];
-    },
-    enabled: !!profile?.organization_id,
-  });
-}
-
-export function useUpsertPayConfig() {
-  const queryClient = useQueryClient();
-  const { profile } = useAuth();
-
-  return useMutation({
-    mutationFn: async (config: { profile_id: string; pay_model: 'salary' | 'commission'; weekly_salary: number; commission_percent: number; effective_date: string }) => {
-      if (!profile?.organization_id) throw new Error('No organization');
-      const { error } = await supabase
-        .from('technician_pay_config' as any)
-        .upsert({
-          ...config,
-          organization_id: profile.organization_id,
-        }, { onConflict: 'profile_id,effective_date' });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pay-configs'] });
-      queryClient.invalidateQueries({ queryKey: ['payroll-report'] });
-      toast.success('Pay configuration saved');
-    },
-    onError: (err) => toast.error(`Failed to save: ${(err as Error).message}`),
   });
 }
 
@@ -247,15 +203,37 @@ export function useCcFeePercent() {
   });
 }
 
-export function useUpdateCcFeePercent() {
+export function useOrgPaySettings() {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ['org-pay-settings', profile?.organization_id],
+    queryFn: async () => {
+      if (!profile?.organization_id) return { cc_fee_percent: 3.49, weekly_minimum: 1000, commission_percent: 40 };
+      const { data } = await supabase
+        .from('organizations')
+        .select('settings')
+        .eq('id', profile.organization_id)
+        .single();
+      const s = (data?.settings as any) || {};
+      return {
+        cc_fee_percent: s.cc_fee_percent ?? 3.49,
+        weekly_minimum: s.weekly_minimum ?? 1000,
+        commission_percent: s.commission_percent ?? 40,
+      };
+    },
+    enabled: !!profile?.organization_id,
+  });
+}
+
+export function useUpdateOrgPaySettings() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
 
   return useMutation({
-    mutationFn: async (percent: number) => {
+    mutationFn: async (updates: { cc_fee_percent?: number; weekly_minimum?: number; commission_percent?: number }) => {
       if (!profile?.organization_id) throw new Error('No organization');
       
-      // Get current settings
       const { data: org } = await supabase
         .from('organizations')
         .select('settings')
@@ -265,14 +243,15 @@ export function useUpdateCcFeePercent() {
       const currentSettings = (org?.settings as Record<string, any>) || {};
       const { error } = await supabase
         .from('organizations')
-        .update({ settings: { ...currentSettings, cc_fee_percent: percent } })
+        .update({ settings: { ...currentSettings, ...updates } })
         .eq('id', profile.organization_id);
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-pay-settings'] });
       queryClient.invalidateQueries({ queryKey: ['cc-fee-percent'] });
       queryClient.invalidateQueries({ queryKey: ['payroll-report'] });
-      toast.success('CC fee percentage updated');
+      toast.success('Pay settings updated');
     },
     onError: (err) => toast.error(`Failed: ${(err as Error).message}`),
   });
