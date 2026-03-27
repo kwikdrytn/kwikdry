@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, DollarSign, Settings2, RefreshCw } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePayrollReport, usePayConfigs, useUpsertPayConfig, useCcFeePercent, useUpdateCcFeePercent, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { useUsers } from "@/hooks/useUsers";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ export default function PayrollReports() {
   const [expandedTech, setExpandedTech] = useState<string | null>(null);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
 
   const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(weekAnchor, { weekStartsOn: 1 });
@@ -83,6 +85,7 @@ export default function PayrollReports() {
                 const { error } = await supabase.functions.invoke('sync-hcp-data');
                 if (error) throw error;
                 toast.success('HCP data synced successfully');
+                queryClient.invalidateQueries({ queryKey: ['payroll-report'] });
               } catch (e: any) {
                 toast.error('Sync failed: ' + (e.message || 'Unknown error'));
               } finally {
