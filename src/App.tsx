@@ -27,6 +27,8 @@ import CallMetrics from "./pages/admin/CallMetrics";
 import Training from "./pages/Training";
 import TrainingVideo from "./pages/TrainingVideo";
 import TrainingManagement from "./pages/admin/TrainingManagement";
+import PayrollReports from "./pages/admin/PayrollReports";
+import ActivityFeed from "./pages/admin/ActivityFeed";
 
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
@@ -249,6 +251,30 @@ const App = () => (
             {/* Legacy route redirect */}
             <Route path="/admin/settings/integrations" element={<Navigate to="/settings/integrations" replace />} />
             
+            {/* Payroll - Admin only */}
+            <Route
+              path="/payroll"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard requiredPermission="payroll.view">
+                    <PayrollReports />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Activity Feed - Admin only */}
+            <Route
+              path="/activity"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard requiredPermission="activity_feed.view">
+                    <ActivityFeed />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

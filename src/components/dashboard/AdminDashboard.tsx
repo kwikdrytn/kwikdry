@@ -433,28 +433,86 @@ export function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Activity className="h-5 w-5 text-primary" />
-              Recent Activity
-            </CardTitle>
-            <CardDescription>Latest actions across the organization</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-muted p-3 mb-3">
-                <Activity className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="font-medium text-muted-foreground">Activity feed coming soon</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Track inventory changes, checklist submissions, and more
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Recent Activity - Job Changes */}
+        <RecentActivityCard />
       </div>
     </div>
+  );
+}
+
+function RecentActivityCard() {
+  const navigate = useNavigate();
+  const { data: events, isLoading } = useQuery({
+    queryKey: ['dashboard-recent-activity'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_change_events' as any)
+        .select('*')
+        .order('detected_at', { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+  });
+
+  const unreadCount = events?.filter((e: any) => !e.is_read).length || 0;
+
+  const changeIcons: Record<string, string> = {
+    cancelled: '❌',
+    rescheduled: '📅',
+    reassigned: '👤',
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Activity className="h-5 w-5 text-primary" />
+            Recent Activity
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="text-xs">{unreadCount}</Badge>
+            )}
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/activity')} className="text-xs">
+            View All <ChevronRight className="ml-1 h-3 w-3" />
+          </Button>
+        </div>
+        <CardDescription>Job changes detected from HCP</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        ) : !events?.length ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="rounded-full bg-muted p-3 mb-3">
+              <Activity className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">No job changes detected yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {events.map((event: any) => (
+              <div
+                key={event.id}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer hover:bg-muted/50",
+                  !event.is_read && "bg-primary/5 border-primary/20"
+                )}
+                onClick={() => navigate('/activity')}
+              >
+                <span>{changeIcons[event.change_type] || '🔔'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{event.customer_name || 'Unknown'}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{event.change_type}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -1302,6 +1302,70 @@ export type Database = {
           },
         ]
       }
+      job_change_events: {
+        Row: {
+          change_type: string
+          customer_name: string | null
+          detected_at: string | null
+          hcp_job_id: string
+          id: string
+          is_read: boolean | null
+          new_value: Json | null
+          old_value: Json | null
+          organization_id: string
+          read_by: string | null
+          technician_name: string | null
+        }
+        Insert: {
+          change_type: string
+          customer_name?: string | null
+          detected_at?: string | null
+          hcp_job_id: string
+          id?: string
+          is_read?: boolean | null
+          new_value?: Json | null
+          old_value?: Json | null
+          organization_id: string
+          read_by?: string | null
+          technician_name?: string | null
+        }
+        Update: {
+          change_type?: string
+          customer_name?: string | null
+          detected_at?: string | null
+          hcp_job_id?: string
+          id?: string
+          is_read?: boolean | null
+          new_value?: Json | null
+          old_value?: Json | null
+          organization_id?: string
+          read_by?: string | null
+          technician_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_change_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_change_events_read_by_fkey"
+            columns: ["read_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_change_events_read_by_fkey"
+            columns: ["read_by"]
+            isOneToOne: false
+            referencedRelation: "technician_checklist_compliance"
+            referencedColumns: ["technician_id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null
@@ -1734,6 +1798,61 @@ export type Database = {
           },
         ]
       }
+      technician_pay_config: {
+        Row: {
+          commission_percent: number | null
+          created_at: string | null
+          effective_date: string
+          id: string
+          organization_id: string
+          pay_model: string
+          profile_id: string
+          weekly_salary: number | null
+        }
+        Insert: {
+          commission_percent?: number | null
+          created_at?: string | null
+          effective_date?: string
+          id?: string
+          organization_id: string
+          pay_model?: string
+          profile_id: string
+          weekly_salary?: number | null
+        }
+        Update: {
+          commission_percent?: number | null
+          created_at?: string | null
+          effective_date?: string
+          id?: string
+          organization_id?: string
+          pay_model?: string
+          profile_id?: string
+          weekly_salary?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_pay_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_pay_config_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_pay_config_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "technician_checklist_compliance"
+            referencedColumns: ["technician_id"]
+          },
+        ]
+      }
       technician_skills: {
         Row: {
           avg_job_duration_minutes: number | null
@@ -2145,6 +2264,7 @@ export type Database = {
         | "training.view"
         | "training.manage"
         | "payroll.view"
+        | "activity_feed.view"
       processing_status: "pending" | "processing" | "completed" | "failed"
       transaction_type:
         | "restock"
@@ -2340,6 +2460,7 @@ export const Constants = {
         "training.view",
         "training.manage",
         "payroll.view",
+        "activity_feed.view",
       ],
       processing_status: ["pending", "processing", "completed", "failed"],
       transaction_type: ["restock", "usage", "transfer", "adjustment", "count"],

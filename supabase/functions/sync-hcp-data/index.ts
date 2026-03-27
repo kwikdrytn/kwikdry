@@ -805,12 +805,13 @@ async function syncOrganization(
       }
     }
 
-    // Upsert jobs
+    // Upsert jobs with change detection
     if (jobs.length > 0) {
       const effectiveMapboxToken = mapboxToken || '';
       const geocodeCache = new Map<string, { lat: number; lng: number }>();
       let geocodedCount = 0;
       const GEOCODE_LIMIT = 75; // safety cap per sync
+      const changeEvents: Array<{ hcp_job_id: string; change_type: string; old_value: any; new_value: any; customer_name: string | null; technician_name: string | null }> = [];
 
       // Fetch location timezone for converting UTC times to local
       let locationTimezone = 'America/New_York'; // Default
@@ -827,6 +828,17 @@ async function syncOrganization(
       }
       console.log(`Using timezone for job times: ${locationTimezone}`);
 
+      // Pre-fetch existing jobs for change detection
+      const hcpJobIds = jobs.map(j => j.id);
+      const { data: existingJobs } = await supabase
+        .from('hcp_jobs')
+        .select('hcp_job_id, status, scheduled_date, scheduled_time, technician_hcp_id, technician_name, customer_name')
+        .eq('organization_id', organization_id)
+        .in('hcp_job_id', hcpJobIds);
+      
+      const existingJobMap = new Map<string, any>();
+      (existingJobs || []).forEach(j => existingJobMap.set(j.hcp_job_id, j));
+
       for (const job of jobs) {
         const scheduledStart = job.schedule?.scheduled_start;
         const scheduledEnd = job.schedule?.scheduled_end;
@@ -836,64 +848,41 @@ async function syncOrganization(
         let scheduledEndTime: string | null = null;
 
         if (scheduledStart) {
-          // HCP returns times in UTC (ending with Z)
-          // We need to convert to the location's local timezone
-          
-          // Check if it's a UTC time (ends with Z)
           if (scheduledStart.endsWith('Z') || scheduledStart.includes('+00:00')) {
-            // Convert UTC to local timezone
             const local = convertUtcToTimezone(scheduledStart, locationTimezone);
             scheduledDate = local.date;
             scheduledTime = local.time;
             console.log(`Converted UTC start: ${scheduledStart} -> ${locationTimezone}: date=${scheduledDate}, time=${scheduledTime}`);
           } else if (scheduledStart.match(/[+-]\d{2}:\d{2}$/)) {
-            // Has a timezone offset (e.g., -05:00) - extract local time directly
             const isoMatch = scheduledStart.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
             if (isoMatch) {
               scheduledDate = isoMatch[1];
               scheduledTime = isoMatch[2];
-              console.log(`Extracted local time from offset: ${scheduledStart} -> date=${scheduledDate}, time=${scheduledTime}`);
             }
           } else {
-            // No timezone info - assume it's already local time
             const isoMatch = scheduledStart.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
             if (isoMatch) {
               scheduledDate = isoMatch[1];
               scheduledTime = isoMatch[2];
-              console.log(`No timezone in start, using as-is: ${scheduledStart} -> date=${scheduledDate}, time=${scheduledTime}`);
-            } else {
-              console.log(`Could not parse start time format: ${scheduledStart}`);
             }
           }
         }
 
         if (scheduledEnd) {
-          // Same timezone handling for end time
           if (scheduledEnd.endsWith('Z') || scheduledEnd.includes('+00:00')) {
             const local = convertUtcToTimezone(scheduledEnd, locationTimezone);
             scheduledEndTime = local.time;
-            console.log(`Converted UTC end: ${scheduledEnd} -> ${locationTimezone}: time=${scheduledEndTime}`);
           } else if (scheduledEnd.match(/[+-]\d{2}:\d{2}$/)) {
             const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
-            if (isoMatch) {
-              scheduledEndTime = isoMatch[2];
-              console.log(`Extracted local end time from offset: ${scheduledEnd} -> time=${scheduledEndTime}`);
-            }
+            if (isoMatch) scheduledEndTime = isoMatch[2];
           } else {
             const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
-            if (isoMatch) {
-              scheduledEndTime = isoMatch[2];
-              console.log(`No timezone in end, using as-is: ${scheduledEnd} -> time=${scheduledEndTime}`);
-            } else {
-              console.log(`Could not parse end time format: ${scheduledEnd}`);
-            }
+            if (isoMatch) scheduledEndTime = isoMatch[2];
           }
         }
 
         const assignedEmployee = job.assigned_employees?.[0];
         
-        // Fetch line items from the dedicated endpoint: GET /jobs/{job_id}/line_items
-        // This provides service_item_id which links to the price book
         let services: Array<{
           name?: string;
           description?: string;
@@ -902,7 +891,6 @@ async function syncOrganization(
           service_item_id?: string;
         }> = [];
         
-        // Try fetching from the dedicated line_items endpoint first
         const lineItems = await fetchJobLineItems(api_key, job.id);
         if (lineItems.length > 0) {
           services = lineItems.map(item => ({
@@ -913,7 +901,6 @@ async function syncOrganization(
             service_item_id: item.service_item_id,
           }));
         } else {
-          // Fallback to embedded line_items or total_items if endpoint failed
           const lineItemsSource = job.total_items || job.line_items || [];
           services = lineItemsSource.map(item => ({
             name: item.name,
@@ -947,32 +934,24 @@ async function syncOrganization(
           }
         }
 
-        // Handle notes - can be string, array of {id, content}, or other fields
         let jobNotes: string | object | null = null;
-        
         if (job.notes) {
           if (Array.isArray(job.notes)) {
-            // Notes is an array of {id, content} objects - store as JSON
             jobNotes = job.notes;
           } else if (typeof job.notes === 'string') {
-            // Combine with other string note fields
             const noteFields = [job.notes, job.description, job.work_order_notes]
               .filter(n => typeof n === 'string' && n.trim().length > 0)
               .map(n => (n as string).trim());
             jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
           }
         } else {
-          // No main notes, check other fields
           const noteFields = [job.description, job.work_order_notes]
             .filter(n => typeof n === 'string' && n.trim().length > 0)
             .map(n => (n as string).trim());
           jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
         }
 
-        // Extract financial details for payroll
         const tipAmount = job.tip_amount ?? job.tip ?? null;
-        
-        // CC fee: check multiple possible locations in the HCP response
         let ccFeeAmount: number | null = null;
         if (job.cc_fee != null) {
           ccFeeAmount = job.cc_fee;
@@ -984,24 +963,68 @@ async function syncOrganization(
           ccFeeAmount = job.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0);
         }
         
-        // Payment method
         const paymentMethod = job.payment_type 
           ?? job.invoice?.payment_method 
           ?? job.invoice?.payments?.[0]?.payment_type 
           ?? job.payments?.[0]?.payment_type 
           ?? null;
         
-        // Invoice paid date
         const invoicePaidAt = job.invoice?.paid_at ?? job.payments?.[0]?.paid_at ?? null;
+
+        const newStatus = job.work_status || null;
+        const newTechHcpId = assignedEmployee?.id || null;
+        const newTechName = assignedEmployee ?
+          [assignedEmployee.first_name, assignedEmployee.last_name].filter(Boolean).join(' ') : null;
+        const customerName = job.customer ?
+          [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') ||
+          job.customer.company || 'Unknown' : null;
+
+        // Change detection
+        const existing = existingJobMap.get(job.id);
+        if (existing) {
+          // Cancellation
+          if (existing.status && existing.status !== 'canceled' && existing.status !== 'cancelled' &&
+              (newStatus === 'canceled' || newStatus === 'cancelled')) {
+            changeEvents.push({
+              hcp_job_id: job.id,
+              change_type: 'cancelled',
+              old_value: { status: existing.status },
+              new_value: { status: newStatus },
+              customer_name: customerName || existing.customer_name,
+              technician_name: newTechName || existing.technician_name,
+            });
+          }
+          // Reschedule
+          if ((existing.scheduled_date && scheduledDate && existing.scheduled_date !== scheduledDate) ||
+              (existing.scheduled_time && scheduledTime && existing.scheduled_time !== scheduledTime)) {
+            changeEvents.push({
+              hcp_job_id: job.id,
+              change_type: 'rescheduled',
+              old_value: { scheduled_date: existing.scheduled_date, scheduled_time: existing.scheduled_time },
+              new_value: { scheduled_date: scheduledDate, scheduled_time: scheduledTime },
+              customer_name: customerName || existing.customer_name,
+              technician_name: newTechName || existing.technician_name,
+            });
+          }
+          // Reassignment
+          if (existing.technician_hcp_id && newTechHcpId && existing.technician_hcp_id !== newTechHcpId) {
+            changeEvents.push({
+              hcp_job_id: job.id,
+              change_type: 'reassigned',
+              old_value: { technician_hcp_id: existing.technician_hcp_id, technician_name: existing.technician_name },
+              new_value: { technician_hcp_id: newTechHcpId, technician_name: newTechName },
+              customer_name: customerName || existing.customer_name,
+              technician_name: newTechName,
+            });
+          }
+        }
 
         const record = {
           organization_id,
           location_id: location_id || null,
           hcp_job_id: job.id,
           customer_hcp_id: job.customer?.id || null,
-          customer_name: job.customer ?
-            [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') ||
-            job.customer.company || 'Unknown' : null,
+          customer_name: customerName,
           address: job.address?.street || null,
           city: job.address?.city || null,
           state: job.address?.state || null,
@@ -1011,10 +1034,9 @@ async function syncOrganization(
           scheduled_date: scheduledDate,
           scheduled_time: scheduledTime,
           scheduled_end: scheduledEndTime,
-          technician_hcp_id: assignedEmployee?.id || null,
-          technician_name: assignedEmployee ?
-            [assignedEmployee.first_name, assignedEmployee.last_name].filter(Boolean).join(' ') : null,
-          status: job.work_status || null,
+          technician_hcp_id: newTechHcpId,
+          technician_name: newTechName,
+          status: newStatus,
           total_amount: job.total_amount || null,
           tip_amount: tipAmount,
           cc_fee_amount: ccFeeAmount,
@@ -1030,6 +1052,43 @@ async function syncOrganization(
           .upsert(record, { onConflict: 'organization_id,hcp_job_id' });
         
         if (!error) jobsSynced++;
+      }
+
+      // Insert change events
+      if (changeEvents.length > 0) {
+        console.log(`Detected ${changeEvents.length} job changes, inserting events...`);
+        const eventRecords = changeEvents.map(e => ({
+          organization_id,
+          hcp_job_id: e.hcp_job_id,
+          change_type: e.change_type,
+          old_value: e.old_value,
+          new_value: e.new_value,
+          customer_name: e.customer_name,
+          technician_name: e.technician_name,
+        }));
+
+        const { error: eventsError } = await supabase
+          .from('job_change_events')
+          .insert(eventRecords);
+        
+        if (eventsError) {
+          console.error('Failed to insert change events:', eventsError);
+        } else {
+          // Send push notifications for changes
+          try {
+            const notifUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-job-change-notifications`;
+            await fetch(notifUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({ organization_id, events: changeEvents }),
+            });
+          } catch (notifErr) {
+            console.log('Failed to send change notifications:', notifErr);
+          }
+        }
       }
 
       if (geocodedCount > 0) {

@@ -28,7 +28,8 @@ export type PermissionKey =
   | 'locations.manage'
   | 'settings.view'
   | 'settings.manage_integrations'
-  | 'payroll.view';
+  | 'payroll.view'
+  | 'activity_feed.view';
 
 // Permission groups for UI organization
 export const PERMISSION_GROUPS = {
@@ -109,6 +110,12 @@ export const PERMISSION_GROUPS = {
     label: 'Payroll',
     permissions: [
       { key: 'payroll.view', label: 'View Payroll Reports' },
+    ],
+  },
+  activity_feed: {
+    label: 'Activity Feed',
+    permissions: [
+      { key: 'activity_feed.view', label: 'View Job Change Activity' },
     ],
   },
 } as const;
