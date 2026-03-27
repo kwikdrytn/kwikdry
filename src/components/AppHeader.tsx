@@ -43,6 +43,7 @@ export function AppHeader({ title }: AppHeaderProps) {
 
       <div className="flex items-center gap-2 md:gap-4">
         <LocationSelector />
+        <NotificationBell />
         <Link to="/settings" className="hidden md:block">
           <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity">
             <AvatarImage src={profile?.avatar_url ?? undefined} />

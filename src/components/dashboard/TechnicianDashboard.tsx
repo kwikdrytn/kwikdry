@@ -227,6 +227,9 @@ export function TechnicianDashboard() {
         </Card>
       </div>
 
+      {/* My Pay Card */}
+      <MyPayCard />
+
       {/* Inventory & Equipment Row */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* My Inventory Card */}
