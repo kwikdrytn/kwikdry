@@ -264,6 +264,9 @@ export default function PayrollReports() {
                     return (
                     <Fragment key={tech.technician_hcp_id}>
                       <tr className="border-b cursor-pointer hover:bg-muted/50" onClick={() => setExpandedTech(isExpanded ? null : tech.technician_hcp_id)}>
+                        <td className="py-3 px-2 text-center">
+                          {isExpanded ? <ChevronUp className="h-4 w-4 inline" /> : <ChevronDown className="h-4 w-4 inline" />}
+                        </td>
                         <td className="py-3 px-3 font-medium">{tech.technician_name}</td>
                         <td className="py-3 px-3 text-center">{tech.jobCount}</td>
                         <td className="py-3 px-3 text-right">{formatCurrency(tech.grossRevenue)}</td>
@@ -274,9 +277,6 @@ export default function PayrollReports() {
                           <Badge variant={getPayModelVariant(tech)} className="text-xs">
                             {getPayModelLabel(tech)}
                           </Badge>
-                        </td>
-                        <td className="py-3 px-3">
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </td>
                       </tr>
                       {isExpanded && (
