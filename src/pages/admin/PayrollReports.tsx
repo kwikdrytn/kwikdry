@@ -179,17 +179,27 @@ export default function PayrollReports() {
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
               <div className="overflow-x-auto">
-              <table className="w-full text-sm caption-bottom">
+              <table className="w-full text-sm caption-bottom" style={{tableLayout: 'fixed'}}>
+                <colgroup>
+                  <col style={{width: '20%'}} />
+                  <col style={{width: '8%'}} />
+                  <col style={{width: '14%'}} />
+                  <col style={{width: '12%'}} />
+                  <col style={{width: '12%'}} />
+                  <col style={{width: '14%'}} />
+                  <col style={{width: '12%'}} />
+                  <col style={{width: '8%'}} />
+                </colgroup>
                 <TableHeader>
                   <TableRow className="border-b">
-                    <TableHead className="text-left" style={{width: '20%'}}>Technician</TableHead>
-                    <TableHead className="text-center" style={{width: '8%'}}>Jobs</TableHead>
-                    <TableHead className="text-right" style={{width: '14%'}}>Revenue</TableHead>
-                    <TableHead className="text-right" style={{width: '12%'}}>Tips</TableHead>
-                    <TableHead className="text-right" style={{width: '12%'}}>CC Fees</TableHead>
-                    <TableHead className="text-right" style={{width: '14%'}}>Net Pay</TableHead>
-                    <TableHead className="text-center" style={{width: '12%'}}>Model</TableHead>
-                    <TableHead style={{width: '8%'}} />
+                    <TableHead className="text-left">Technician</TableHead>
+                    <TableHead className="text-center">Jobs</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Tips</TableHead>
+                    <TableHead className="text-right">CC Fees</TableHead>
+                    <TableHead className="text-right">Net Pay</TableHead>
+                    <TableHead className="text-center">Model</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -197,16 +207,16 @@ export default function PayrollReports() {
                     <Collapsible key={tech.technician_hcp_id} open={expandedTech === tech.technician_hcp_id} onOpenChange={(open) => setExpandedTech(open ? tech.technician_hcp_id : null)}>
                       <CollapsibleTrigger asChild>
                         <TableRow className="cursor-pointer hover:bg-muted/50">
-                          <TableCell className="font-medium" style={{width: '20%'}}>{tech.technician_name}</TableCell>
-                          <TableCell className="text-center" style={{width: '8%'}}>{tech.jobCount}</TableCell>
-                          <TableCell className="text-right" style={{width: '14%'}}>{formatCurrency(tech.grossRevenue)}</TableCell>
-                          <TableCell className="text-right" style={{width: '12%'}}>{formatCurrency(tech.totalTips)}</TableCell>
-                          <TableCell className="text-right text-destructive" style={{width: '12%'}}>-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</TableCell>
-                          <TableCell className="text-right font-semibold" style={{width: '14%'}}>{formatCurrency(tech.netPay)}</TableCell>
-                          <TableCell className="text-center" style={{width: '12%'}}>
+                          <TableCell className="font-medium">{tech.technician_name}</TableCell>
+                          <TableCell className="text-center">{tech.jobCount}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(tech.grossRevenue)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(tech.totalTips)}</TableCell>
+                          <TableCell className="text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</TableCell>
+                          <TableCell className="text-right font-semibold">{formatCurrency(tech.netPay)}</TableCell>
+                          <TableCell className="text-center">
                             <Badge variant="outline" className="text-xs capitalize">{tech.payModel}</Badge>
                           </TableCell>
-                          <TableCell style={{width: '8%'}}>
+                          <TableCell>
                             {expandedTech === tech.technician_hcp_id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </TableCell>
                         </TableRow>
@@ -264,13 +274,13 @@ export default function PayrollReports() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="font-bold">
-                    <TableCell style={{width: '20%'}}>Totals</TableCell>
-                    <TableCell className="text-center" style={{width: '8%'}}>{totals.jobs}</TableCell>
-                    <TableCell className="text-right" style={{width: '14%'}}>{formatCurrency(totals.revenue)}</TableCell>
-                    <TableCell className="text-right" style={{width: '12%'}}>{formatCurrency(totals.tips)}</TableCell>
-                    <TableCell className="text-right text-destructive" style={{width: '12%'}}>-{formatCurrency(totals.ccFees)}</TableCell>
-                    <TableCell className="text-right" style={{width: '14%'}}>{formatCurrency(totals.netPay)}</TableCell>
-                    <TableCell colSpan={2} style={{width: '20%'}} />
+                    <TableCell>Totals</TableCell>
+                    <TableCell className="text-center">{totals.jobs}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.tips)}</TableCell>
+                    <TableCell className="text-right text-destructive">-{formatCurrency(totals.ccFees)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.netPay)}</TableCell>
+                    <TableCell colSpan={2} />
                   </TableRow>
                 </TableFooter>
               </table>
