@@ -112,6 +112,12 @@ export const PERMISSION_GROUPS = {
       { key: 'payroll.view', label: 'View Payroll Reports' },
     ],
   },
+  activity_feed: {
+    label: 'Activity Feed',
+    permissions: [
+      { key: 'activity_feed.view', label: 'View Job Change Activity' },
+    ],
+  },
 } as const;
 
 // Default permissions for legacy roles

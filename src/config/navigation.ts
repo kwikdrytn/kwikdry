@@ -75,6 +75,20 @@ export const navItems: NavItem[] = [
     requiredPermission: 'training.view'
   },
   { 
+    title: "Payroll", 
+    url: "/payroll", 
+    icon: DollarSign,
+    allowedRoles: ['admin'],
+    requiredPermission: 'payroll.view'
+  },
+  { 
+    title: "Activity", 
+    url: "/activity", 
+    icon: Activity,
+    allowedRoles: ['admin'],
+    requiredPermission: 'activity_feed.view'
+  },
+  { 
     title: "Settings", 
     url: "/settings", 
     icon: Settings,
