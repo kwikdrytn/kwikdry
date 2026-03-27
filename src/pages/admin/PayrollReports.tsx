@@ -343,7 +343,8 @@ export default function PayrollReports() {
                     <td className="py-3 px-3 text-right">{formatCurrency(totals.tips)}</td>
                     <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(totals.ccFees)}</td>
                     <td className="py-3 px-3 text-right">{formatCurrency(totals.netPay)}</td>
-                    <td className="py-3 px-3" colSpan={2} />
+                    <td className="py-3 px-3" />
+                    <td className="py-3 px-3" />
                   </tr>
                 </tfoot>
               </table>
