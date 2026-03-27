@@ -966,11 +966,41 @@ async function syncOrganization(
           ccFeeAmount = job.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0) / 100;
         }
         
-        const paymentMethod = job.payment_type 
+        // Try to get payment method from job fields first
+        let paymentMethod = job.payment_type 
           ?? job.invoice?.payment_method 
           ?? job.invoice?.payments?.[0]?.payment_type 
           ?? job.payments?.[0]?.payment_type 
           ?? null;
+        
+        // If no payment method found and job is completed, fetch invoice from HCP API
+        if (!paymentMethod && (job.work_status === 'complete unrated' || job.work_status === 'complete rated' || job.work_status === 'completed')) {
+          try {
+            const invoiceRes = await fetchWithRetry(`${HCP_BASE_URL}/jobs/${job.id}/invoices`, apiKey);
+            const invoiceData = await invoiceRes.json();
+            const invoices = invoiceData.invoices || invoiceData.data || [];
+            if (invoices.length > 0) {
+              const inv = invoices[0];
+              // Check payments array on the invoice
+              const payments = inv.payments || [];
+              if (payments.length > 0) {
+                paymentMethod = payments[0].payment_type || payments[0].type || payments[0].method || null;
+                // Also grab tip and fees from invoice if missing
+                if (tipAmountRaw == null && inv.tip_amount != null) {
+                  // Invoice tip may also be in cents
+                }
+              }
+              // Fallback: check invoice-level payment_method
+              if (!paymentMethod) {
+                paymentMethod = inv.payment_method || inv.payment_type || null;
+              }
+            }
+            // Small delay to respect rate limits
+            await new Promise(r => setTimeout(r, 200));
+          } catch (err) {
+            console.log(`Failed to fetch invoice for job ${job.id}:`, err);
+          }
+        }
         
         const invoicePaidAt = job.invoice?.paid_at ?? job.payments?.[0]?.paid_at ?? null;
 
