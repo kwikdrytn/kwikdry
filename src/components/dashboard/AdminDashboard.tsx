@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEquipmentNeedingMaintenance } from "@/hooks/useEquipment";
+import { ChecklistComplianceHeatmap } from "@/components/checklists/ChecklistComplianceHeatmap";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
