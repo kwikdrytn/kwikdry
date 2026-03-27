@@ -27,6 +27,8 @@ import CallMetrics from "./pages/admin/CallMetrics";
 import Training from "./pages/Training";
 import TrainingVideo from "./pages/TrainingVideo";
 import TrainingManagement from "./pages/admin/TrainingManagement";
+import PayrollReports from "./pages/admin/PayrollReports";
+import ActivityFeed from "./pages/admin/ActivityFeed";
 
 import Settings from "./pages/Settings";
 import Unauthorized from "./pages/Unauthorized";
