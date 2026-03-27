@@ -1,4 +1,5 @@
 import { LocationSelector } from "@/components/LocationSelector";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
