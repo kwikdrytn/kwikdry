@@ -951,16 +951,19 @@ async function syncOrganization(
           jobNotes = noteFields.length > 0 ? noteFields.join('\n\n') : null;
         }
 
-        const tipAmount = job.tip_amount ?? job.tip ?? null;
+        // HCP returns monetary amounts in cents — convert to dollars
+        const totalAmountDollars = job.total_amount != null ? job.total_amount / 100 : null;
+        const tipAmountRaw = job.tip_amount ?? job.tip ?? null;
+        const tipAmount = tipAmountRaw != null ? tipAmountRaw / 100 : null;
         let ccFeeAmount: number | null = null;
         if (job.cc_fee != null) {
-          ccFeeAmount = job.cc_fee;
+          ccFeeAmount = job.cc_fee / 100;
         } else if (job.processing_fee != null) {
-          ccFeeAmount = job.processing_fee;
+          ccFeeAmount = job.processing_fee / 100;
         } else if (job.invoice?.payments?.length) {
-          ccFeeAmount = job.invoice.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0);
+          ccFeeAmount = job.invoice.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0) / 100;
         } else if (job.payments?.length) {
-          ccFeeAmount = job.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0);
+          ccFeeAmount = job.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0) / 100;
         }
         
         const paymentMethod = job.payment_type 
