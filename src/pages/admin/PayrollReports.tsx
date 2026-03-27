@@ -229,8 +229,8 @@ export default function PayrollReports() {
                                         {Array.isArray(job.services) ? job.services.map((s: any) => s.name).filter(Boolean).join(', ') : '-'}
                                       </td>
                                       <td className="py-2 pr-4 text-right">{formatCurrency(Number(job.total_amount) || 0)}</td>
-                                      <td className="py-2 pr-4 text-right">{formatCurrency(Number(job.tip_amount) || 0)}</td>
-                                      <td className="py-2">{job.payment_method || '-'}</td>
+<td className="py-2 pr-4 text-right">{Number(job.tip_amount) ? formatCurrency(Number(job.tip_amount)) : '-'}</td>
+                                      <td className="py-2">{formatPaymentMethod(job.payment_method)}</td>
                                     </tr>
                                   ))}
                                 </tbody>
