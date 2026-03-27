@@ -236,13 +236,13 @@ export default function PayrollReports() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="font-bold">
-                    <TableCell>Totals</TableCell>
-                    <TableCell className="text-center">{totals.jobs}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.revenue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.tips)}</TableCell>
-                    <TableCell className="text-right text-destructive">-{formatCurrency(totals.ccFees)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.netPay)}</TableCell>
-                    <TableCell colSpan={2} />
+                    <TableCell className="w-[20%]">Totals</TableCell>
+                    <TableCell className="w-[8%] text-center">{totals.jobs}</TableCell>
+                    <TableCell className="w-[14%] text-right">{formatCurrency(totals.revenue)}</TableCell>
+                    <TableCell className="w-[12%] text-right">{formatCurrency(totals.tips)}</TableCell>
+                    <TableCell className="w-[12%] text-right text-destructive">-{formatCurrency(totals.ccFees)}</TableCell>
+                    <TableCell className="w-[14%] text-right">{formatCurrency(totals.netPay)}</TableCell>
+                    <TableCell className="w-[20%]" colSpan={2} />
                   </TableRow>
                 </TableFooter>
               </Table>
