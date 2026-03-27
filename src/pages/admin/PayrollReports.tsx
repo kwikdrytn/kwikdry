@@ -17,6 +17,8 @@ import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Dollar
 import { usePayrollReport, usePayConfigs, useUpsertPayConfig, useCcFeePercent, useUpdateCcFeePercent, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { useUsers } from "@/hooks/useUsers";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
