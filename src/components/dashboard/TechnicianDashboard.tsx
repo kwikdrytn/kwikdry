@@ -16,6 +16,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MyPayCard } from "@/components/dashboard/MyPayCard";
 
 export function TechnicianDashboard() {
   const { profile } = useAuth();
@@ -225,6 +226,9 @@ export function TechnicianDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* My Pay Card */}
+      <MyPayCard />
 
       {/* Inventory & Equipment Row */}
       <div className="grid gap-4 md:grid-cols-2">

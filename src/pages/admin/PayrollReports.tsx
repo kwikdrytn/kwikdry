@@ -12,10 +12,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Fragment } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Settings2, RefreshCw, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Settings2, RefreshCw, Download, Printer } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePayrollReport, useOrgPaySettings, useUpdateOrgPaySettings, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { cn } from "@/lib/utils";
+import { PayrollYTDSummary } from "@/components/payroll/PayrollYTDSummary";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -129,6 +130,10 @@ export default function PayrollReports() {
             }}>
               <Download className="mr-2 h-4 w-4" />
               CSV
+            </Button>
+            <Button variant="outline" size="sm" disabled={!payrollData?.length} onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              PDF
             </Button>
             <Button variant="outline" size="sm" disabled={syncing} onClick={async () => {
               setSyncing(true);
@@ -346,6 +351,9 @@ export default function PayrollReports() {
             )}
           </CardContent>
         </Card>
+
+        {/* YTD Summary */}
+        <PayrollYTDSummary />
       </div>
 
       <PaySettingsDialog open={configDialogOpen} onOpenChange={setConfigDialogOpen} />
