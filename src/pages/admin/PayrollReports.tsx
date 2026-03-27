@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Fragment } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Settings2, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Settings2, RefreshCw, Download } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePayrollReport, useOrgPaySettings, useUpdateOrgPaySettings, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { cn } from "@/lib/utils";
