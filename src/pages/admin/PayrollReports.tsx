@@ -24,6 +24,14 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
+function formatPaymentMethod(method: string | null): string {
+  if (!method) return '-';
+  const lower = method.toLowerCase();
+  if (lower.includes('credit') || lower === 'credit_card') return 'Credit Card';
+  if (lower.includes('external') || lower === 'cash' || lower === 'check') return 'Cash/Check';
+  return method.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export default function PayrollReports() {
   const [mode, setMode] = useState<'weekly' | 'custom'>('weekly');
   const [weekAnchor, setWeekAnchor] = useState(new Date());
