@@ -954,7 +954,7 @@ async function syncOrganization(
         // HCP returns monetary amounts in cents — convert to dollars
         const totalAmountDollars = job.total_amount != null ? job.total_amount / 100 : null;
         const tipAmountRaw = job.tip_amount ?? job.tip ?? null;
-        const tipAmount = tipAmountRaw != null ? tipAmountRaw / 100 : null;
+        let tipAmount = tipAmountRaw != null ? tipAmountRaw / 100 : null;
         let ccFeeAmount: number | null = null;
         if (job.cc_fee != null) {
           ccFeeAmount = job.cc_fee / 100;
@@ -965,7 +965,7 @@ async function syncOrganization(
         } else if (job.payments?.length) {
           ccFeeAmount = job.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0) / 100;
         }
-        
+
         // Try to get payment method from job fields first
         let paymentMethod = job.payment_type
           ?? job.invoice?.payment_method
@@ -973,41 +973,82 @@ async function syncOrganization(
           ?? job.payments?.[0]?.payment_type
           ?? null;
 
+        let invoicePaidAt = job.invoice?.paid_at ?? job.payments?.[0]?.paid_at ?? null;
+
         const isCompletedJob = ['complete unrated', 'complete rated', 'completed', 'paid']
           .includes((job.work_status || '').toLowerCase());
 
-        // If no payment method found and job is completed, fetch invoice from HCP API
-        if (!paymentMethod && isCompletedJob) {
+        // If payment details are missing and job is completed, fetch invoice details from HCP
+        if ((!paymentMethod || !invoicePaidAt) && isCompletedJob) {
           try {
             const invoiceRes = await fetchWithRetry(`${HCP_BASE_URL}/jobs/${job.id}/invoices`, api_key);
             const invoiceData = await invoiceRes.json();
-            const invoices = invoiceData.invoices || invoiceData.data || [];
-            if (invoices.length > 0) {
-              const inv = invoices[0];
-              // Check payments array on the invoice
-              const payments = inv.payments || [];
-              if (payments.length > 0) {
-                paymentMethod = payments[0].payment_type || payments[0].type || payments[0].method || null;
-                // Also grab tip and fees from invoice if missing
-                if (tipAmountRaw == null && inv.tip_amount != null) {
-                  // Invoice tip may also be in cents
+
+            const toArray = (value: any): any[] => Array.isArray(value) ? value : [];
+            const rawInvoices = [
+              ...toArray(invoiceData?.invoices),
+              ...toArray(invoiceData?.job_invoices),
+              ...toArray(invoiceData?.data),
+              ...toArray(invoiceData?.results),
+            ];
+            const invoiceEntries = rawInvoices.length > 0 ? rawInvoices : toArray(invoiceData);
+
+            if (invoiceEntries.length > 0) {
+              const firstEntry = invoiceEntries[0] ?? {};
+              const invoiceObj = firstEntry?.invoice ?? firstEntry;
+              const payments = [
+                ...toArray(invoiceObj?.payments),
+                ...toArray(firstEntry?.payments),
+                ...toArray(invoiceObj?.transactions),
+              ];
+              const firstPayment = payments[0] ?? null;
+
+              if (!paymentMethod) {
+                paymentMethod = firstPayment?.payment_type
+                  ?? firstPayment?.payment_method
+                  ?? firstPayment?.method
+                  ?? firstPayment?.type
+                  ?? firstPayment?.name
+                  ?? invoiceObj?.payment_method
+                  ?? invoiceObj?.payment_type
+                  ?? firstEntry?.payment_method
+                  ?? firstEntry?.payment_type
+                  ?? null;
+              }
+
+              if (!invoicePaidAt) {
+                invoicePaidAt = firstPayment?.paid_at
+                  ?? firstPayment?.created_at
+                  ?? invoiceObj?.paid_at
+                  ?? invoiceObj?.closed_at
+                  ?? firstEntry?.paid_at
+                  ?? null;
+              }
+
+              if (tipAmount == null) {
+                const invoiceTipRaw = invoiceObj?.tip_amount ?? firstEntry?.tip_amount ?? null;
+                if (typeof invoiceTipRaw === 'number') {
+                  tipAmount = invoiceTipRaw / 100;
                 }
               }
-              // Fallback: check invoice-level payment_method
-              if (!paymentMethod) {
-                paymentMethod = inv.payment_method || inv.payment_type || null;
+
+              if (ccFeeAmount == null) {
+                const feeFromPayment = payments.reduce((sum: number, p: any) => sum + (p?.transaction_fees ?? p?.processing_fee ?? 0), 0);
+                if (feeFromPayment > 0) {
+                  ccFeeAmount = feeFromPayment / 100;
+                }
               }
+            } else {
+              console.log(`No invoice records found for completed job ${job.id}. Invoice response keys: ${Object.keys(invoiceData || {}).join(', ')}`);
             }
+
             // Small delay to respect rate limits
             await new Promise(r => setTimeout(r, 200));
           } catch (err) {
             console.log(`Failed to fetch invoice for job ${job.id}:`, err);
           }
         }
-        
-        const invoicePaidAt = job.invoice?.paid_at ?? job.payments?.[0]?.paid_at ?? null;
 
-        const newStatus = job.work_status || null;
         const newTechHcpId = assignedEmployee?.id || null;
         const newTechName = assignedEmployee ?
           [assignedEmployee.first_name, assignedEmployee.last_name].filter(Boolean).join(' ') : null;
