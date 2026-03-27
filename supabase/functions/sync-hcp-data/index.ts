@@ -967,16 +967,19 @@ async function syncOrganization(
         }
         
         // Try to get payment method from job fields first
-        let paymentMethod = job.payment_type 
-          ?? job.invoice?.payment_method 
-          ?? job.invoice?.payments?.[0]?.payment_type 
-          ?? job.payments?.[0]?.payment_type 
+        let paymentMethod = job.payment_type
+          ?? job.invoice?.payment_method
+          ?? job.invoice?.payments?.[0]?.payment_type
+          ?? job.payments?.[0]?.payment_type
           ?? null;
-        
+
+        const isCompletedJob = ['complete unrated', 'complete rated', 'completed', 'paid']
+          .includes((job.work_status || '').toLowerCase());
+
         // If no payment method found and job is completed, fetch invoice from HCP API
-        if (!paymentMethod && (job.work_status === 'complete unrated' || job.work_status === 'complete rated' || job.work_status === 'completed')) {
+        if (!paymentMethod && isCompletedJob) {
           try {
-            const invoiceRes = await fetchWithRetry(`${HCP_BASE_URL}/jobs/${job.id}/invoices`, apiKey);
+            const invoiceRes = await fetchWithRetry(`${HCP_BASE_URL}/jobs/${job.id}/invoices`, api_key);
             const invoiceData = await invoiceRes.json();
             const invoices = invoiceData.invoices || invoiceData.data || [];
             if (invoices.length > 0) {
