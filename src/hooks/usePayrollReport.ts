@@ -61,7 +61,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
         .eq('id', profile.organization_id)
         .single();
 
-      const ccFeePercent = (org?.settings as any)?.cc_fee_percent ?? 3;
+      const ccFeePercent = (org?.settings as any)?.cc_fee_percent ?? 3.49;
 
       // Fetch completed jobs in date range
       const { data: jobs, error: jobsError } = await supabase
@@ -227,13 +227,13 @@ export function useCcFeePercent() {
   return useQuery({
     queryKey: ['cc-fee-percent', profile?.organization_id],
     queryFn: async () => {
-      if (!profile?.organization_id) return 3;
+      if (!profile?.organization_id) return 3.49;
       const { data } = await supabase
         .from('organizations')
         .select('settings')
         .eq('id', profile.organization_id)
         .single();
-      return (data?.settings as any)?.cc_fee_percent ?? 3;
+      return (data?.settings as any)?.cc_fee_percent ?? 3.49;
     },
     enabled: !!profile?.organization_id,
   });

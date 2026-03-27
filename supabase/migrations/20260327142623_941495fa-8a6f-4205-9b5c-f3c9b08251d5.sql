@@ -1,0 +1,1 @@
+UPDATE organizations SET settings = COALESCE(settings, '{}'::jsonb) || '{"cc_fee_percent": 3.49}'::jsonb WHERE id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
