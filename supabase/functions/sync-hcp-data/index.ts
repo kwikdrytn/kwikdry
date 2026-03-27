@@ -173,6 +173,43 @@ function coerceNumber(value: unknown): number | null {
   return null;
 }
 
+function normalizeInvoiceMoney(rawValue: unknown, maxExpected?: number | null): number | null {
+  const numeric = coerceNumber(rawValue);
+  if (numeric == null || numeric <= 0) return null;
+
+  const candidates = [numeric, numeric / 100].filter(v => Number.isFinite(v) && v > 0);
+  const bounded = maxExpected != null
+    ? candidates.filter(v => v <= maxExpected + 0.01)
+    : candidates;
+  const pool = bounded.length > 0 ? bounded : candidates;
+
+  return Math.max(...pool);
+}
+
+function sumInvoiceFees(payments: any[], maxExpected?: number | null): number | null {
+  let rawFeeTotal = 0;
+
+  for (const payment of payments) {
+    const feeCandidates = [
+      payment?.transaction_fees,
+      payment?.processing_fee,
+      payment?.fee_amount,
+      payment?.fee,
+      payment?.credit_card_fee,
+    ];
+
+    for (const rawFee of feeCandidates) {
+      const parsedFee = coerceNumber(rawFee);
+      if (parsedFee != null && parsedFee > 0) {
+        rawFeeTotal += parsedFee;
+        break;
+      }
+    }
+  }
+
+  return rawFeeTotal > 0 ? normalizeInvoiceMoney(rawFeeTotal, maxExpected) : null;
+}
+
 function extractLatLngFromJob(job: unknown): { lat: number; lng: number } | null {
   const j = job as Record<string, any>;
 
@@ -961,9 +998,9 @@ async function syncOrganization(
         } else if (job.processing_fee != null) {
           ccFeeAmount = job.processing_fee / 100;
         } else if (job.invoice?.payments?.length) {
-          ccFeeAmount = job.invoice.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0) / 100;
+          ccFeeAmount = sumInvoiceFees(job.invoice.payments, totalAmountDollars);
         } else if (job.payments?.length) {
-          ccFeeAmount = job.payments.reduce((sum, p) => sum + (p.transaction_fees ?? p.processing_fee ?? 0), 0) / 100;
+          ccFeeAmount = sumInvoiceFees(job.payments, totalAmountDollars);
         }
 
         // Try to get payment method from job fields first
@@ -1028,20 +1065,76 @@ async function syncOrganization(
               }
 
               if (tipAmount == null) {
-                const invoiceTipRaw = invoiceObj?.tip_amount ?? invoiceObj?.tip
-                  ?? firstEntry?.tip_amount ?? firstEntry?.tip
-                  ?? firstPayment?.tip_amount ?? firstPayment?.tip ?? null;
-                if (typeof invoiceTipRaw === 'number' && invoiceTipRaw > 0) {
-                  tipAmount = invoiceTipRaw / 100;
-                  console.log(`Found tip for job ${job.id}: ${invoiceTipRaw} cents -> $${tipAmount}`);
+                const tipCandidates = [
+                  invoiceObj?.tip_amount,
+                  invoiceObj?.tip,
+                  invoiceObj?.gratuity,
+                  invoiceObj?.gratuity_amount,
+                  invoiceObj?.tips_total,
+                  invoiceObj?.amount_details?.tip_amount,
+                  firstEntry?.tip_amount,
+                  firstEntry?.tip,
+                  firstEntry?.gratuity,
+                  firstEntry?.gratuity_amount,
+                  firstEntry?.amount_details?.tip_amount,
+                  firstPayment?.tip_amount,
+                  firstPayment?.tip,
+                  firstPayment?.gratuity,
+                  firstPayment?.gratuity_amount,
+                  firstPayment?.amount_details?.tip_amount,
+                ];
+
+                const parsedTips = tipCandidates
+                  .map(raw => normalizeInvoiceMoney(raw, totalAmountDollars))
+                  .filter((value): value is number => value != null && value > 0);
+
+                if (parsedTips.length > 0) {
+                  tipAmount = Math.max(...parsedTips);
+                  console.log(`Found tip for job ${job.id}: $${tipAmount}`);
+                } else if (totalAmountDollars != null) {
+                  const subtotalCandidates = [
+                    invoiceObj?.subtotal,
+                    invoiceObj?.subtotal_amount,
+                    invoiceObj?.sub_total,
+                    invoiceObj?.amount_subtotal,
+                    invoiceObj?.amount_before_tip,
+                    invoiceObj?.line_items_total,
+                    invoiceObj?.service_total,
+                    invoiceObj?.job_total,
+                    firstEntry?.subtotal,
+                    firstEntry?.subtotal_amount,
+                    firstEntry?.sub_total,
+                    firstEntry?.amount_subtotal,
+                    firstEntry?.amount_before_tip,
+                  ];
+
+                  const parsedSubtotals = subtotalCandidates
+                    .map(raw => normalizeInvoiceMoney(raw, totalAmountDollars))
+                    .filter((value): value is number => value != null && value >= 0);
+
+                  if (parsedSubtotals.length > 0) {
+                    const bestSubtotal = Math.max(...parsedSubtotals);
+                    const derivedTip = Number((totalAmountDollars - bestSubtotal).toFixed(2));
+                    if (derivedTip > 0.01) {
+                      tipAmount = derivedTip;
+                      console.log(`Derived tip for job ${job.id} from totals: $${tipAmount}`);
+                    }
+                  }
                 }
               }
 
               if (ccFeeAmount == null) {
-                const feeFromPayment = payments.reduce((sum: number, p: any) => sum + (p?.transaction_fees ?? p?.processing_fee ?? 0), 0);
-                if (feeFromPayment > 0) {
-                  ccFeeAmount = feeFromPayment / 100;
-                }
+                const invoiceFee = normalizeInvoiceMoney(
+                  invoiceObj?.cc_fee_amount
+                    ?? invoiceObj?.cc_fee
+                    ?? invoiceObj?.processing_fee
+                    ?? invoiceObj?.transaction_fee
+                    ?? firstEntry?.cc_fee_amount
+                    ?? firstEntry?.cc_fee,
+                  totalAmountDollars,
+                );
+
+                ccFeeAmount = invoiceFee ?? sumInvoiceFees(payments, totalAmountDollars);
               }
             } else {
               console.log(`No invoice records found for completed job ${job.id}. Invoice response keys: ${Object.keys(invoiceData || {}).join(', ')}`);

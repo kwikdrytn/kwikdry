@@ -32,6 +32,13 @@ function formatPaymentMethod(method: string | null): string {
   return method.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function getDisplayJobAmount(totalAmount: number | null, tipAmount: number | null): number {
+  const total = Number(totalAmount) || 0;
+  const tip = Number(tipAmount) || 0;
+  if (tip <= 0) return total;
+  return Math.max(total - tip, 0);
+}
+
 export default function PayrollReports() {
   const [mode, setMode] = useState<'weekly' | 'custom'>('weekly');
   const [weekAnchor, setWeekAnchor] = useState(new Date());
@@ -223,10 +230,11 @@ export default function PayrollReports() {
                                 </thead>
                                 <tbody>
                                   {tech.jobs.map(job => {
-                                    const jobAmount = Number(job.total_amount) || 0;
+                                    const rawTotal = Number(job.total_amount) || 0;
                                     const jobTip = Number(job.tip_amount) || 0;
+                                    const jobAmount = getDisplayJobAmount(rawTotal, jobTip);
                                     const isCard = job.payment_method?.toLowerCase().includes('credit') || job.payment_method === 'credit_card';
-                                    const jobCcFee = Number(job.cc_fee_amount) || (isCard ? (jobAmount + jobTip) * ((ccFeePercent ?? 3.49) / 100) : 0);
+                                    const jobCcFee = Number(job.cc_fee_amount) || (isCard ? (rawTotal || (jobAmount + jobTip)) * ((ccFeePercent ?? 3.49) / 100) : 0);
                                     return (
                                     <tr key={job.id} className="border-b last:border-0 text-xs">
                                       <td className="py-2 pr-4">{job.scheduled_date ? format(new Date(job.scheduled_date + 'T12:00:00'), 'MMM d') : '-'}</td>
