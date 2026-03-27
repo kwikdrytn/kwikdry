@@ -271,7 +271,7 @@ export function TechnicianDashboard() {
                 <Button 
                   variant="outline" 
                   className="w-full h-12"
-                  onClick={() => navigate('/admin/inventory')}
+                  onClick={() => navigate('/inventory')}
                 >
                   View My Inventory
                   <ChevronRight className="ml-2 h-4 w-4" />
