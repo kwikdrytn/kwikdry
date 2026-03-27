@@ -212,27 +212,35 @@ export default function PayrollReports() {
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="border-b">
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[15%]">Date</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[20%]">Customer</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[25%]">Service</th>
-                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[13%]">Amount</th>
-                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[12%]">Tip</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 w-[15%]">Payment</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[14%]">Date</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[18%]">Customer</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[22%]">Service</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[12%]">Amount</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[10%]">Tip</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[10%]">CC Fees</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 w-[14%]">Payment</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {tech.jobs.map(job => (
+                                  {tech.jobs.map(job => {
+                                    const jobAmount = Number(job.total_amount) || 0;
+                                    const jobTip = Number(job.tip_amount) || 0;
+                                    const isCard = job.payment_method?.toLowerCase().includes('credit') || job.payment_method === 'credit_card';
+                                    const jobCcFee = Number(job.cc_fee_amount) || (isCard ? (jobAmount + jobTip) * ((ccFeePercent ?? 3.49) / 100) : 0);
+                                    return (
                                     <tr key={job.id} className="border-b last:border-0 text-xs">
                                       <td className="py-2 pr-4">{job.scheduled_date ? format(new Date(job.scheduled_date + 'T12:00:00'), 'MMM d') : '-'}</td>
                                       <td className="py-2 pr-4">{job.customer_name || '-'}</td>
                                       <td className="py-2 pr-4 max-w-[200px] truncate">
                                         {Array.isArray(job.services) ? job.services.map((s: any) => s.name).filter(Boolean).join(', ') : '-'}
                                       </td>
-                                      <td className="py-2 pr-4 text-right">{formatCurrency(Number(job.total_amount) || 0)}</td>
-<td className="py-2 pr-4 text-right">{Number(job.tip_amount) ? formatCurrency(Number(job.tip_amount)) : '-'}</td>
+                                      <td className="py-2 pr-4 text-right">{formatCurrency(jobAmount)}</td>
+                                      <td className="py-2 pr-4 text-right">{jobTip ? formatCurrency(jobTip) : '-'}</td>
+                                      <td className="py-2 pr-4 text-right">{jobCcFee ? formatCurrency(jobCcFee) : '-'}</td>
                                       <td className="py-2">{formatPaymentMethod(job.payment_method)}</td>
                                     </tr>
-                                  ))}
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>

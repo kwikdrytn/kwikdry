@@ -20,6 +20,7 @@ export interface PayrollJob {
   scheduled_date: string | null;
   total_amount: number | null;
   tip_amount: number | null;
+  cc_fee_amount: number | null;
   payment_method: string | null;
   status: string | null;
   services: any;
@@ -66,7 +67,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
       // Fetch completed jobs in date range
       const { data: jobs, error: jobsError } = await supabase
         .from('hcp_jobs')
-        .select('id, hcp_job_id, customer_name, scheduled_date, total_amount, tip_amount, payment_method, status, services, technician_hcp_id, technician_name')
+        .select('id, hcp_job_id, customer_name, scheduled_date, total_amount, tip_amount, cc_fee_amount, payment_method, status, services, technician_hcp_id, technician_name')
         .eq('organization_id', profile.organization_id)
         .gte('scheduled_date', startDate)
         .lte('scheduled_date', endDate)
