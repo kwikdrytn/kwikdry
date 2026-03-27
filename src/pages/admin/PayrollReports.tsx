@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,10 +13,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, DollarSign, Settings2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, DollarSign, Settings2, RefreshCw } from "lucide-react";
 import { usePayrollReport, usePayConfigs, useUpsertPayConfig, useCcFeePercent, useUpdateCcFeePercent, TechnicianPayroll } from "@/hooks/usePayrollReport";
 import { useUsers } from "@/hooks/useUsers";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -29,6 +31,7 @@ export default function PayrollReports() {
   const [customEnd, setCustomEnd] = useState<Date | undefined>();
   const [expandedTech, setExpandedTech] = useState<string | null>(null);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(weekAnchor, { weekStartsOn: 1 });
@@ -58,10 +61,27 @@ export default function PayrollReports() {
             <h1 className="text-2xl font-bold">Payroll Reports</h1>
             <p className="text-muted-foreground text-sm">Revenue, tips, and CC fees by technician</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setConfigDialogOpen(true)}>
-            <Settings2 className="mr-2 h-4 w-4" />
-            Pay Settings
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={syncing} onClick={async () => {
+              setSyncing(true);
+              try {
+                const { error } = await supabase.functions.invoke('sync-hcp-data');
+                if (error) throw error;
+                toast.success('HCP data synced successfully');
+              } catch (e: any) {
+                toast.error('Sync failed: ' + (e.message || 'Unknown error'));
+              } finally {
+                setSyncing(false);
+              }
+            }}>
+              <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
+              {syncing ? 'Syncing…' : 'Sync HCP'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setConfigDialogOpen(true)}>
+              <Settings2 className="mr-2 h-4 w-4" />
+              Pay Settings
+            </Button>
+          </div>
         </div>
 
         {/* Date Controls */}
