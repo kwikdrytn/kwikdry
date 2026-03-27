@@ -24,6 +24,14 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
+function formatPaymentMethod(method: string | null): string {
+  if (!method) return '-';
+  const lower = method.toLowerCase();
+  if (lower.includes('credit') || lower === 'credit_card') return 'Credit Card';
+  if (lower.includes('external') || lower === 'cash' || lower === 'check') return 'Cash/Check';
+  return method.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export default function PayrollReports() {
   const [mode, setMode] = useState<'weekly' | 'custom'>('weekly');
   const [weekAnchor, setWeekAnchor] = useState(new Date());
@@ -221,8 +229,8 @@ export default function PayrollReports() {
                                         {Array.isArray(job.services) ? job.services.map((s: any) => s.name).filter(Boolean).join(', ') : '-'}
                                       </td>
                                       <td className="py-2 pr-4 text-right">{formatCurrency(Number(job.total_amount) || 0)}</td>
-                                      <td className="py-2 pr-4 text-right">{formatCurrency(Number(job.tip_amount) || 0)}</td>
-                                      <td className="py-2">{job.payment_method || '-'}</td>
+<td className="py-2 pr-4 text-right">{Number(job.tip_amount) ? formatCurrency(Number(job.tip_amount)) : '-'}</td>
+                                      <td className="py-2">{formatPaymentMethod(job.payment_method)}</td>
                                     </tr>
                                   ))}
                                 </tbody>
