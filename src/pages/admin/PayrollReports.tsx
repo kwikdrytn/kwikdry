@@ -337,13 +337,13 @@ export default function PayrollReports() {
                 </tbody>
                 <tfoot className="border-t bg-muted/50">
                   <tr className="font-bold">
+                    <td className="py-3 px-2" />
                     <td className="py-3 px-3">Totals</td>
                     <td className="py-3 px-3 text-center">{totals.jobs}</td>
                     <td className="py-3 px-3 text-right">{formatCurrency(totals.revenue)}</td>
                     <td className="py-3 px-3 text-right">{formatCurrency(totals.tips)}</td>
                     <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(totals.ccFees)}</td>
                     <td className="py-3 px-3 text-right">{formatCurrency(totals.netPay)}</td>
-                    <td className="py-3 px-3" />
                     <td className="py-3 px-3" />
                   </tr>
                 </tfoot>
