@@ -7,6 +7,8 @@ import {
   Map, 
   Settings,
   GraduationCap,
+  DollarSign,
+  Activity,
   LucideIcon
 } from "lucide-react";
 import { UserRole } from "@/stores/useAuthStore";
