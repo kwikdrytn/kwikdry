@@ -18,7 +18,19 @@ messaging.onBackgroundMessage((payload) => {
   console.log('Received background message:', payload);
 
   const notificationType = payload.data?.type || '';
+  const clickAction = payload.data?.click_action || '';
   const isInventory = notificationType.includes('stock') || notificationType.includes('inventory');
+  const isJobChange = notificationType === 'job_change';
+
+  let clickUrl = '/checklists';
+  let actionTitle = 'Open Checklists';
+  if (isJobChange && clickAction) {
+    clickUrl = clickAction;
+    actionTitle = clickAction.startsWith('http') ? 'View in HCP' : 'View Activity';
+  } else if (isInventory) {
+    clickUrl = '/inventory';
+    actionTitle = 'View Inventory';
+  }
 
   const notificationTitle = payload.notification?.title || 'New Notification';
   const notificationOptions = {
@@ -26,9 +38,9 @@ messaging.onBackgroundMessage((payload) => {
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: notificationType || 'general',
-    data: { ...payload.data, clickUrl: isInventory ? '/inventory' : '/checklists' },
+    data: { ...payload.data, clickUrl },
     actions: [
-      { action: 'open', title: isInventory ? 'View Inventory' : 'Open Checklists' },
+      { action: 'open', title: actionTitle },
       { action: 'dismiss', title: 'Dismiss' }
     ]
   };
