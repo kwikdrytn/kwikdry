@@ -74,6 +74,11 @@ Deno.serve(async (req) => {
       ? 'Job Change Detected'
       : `${events.length} Job Changes Detected`;
 
+    // Determine click action - single event opens HCP directly, multiple opens activity feed
+    const clickAction = events.length === 1 && events[0].hcp_job_id
+      ? `https://pro.housecallpro.com/pro/jobs/${events[0].hcp_job_id}`
+      : '/activity';
+
     let sent = 0;
     for (const token of tokens) {
       try {
@@ -86,7 +91,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             to: token,
             notification: { title, body: summary },
-            data: { click_action: '/activity', type: 'job_change' },
+            data: { click_action: clickAction, type: 'job_change' },
           }),
         });
         if (res.ok) sent++;
@@ -102,7 +107,7 @@ Deno.serve(async (req) => {
         type: 'job_change',
         title,
         body: summary,
-        click_action: '/activity',
+        click_action: clickAction,
         delivered: sent > 0,
       });
     }

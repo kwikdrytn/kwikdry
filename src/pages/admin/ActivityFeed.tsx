@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Activity, XCircle, CalendarClock, UserRoundX, Check, CheckCheck } from "lucide-react";
+import { Activity, XCircle, CalendarClock, UserRoundX, Check, CheckCheck, ExternalLink } from "lucide-react";
 import { useActivityFeed, useMarkAsRead, useMarkAllAsRead, JobChangeEvent } from "@/hooks/useActivityFeed";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -55,11 +55,23 @@ function ChangeEventCard({ event, onMarkRead }: { event: JobChangeEvent; onMarkR
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium">{getDescription()}</p>
-          {!event.is_read && (
-            <Button variant="ghost" size="sm" className="shrink-0 h-7 text-xs" onClick={() => onMarkRead(event.id)}>
-              <Check className="h-3 w-3 mr-1" /> Read
-            </Button>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {event.hcp_job_id && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => window.open(`https://pro.housecallpro.com/pro/jobs/${event.hcp_job_id}`, '_blank')}
+              >
+                <ExternalLink className="h-3 w-3 mr-1" /> HCP
+              </Button>
+            )}
+            {!event.is_read && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onMarkRead(event.id)}>
+                <Check className="h-3 w-3 mr-1" /> Read
+              </Button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline" className="text-xs capitalize">{config.label}</Badge>
