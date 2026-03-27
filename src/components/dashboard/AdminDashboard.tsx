@@ -535,7 +535,14 @@ function RecentActivityCard() {
                     "flex items-start gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-colors hover:bg-muted/50",
                     !event.is_read && "bg-primary/5 border-primary/20"
                   )}
-                  onClick={() => navigate('/activity')}
+                  onClick={() => {
+                    const hcpJobId = event.hcp_job_id;
+                    if (hcpJobId) {
+                      window.open(`https://pro.housecallpro.com/pro/jobs/${hcpJobId}`, '_blank');
+                    } else {
+                      navigate('/activity');
+                    }
+                  }}
                 >
                   <Icon className={cn("h-4 w-4 mt-0.5 shrink-0", config.color)} />
                   <div className="flex-1 min-w-0">
