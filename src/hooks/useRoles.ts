@@ -340,13 +340,36 @@ export function useUserPermissions() {
 
       // If user has a custom role, fetch those permissions
       if (profile.custom_role_id) {
-        const { data, error } = await supabase
-          .from('role_permissions')
-          .select('permission')
-          .eq('role_id', profile.custom_role_id);
+        const [permissionsResult, roleResult] = await Promise.all([
+          supabase
+            .from('role_permissions')
+            .select('permission')
+            .eq('role_id', profile.custom_role_id),
+          supabase
+            .from('custom_roles')
+            .select('name')
+            .eq('id', profile.custom_role_id)
+            .maybeSingle(),
+        ]);
 
-        if (error) throw error;
-        return (data || []).map(p => p.permission as PermissionKey);
+        if (permissionsResult.error) throw permissionsResult.error;
+        if (roleResult.error) throw roleResult.error;
+
+        const permissions = (permissionsResult.data || []).map(p => p.permission as PermissionKey);
+        const roleName = roleResult.data?.name?.trim().toLowerCase();
+
+        // Backward compatibility: older "Admin" custom roles created before new permission keys
+        // should still receive newly added admin-level pages.
+        const isAdminNamedRole = roleName === 'admin';
+        if (isAdminNamedRole) {
+          return Array.from(new Set<PermissionKey>([
+            ...permissions,
+            'payroll.view',
+            'activity_feed.view',
+          ]));
+        }
+
+        return permissions;
       }
 
       // Otherwise, use default permissions for legacy role

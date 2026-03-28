@@ -235,20 +235,18 @@ export default function PayrollReports() {
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
               <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse" style={{tableLayout: 'fixed'}}>
+              <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
                 <colgroup>
-                  <col style={{width: '4%'}} />
-                  <col style={{width: '18%'}} />
-                  <col style={{width: '8%'}} />
-                  <col style={{width: '14%'}} />
-                  <col style={{width: '12%'}} />
-                  <col style={{width: '12%'}} />
-                  <col style={{width: '14%'}} />
-                  <col style={{width: '18%'}} />
+                  <col style={{ width: '24%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '16%' }} />
                 </colgroup>
                 <thead>
                   <tr className="border-b">
-                    <th className="py-3 px-2" />
                     <th className="py-3 px-3 text-left text-xs font-medium text-muted-foreground">Technician</th>
                     <th className="py-3 px-3 text-center text-xs font-medium text-muted-foreground">Jobs</th>
                     <th className="py-3 px-3 text-right text-xs font-medium text-muted-foreground">Revenue</th>
@@ -264,10 +262,12 @@ export default function PayrollReports() {
                     return (
                     <Fragment key={tech.technician_hcp_id}>
                       <tr className="border-b cursor-pointer hover:bg-muted/50" onClick={() => setExpandedTech(isExpanded ? null : tech.technician_hcp_id)}>
-                        <td className="py-3 px-2 text-center">
-                          {isExpanded ? <ChevronUp className="h-4 w-4 inline" /> : <ChevronDown className="h-4 w-4 inline" />}
+                        <td className="py-3 px-3 font-medium">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+                            <span className="truncate">{tech.technician_name}</span>
+                          </div>
                         </td>
-                        <td className="py-3 px-3 font-medium">{tech.technician_name}</td>
                         <td className="py-3 px-3 text-center">{tech.jobCount}</td>
                         <td className="py-3 px-3 text-right">{formatCurrency(tech.grossRevenue)}</td>
                         <td className="py-3 px-3 text-right">{formatCurrency(tech.totalTips)}</td>
@@ -281,7 +281,7 @@ export default function PayrollReports() {
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={8} className="p-0">
+                          <td colSpan={7} className="p-0">
                             <div className="bg-muted/30 px-6 py-3 overflow-x-auto">
                               <p className="text-xs font-medium text-muted-foreground mb-2">
                                 {tech.commissionPercent}% Commission (min {formatCurrency(tech.weeklyMinimum)}/week) + Tips - CC Fees on Tips
@@ -337,7 +337,6 @@ export default function PayrollReports() {
                 </tbody>
                 <tfoot className="border-t bg-muted/50">
                   <tr className="font-bold">
-                    <td className="py-3 px-2" />
                     <td className="py-3 px-3">Totals</td>
                     <td className="py-3 px-3 text-center">{totals.jobs}</td>
                     <td className="py-3 px-3 text-right">{formatCurrency(totals.revenue)}</td>
