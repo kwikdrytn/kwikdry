@@ -146,6 +146,14 @@ All colors MUST be HSL.
   border-top-color: white !important;
 }
 
+/* Hover popups should not intercept mouse events from markers */
+.job-hover-popup {
+  pointer-events: none !important;
+}
+.job-hover-popup .mapboxgl-popup-content {
+  pointer-events: none !important;
+}
+
 /* YouTube iframe responsive styling */
 .aspect-video iframe {
   width: 100% !important;

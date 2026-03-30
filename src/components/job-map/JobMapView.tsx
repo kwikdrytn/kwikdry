@@ -721,20 +721,23 @@ export function JobMapView() {
         border-radius: 50%;
         cursor: pointer;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        transition: transform 0.15s ease;
       `;
 
-      // Create popup for hover
+      // Create popup for hover - use anchor bottom so popup appears above marker
       const hoverPopup = new mapboxgl.Popup({
-        offset: 15,
+        offset: [0, -16],
         closeButton: false,
         closeOnClick: false,
         maxWidth: "300px",
         className: "job-hover-popup",
+        anchor: "bottom",
       }).setHTML(createHoverContent(job, filters.weekView));
 
       el.addEventListener("mouseenter", () => {
-        el.style.transform = "scale(1.2)";
+        el.style.width = "28px";
+        el.style.height = "28px";
+        el.style.marginLeft = "-2px";
+        el.style.marginTop = "-2px";
         // Only show hover popup if click popup is not open
         if (!clickPopupRef.current?.isOpen()) {
           hoverPopup.setLngLat([job.lng!, job.lat!]).addTo(map.current!);
@@ -742,7 +745,10 @@ export function JobMapView() {
       });
       
       el.addEventListener("mouseleave", () => {
-        el.style.transform = "scale(1)";
+        el.style.width = "24px";
+        el.style.height = "24px";
+        el.style.marginLeft = "0";
+        el.style.marginTop = "0";
         hoverPopup.remove();
       });
 
