@@ -338,6 +338,13 @@ export function useUserPermissions() {
     queryFn: async () => {
       if (!profile) return [];
 
+      // System admin always has full access, regardless of custom role assignment.
+      if (profile.role === 'admin') {
+        return Object.values(PERMISSION_GROUPS).flatMap(g =>
+          g.permissions.map(p => p.key as PermissionKey)
+        );
+      }
+
       // If user has a custom role, fetch those permissions
       if (profile.custom_role_id) {
         const [permissionsResult, roleResult] = await Promise.all([
@@ -360,7 +367,7 @@ export function useUserPermissions() {
 
         // Backward compatibility: older "Admin" custom roles created before new permission keys
         // should still receive newly added admin-level pages.
-        const isAdminNamedRole = roleName === 'admin';
+        const isAdminNamedRole = !!roleName && roleName.includes('admin');
         if (isAdminNamedRole) {
           return Array.from(new Set<PermissionKey>([
             ...permissions,
@@ -373,13 +380,6 @@ export function useUserPermissions() {
       }
 
       // Otherwise, use default permissions for legacy role
-      // Admin has all permissions
-      if (profile.role === 'admin') {
-        return Object.values(PERMISSION_GROUPS).flatMap(g => 
-          g.permissions.map(p => p.key as PermissionKey)
-        );
-      }
-
       return DEFAULT_ROLE_PERMISSIONS[profile.role] || [];
     },
     enabled: !!profile,
