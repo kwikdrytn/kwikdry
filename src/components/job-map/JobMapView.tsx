@@ -737,7 +737,7 @@ export function JobMapView() {
         el.style.transform = "scale(1.2)";
         // Only show hover popup if click popup is not open
         if (!clickPopupRef.current?.isOpen()) {
-          hoverPopup.addTo(map.current!);
+          hoverPopup.setLngLat([job.lng!, job.lat!]).addTo(map.current!);
         }
       });
       
