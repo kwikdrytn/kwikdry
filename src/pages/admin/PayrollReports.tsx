@@ -234,17 +234,17 @@ export default function PayrollReports() {
             ) : !payrollData?.length ? (
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
-              <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+              <div className="overflow-x-auto -mx-6">
+              <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed', minWidth: '700px' }}>
                 <colgroup>
-                  <col style={{ width: '4%' }} />
-                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '40px' }} />
+                  <col style={{ width: '22%' }} />
                   <col style={{ width: '8%' }} />
                   <col style={{ width: '14%' }} />
                   <col style={{ width: '12%' }} />
                   <col style={{ width: '12%' }} />
                   <col style={{ width: '14%' }} />
-                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '14%' }} />
                 </colgroup>
                 <thead>
                   <tr className="border-b">
@@ -270,12 +270,12 @@ export default function PayrollReports() {
                         <td className="py-3 px-3 font-medium">
                           <span className="truncate">{tech.technician_name}</span>
                         </td>
-                        <td className="py-3 px-3 text-center">{tech.jobCount}</td>
-                        <td className="py-3 px-3 text-right">{formatCurrency(tech.grossRevenue)}</td>
-                        <td className="py-3 px-3 text-right">{formatCurrency(tech.totalTips)}</td>
-                        <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
-                        <td className="py-3 px-3 text-right font-semibold">{formatCurrency(tech.netPay)}</td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-3 px-3 text-center whitespace-nowrap">{tech.jobCount}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(tech.grossRevenue)}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(tech.totalTips)}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap font-semibold">{formatCurrency(tech.netPay)}</td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
                           <Badge variant={getPayModelVariant(tech)} className="text-xs">
                             {getPayModelLabel(tech)}
                           </Badge>
@@ -341,11 +341,11 @@ export default function PayrollReports() {
                   <tr className="font-bold">
                     <td className="py-3 px-2" aria-hidden="true" />
                     <td className="py-3 px-3">Totals</td>
-                    <td className="py-3 px-3 text-center">{totals.jobs}</td>
-                    <td className="py-3 px-3 text-right">{formatCurrency(totals.revenue)}</td>
-                    <td className="py-3 px-3 text-right">{formatCurrency(totals.tips)}</td>
-                    <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(totals.ccFees)}</td>
-                    <td className="py-3 px-3 text-right">{formatCurrency(totals.netPay)}</td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">{totals.jobs}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(totals.revenue)}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(totals.tips)}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap text-destructive">-{formatCurrency(totals.ccFees)}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(totals.netPay)}</td>
                     <td className="py-3 px-3" />
                   </tr>
                 </tfoot>
