@@ -270,12 +270,12 @@ export default function PayrollReports() {
                         <td className="py-3 px-3 font-medium">
                           <span className="truncate">{tech.technician_name}</span>
                         </td>
-                        <td className="py-3 px-3 text-center">{tech.jobCount}</td>
-                        <td className="py-3 px-3 text-right">{formatCurrency(tech.grossRevenue)}</td>
-                        <td className="py-3 px-3 text-right">{formatCurrency(tech.totalTips)}</td>
-                        <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
-                        <td className="py-3 px-3 text-right font-semibold">{formatCurrency(tech.netPay)}</td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-3 px-3 text-center whitespace-nowrap">{tech.jobCount}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(tech.grossRevenue)}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(tech.totalTips)}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap text-destructive">-{formatCurrency(tech.ccFeesOnRevenue + tech.ccFeesOnTips)}</td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap font-semibold">{formatCurrency(tech.netPay)}</td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
                           <Badge variant={getPayModelVariant(tech)} className="text-xs">
                             {getPayModelLabel(tech)}
                           </Badge>
