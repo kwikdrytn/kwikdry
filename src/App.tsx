@@ -42,6 +42,7 @@ const App = () => (
     <AuthProvider>
       <TooltipProvider>
         <OfflineBanner />
+        <PWAUpdatePrompt />
         <OAuthCallbackHandler />
         <Toaster />
         <Sonner />
