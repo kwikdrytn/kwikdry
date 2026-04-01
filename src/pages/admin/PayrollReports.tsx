@@ -234,17 +234,17 @@ export default function PayrollReports() {
             ) : !payrollData?.length ? (
               <p className="py-8 text-center text-muted-foreground">No completed jobs found for this period</p>
             ) : (
-              <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+              <div className="overflow-x-auto -mx-6">
+              <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed', minWidth: '700px' }}>
                 <colgroup>
-                  <col style={{ width: '4%' }} />
-                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '40px' }} />
+                  <col style={{ width: '22%' }} />
                   <col style={{ width: '8%' }} />
                   <col style={{ width: '14%' }} />
                   <col style={{ width: '12%' }} />
                   <col style={{ width: '12%' }} />
                   <col style={{ width: '14%' }} />
-                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '14%' }} />
                 </colgroup>
                 <thead>
                   <tr className="border-b">
