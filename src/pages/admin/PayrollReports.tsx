@@ -341,11 +341,11 @@ export default function PayrollReports() {
                   <tr className="font-bold">
                     <td className="py-3 px-2" aria-hidden="true" />
                     <td className="py-3 px-3">Totals</td>
-                    <td className="py-3 px-3 text-center">{totals.jobs}</td>
-                    <td className="py-3 px-3 text-right">{formatCurrency(totals.revenue)}</td>
-                    <td className="py-3 px-3 text-right">{formatCurrency(totals.tips)}</td>
-                    <td className="py-3 px-3 text-right text-destructive">-{formatCurrency(totals.ccFees)}</td>
-                    <td className="py-3 px-3 text-right">{formatCurrency(totals.netPay)}</td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">{totals.jobs}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(totals.revenue)}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(totals.tips)}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap text-destructive">-{formatCurrency(totals.ccFees)}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">{formatCurrency(totals.netPay)}</td>
                     <td className="py-3 px-3" />
                   </tr>
                 </tfoot>
