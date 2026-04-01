@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RoleGuard } from "@/components/RoleGuard";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OAuthCallbackHandler } from "@/components/OAuthCallbackHandler";
+import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
@@ -41,6 +42,7 @@ const App = () => (
     <AuthProvider>
       <TooltipProvider>
         <OfflineBanner />
+        <PWAUpdatePrompt />
         <OAuthCallbackHandler />
         <Toaster />
         <Sonner />
