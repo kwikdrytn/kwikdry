@@ -70,18 +70,20 @@ export function AdminDashboard() {
 
   // Fetch pending checklists (technicians who haven't submitted today)
   const { data: pendingChecklists, isLoading: checklistsLoading } = useQuery({
-    queryKey: ['admin-pending-checklists', profile?.organization_id, todayStr],
+    queryKey: ['admin-pending-checklists', profile?.organization_id, todayStr, locationId],
     queryFn: async () => {
       if (!profile?.organization_id) return { count: 0, technicians: [] };
       
       // Get all active technicians (exclude anyone with an Admin custom role override)
-      const { data: technicians, error: techError } = await supabase
+      let techQuery = supabase
         .from('profiles')
         .select('id, first_name, last_name, custom_role:custom_roles(name)')
         .eq('organization_id', profile.organization_id)
         .eq('role', 'technician')
         .eq('is_active', true)
         .is('deleted_at', null);
+      if (locationId) techQuery = techQuery.eq('location_id', locationId);
+      const { data: technicians, error: techError } = await techQuery;
       
       if (techError) throw techError;
 
