@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEquipmentNeedingMaintenance } from "@/hooks/useEquipment";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { ChecklistComplianceHeatmap } from "@/components/checklists/ChecklistComplianceHeatmap";
 import { TodaysJobsCard } from "@/components/dashboard/TodaysJobsCard";
 
