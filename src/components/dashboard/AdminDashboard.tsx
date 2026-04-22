@@ -474,11 +474,27 @@ function RecentActivityCard() {
       // Look up jobs (current + historical references) by hcp_job_id at the location.
       let allowedJobIds: Set<string> | null = null;
       if (locationId) {
-        const { data: jobs, error: jobsErr } = await supabase
-          .from('hcp_jobs')
-          .select('hcp_job_id')
+        // Include jobs stamped with this location OR jobs from HCP accounts tied to this location
+        // (covers historical rows synced before location stamping was added).
+        const { data: accounts } = await supabase
+          .from('hcp_accounts')
+          .select('id')
           .eq('organization_id', profile.organization_id)
           .eq('location_id', locationId);
+        const accountIds = (accounts || []).map((a: any) => a.id);
+
+        let jobsQuery = supabase
+          .from('hcp_jobs')
+          .select('hcp_job_id')
+          .eq('organization_id', profile.organization_id);
+        if (accountIds.length > 0) {
+          jobsQuery = jobsQuery.or(
+            `location_id.eq.${locationId},hcp_account_id.in.(${accountIds.join(',')})`
+          );
+        } else {
+          jobsQuery = jobsQuery.eq('location_id', locationId);
+        }
+        const { data: jobs, error: jobsErr } = await jobsQuery;
         if (jobsErr) throw jobsErr;
         allowedJobIds = new Set((jobs || []).map((j: any) => j.hcp_job_id));
         if (allowedJobIds.size === 0) return [];
