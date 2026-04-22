@@ -732,11 +732,66 @@ export type Database = {
           },
         ]
       }
+      hcp_accounts: {
+        Row: {
+          created_at: string
+          hcp_api_key: string | null
+          hcp_company_id: string | null
+          id: string
+          is_active: boolean
+          label: string
+          last_synced_at: string | null
+          location_id: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hcp_api_key?: string | null
+          hcp_company_id?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          last_synced_at?: string | null
+          location_id?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hcp_api_key?: string | null
+          hcp_company_id?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          last_synced_at?: string | null
+          location_id?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hcp_accounts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hcp_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hcp_customers: {
         Row: {
           address: string | null
           city: string | null
           email: string | null
+          hcp_account_id: string | null
           hcp_customer_id: string
           id: string
           name: string
@@ -751,6 +806,7 @@ export type Database = {
           address?: string | null
           city?: string | null
           email?: string | null
+          hcp_account_id?: string | null
           hcp_customer_id: string
           id?: string
           name: string
@@ -765,6 +821,7 @@ export type Database = {
           address?: string | null
           city?: string | null
           email?: string | null
+          hcp_account_id?: string | null
           hcp_customer_id?: string
           id?: string
           name?: string
@@ -776,6 +833,13 @@ export type Database = {
           zip?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hcp_customers_hcp_account_id_fkey"
+            columns: ["hcp_account_id"]
+            isOneToOne: false
+            referencedRelation: "hcp_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hcp_customers_organization_id_fkey"
             columns: ["organization_id"]
@@ -795,6 +859,7 @@ export type Database = {
       hcp_employees: {
         Row: {
           email: string | null
+          hcp_account_id: string | null
           hcp_employee_id: string
           id: string
           linked_user_id: string | null
@@ -805,6 +870,7 @@ export type Database = {
         }
         Insert: {
           email?: string | null
+          hcp_account_id?: string | null
           hcp_employee_id: string
           id?: string
           linked_user_id?: string | null
@@ -815,6 +881,7 @@ export type Database = {
         }
         Update: {
           email?: string | null
+          hcp_account_id?: string | null
           hcp_employee_id?: string
           id?: string
           linked_user_id?: string | null
@@ -824,6 +891,13 @@ export type Database = {
           synced_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hcp_employees_hcp_account_id_fkey"
+            columns: ["hcp_account_id"]
+            isOneToOne: false
+            referencedRelation: "hcp_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hcp_employees_linked_user_id_fkey"
             columns: ["linked_user_id"]
@@ -854,6 +928,7 @@ export type Database = {
           city: string | null
           customer_hcp_id: string | null
           customer_name: string | null
+          hcp_account_id: string | null
           hcp_job_id: string
           id: string
           invoice_paid_at: string | null
@@ -882,6 +957,7 @@ export type Database = {
           city?: string | null
           customer_hcp_id?: string | null
           customer_name?: string | null
+          hcp_account_id?: string | null
           hcp_job_id: string
           id?: string
           invoice_paid_at?: string | null
@@ -910,6 +986,7 @@ export type Database = {
           city?: string | null
           customer_hcp_id?: string | null
           customer_name?: string | null
+          hcp_account_id?: string | null
           hcp_job_id?: string
           id?: string
           invoice_paid_at?: string | null
@@ -934,6 +1011,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "hcp_jobs_hcp_account_id_fkey"
+            columns: ["hcp_account_id"]
+            isOneToOne: false
+            referencedRelation: "hcp_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hcp_jobs_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -952,6 +1036,7 @@ export type Database = {
       hcp_service_zones: {
         Row: {
           color: string | null
+          hcp_account_id: string | null
           hcp_zone_id: string
           id: string
           name: string
@@ -961,6 +1046,7 @@ export type Database = {
         }
         Insert: {
           color?: string | null
+          hcp_account_id?: string | null
           hcp_zone_id: string
           id?: string
           name: string
@@ -970,6 +1056,7 @@ export type Database = {
         }
         Update: {
           color?: string | null
+          hcp_account_id?: string | null
           hcp_zone_id?: string
           id?: string
           name?: string
@@ -978,6 +1065,13 @@ export type Database = {
           synced_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hcp_service_zones_hcp_account_id_fkey"
+            columns: ["hcp_account_id"]
+            isOneToOne: false
+            referencedRelation: "hcp_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hcp_service_zones_organization_id_fkey"
             columns: ["organization_id"]
@@ -990,6 +1084,7 @@ export type Database = {
       hcp_services: {
         Row: {
           description: string | null
+          hcp_account_id: string | null
           hcp_service_id: string
           id: string
           is_active: boolean | null
@@ -1000,6 +1095,7 @@ export type Database = {
         }
         Insert: {
           description?: string | null
+          hcp_account_id?: string | null
           hcp_service_id: string
           id?: string
           is_active?: boolean | null
@@ -1010,6 +1106,7 @@ export type Database = {
         }
         Update: {
           description?: string | null
+          hcp_account_id?: string | null
           hcp_service_id?: string
           id?: string
           is_active?: boolean | null
@@ -1019,6 +1116,13 @@ export type Database = {
           synced_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hcp_services_hcp_account_id_fkey"
+            columns: ["hcp_account_id"]
+            isOneToOne: false
+            referencedRelation: "hcp_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hcp_services_organization_id_fkey"
             columns: ["organization_id"]
@@ -1531,6 +1635,7 @@ export type Database = {
         Row: {
           created_at: string
           default_duration_minutes: number
+          hcp_account_id: string | null
           hcp_pricebook_item_id: string
           hcp_pricebook_item_name: string | null
           id: string
@@ -1541,6 +1646,7 @@ export type Database = {
         Insert: {
           created_at?: string
           default_duration_minutes?: number
+          hcp_account_id?: string | null
           hcp_pricebook_item_id: string
           hcp_pricebook_item_name?: string | null
           id?: string
@@ -1551,6 +1657,7 @@ export type Database = {
         Update: {
           created_at?: string
           default_duration_minutes?: number
+          hcp_account_id?: string | null
           hcp_pricebook_item_id?: string
           hcp_pricebook_item_name?: string | null
           id?: string
@@ -1559,6 +1666,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pricebook_mapping_hcp_account_id_fkey"
+            columns: ["hcp_account_id"]
+            isOneToOne: false
+            referencedRelation: "hcp_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pricebook_mapping_organization_id_fkey"
             columns: ["organization_id"]
