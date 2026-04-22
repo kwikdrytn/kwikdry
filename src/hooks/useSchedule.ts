@@ -35,7 +35,19 @@ export const SCHEDULE_STATUSES = [
 
 export function normalizeStatus(status: string | null | undefined): string {
   if (!status) return "scheduled";
-  return status.toLowerCase().replace(/\s+/g, "_");
+  const norm = status.toLowerCase().replace(/\s+/g, "_");
+  // HCP uses "user canceled" / "pro canceled" — map both to our "cancelled" status
+  if (norm === "user_canceled" || norm === "pro_canceled" || norm === "canceled") {
+    return "cancelled";
+  }
+  // HCP uses "complete rated" / "complete unrated" — map both to "completed"
+  if (norm === "complete_rated" || norm === "complete_unrated" || norm === "complete") {
+    return "completed";
+  }
+  if (norm === "in_progress" || norm === "in_progress" || norm === "started") {
+    return "in_progress";
+  }
+  return norm;
 }
 
 export function getStatusColor(status: string | null | undefined): string {
