@@ -99,7 +99,7 @@ export function AdminDashboard() {
       if (subError) throw subError;
       
       const submittedIds = new Set(submissions?.map(s => s.technician_id) || []);
-      const pending = technicians?.filter(t => !submittedIds.has(t.id)) || [];
+      const pending = technicianList.filter(t => !submittedIds.has(t.id));
       
       return { 
         count: pending.length, 
