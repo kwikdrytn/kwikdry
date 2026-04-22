@@ -70,18 +70,20 @@ export function AdminDashboard() {
 
   // Fetch pending checklists (technicians who haven't submitted today)
   const { data: pendingChecklists, isLoading: checklistsLoading } = useQuery({
-    queryKey: ['admin-pending-checklists', profile?.organization_id, todayStr],
+    queryKey: ['admin-pending-checklists', profile?.organization_id, locationId, todayStr],
     queryFn: async () => {
       if (!profile?.organization_id) return { count: 0, technicians: [] };
       
       // Get all active technicians (exclude anyone with an Admin custom role override)
-      const { data: technicians, error: techError } = await supabase
+      let techQuery = supabase
         .from('profiles')
-        .select('id, first_name, last_name, custom_role:custom_roles(name)')
+        .select('id, first_name, last_name, location_id, custom_role:custom_roles(name)')
         .eq('organization_id', profile.organization_id)
         .eq('role', 'technician')
         .eq('is_active', true)
         .is('deleted_at', null);
+      if (locationId) techQuery = techQuery.eq('location_id', locationId);
+      const { data: technicians, error: techError } = await techQuery;
       
       if (techError) throw techError;
 
@@ -111,7 +113,7 @@ export function AdminDashboard() {
 
   // Fetch low stock items
   const { data: lowStockData, isLoading: stockLoading } = useQuery({
-    queryKey: ['admin-low-stock', profile?.organization_id],
+    queryKey: ['admin-low-stock', profile?.organization_id, locationId],
     queryFn: async () => {
       if (!profile?.organization_id) return { count: 0, items: [] };
       
@@ -125,11 +127,13 @@ export function AdminDashboard() {
       
       if (itemsError) throw itemsError;
       
-      // Get stock totals
-      const { data: stocks, error: stockError } = await supabase
+      // Get stock totals (scoped by location when one is selected)
+      let stockQuery = supabase
         .from('inventory_stock')
-        .select('item_id, quantity')
+        .select('item_id, quantity, location_id')
         .is('deleted_at', null);
+      if (locationId) stockQuery = stockQuery.eq('location_id', locationId);
+      const { data: stocks, error: stockError } = await stockQuery;
       
       if (stockError) throw stockError;
       
