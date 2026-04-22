@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import { TodaysJobsCard } from "@/components/dashboard/TodaysJobsCard";
 export function CallStaffDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const locationId = useSelectedLocationId();
   const firstName = profile?.first_name || "User";
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');

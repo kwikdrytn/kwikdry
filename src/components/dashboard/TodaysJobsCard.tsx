@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,18 +16,21 @@ import type { HCPJob } from "@/hooks/useJobMap";
 export function TodaysJobsCard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const locationId = useSelectedLocationId();
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
   const { data: jobs = [], isLoading } = useQuery({
-    queryKey: ["dashboard-todays-jobs", profile?.organization_id, todayStr],
+    queryKey: ["dashboard-todays-jobs", profile?.organization_id, locationId, todayStr],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("hcp_jobs")
         .select("*")
         .eq("organization_id", profile.organization_id)
         .eq("scheduled_date", todayStr)
         .order("scheduled_time");
+      if (locationId) query = query.eq("location_id", locationId);
+      const { data, error } = await query;
       if (error) throw error;
       return ((data ?? []) as HCPJob[]).filter(
         (j) => normalizeStatus(j.status) !== "cancelled",

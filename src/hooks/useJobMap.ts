@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format, addDays, startOfDay } from "date-fns";
+import { useSelectedLocationId, useScopedHcpAccountIds } from "@/hooks/useSelectedLocation";
 
 export interface HCPJobService {
   name?: string;
