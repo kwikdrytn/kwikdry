@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { toast } from "sonner";
 
 export type EquipmentStatus = 'active' | 'maintenance' | 'retired';
@@ -433,29 +434,34 @@ export function useEquipmentMaintenanceCost(equipmentId: string | undefined) {
 // Get all equipment needing maintenance (overdue or due within 7 days)
 export function useEquipmentNeedingMaintenance() {
   const { profile } = useAuth();
+  const locationId = useSelectedLocationId();
 
   return useQuery({
-    queryKey: ['equipment-needing-maintenance', profile?.organization_id],
+    queryKey: ['equipment-needing-maintenance', profile?.organization_id, locationId],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
       // Get all equipment with maintenance records
-      const { data: equipment, error: equipError } = await supabase
+      let equipQuery = supabase
         .from('equipment')
         .select(`
           id,
           name,
           type,
           status,
+          location_id,
           locations:location_id (name)
         `)
         .eq('organization_id', profile.organization_id)
         .is('deleted_at', null)
         .neq('status', 'retired');
+      if (locationId) equipQuery = equipQuery.eq('location_id', locationId);
+      const { data: equipment, error: equipError } = await equipQuery;
 
       if (equipError) throw equipError;
 
       const equipmentIds = equipment.map(e => e.id);
+      if (equipmentIds.length === 0) return [];
 
       // Get all maintenance records with next_due
       const { data: maintenanceData, error: maintError } = await supabase
