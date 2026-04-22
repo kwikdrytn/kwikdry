@@ -17,6 +17,7 @@ import {
   Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TodaysJobsCard } from "@/components/dashboard/TodaysJobsCard";
 
 export function CallStaffDashboard() {
   const { profile } = useAuth();
@@ -206,6 +207,9 @@ export function CallStaffDashboard() {
           View Call Log
         </Button>
       </div>
+
+      {/* Today's Jobs */}
+      <TodaysJobsCard />
 
       {/* Recent Calls */}
       <Card>

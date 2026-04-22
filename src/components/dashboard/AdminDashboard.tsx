@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useEquipmentNeedingMaintenance } from "@/hooks/useEquipment";
 import { ChecklistComplianceHeatmap } from "@/components/checklists/ChecklistComplianceHeatmap";
+import { TodaysJobsCard } from "@/components/dashboard/TodaysJobsCard";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -325,6 +326,9 @@ export function AdminDashboard() {
         </CardContent>
       </Card>
 
+
+      {/* Today's Jobs */}
+      <TodaysJobsCard />
 
       {/* Alerts & Activity Row */}
       <div className="grid gap-6 lg:grid-cols-2">
