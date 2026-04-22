@@ -16,6 +16,7 @@ import Checklists from "./pages/Checklists";
 import Equipment from "./pages/Equipment";
 import EquipmentDetail from "./pages/admin/EquipmentDetail";
 import JobMap from "./pages/JobMap";
+import Schedule from "./pages/Schedule";
 import UserManagement from "./pages/admin/UserManagement";
 import InventoryManagement from "./pages/admin/InventoryManagement";
 import InventoryDetail from "./pages/admin/InventoryDetail";
@@ -164,6 +165,18 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleGuard requiredPermission="job_map.view">
                     <JobMap />
+                  </RoleGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Schedule - Users with schedule.view permission */}
+            <Route
+              path="/schedule"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard requiredPermission="schedule.view">
+                    <Schedule />
                   </RoleGuard>
                 </ProtectedRoute>
               }

@@ -2265,6 +2265,8 @@ export type Database = {
         | "training.manage"
         | "payroll.view"
         | "activity_feed.view"
+        | "schedule.view"
+        | "schedule.edit"
       processing_status: "pending" | "processing" | "completed" | "failed"
       transaction_type:
         | "restock"
@@ -2461,6 +2463,8 @@ export const Constants = {
         "training.manage",
         "payroll.view",
         "activity_feed.view",
+        "schedule.view",
+        "schedule.edit",
       ],
       processing_status: ["pending", "processing", "completed", "failed"],
       transaction_type: ["restock", "usage", "transfer", "adjustment", "count"],

@@ -9,6 +9,7 @@ import {
   GraduationCap,
   DollarSign,
   Activity,
+  CalendarDays,
   LucideIcon
 } from "lucide-react";
 import { UserRole } from "@/stores/useAuthStore";
@@ -66,6 +67,13 @@ export const navItems: NavItem[] = [
     icon: Map,
     allowedRoles: ['admin', 'call_staff'],
     requiredPermission: 'job_map.view'
+  },
+  { 
+    title: "Schedule", 
+    url: "/schedule", 
+    icon: CalendarDays,
+    allowedRoles: ['admin', 'call_staff'],
+    requiredPermission: 'schedule.view'
   },
   { 
     title: "Training", 

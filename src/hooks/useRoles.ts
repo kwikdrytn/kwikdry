@@ -29,7 +29,9 @@ export type PermissionKey =
   | 'settings.view'
   | 'settings.manage_integrations'
   | 'payroll.view'
-  | 'activity_feed.view';
+  | 'activity_feed.view'
+  | 'schedule.view'
+  | 'schedule.edit';
 
 // Permission groups for UI organization
 export const PERMISSION_GROUPS = {
@@ -118,6 +120,13 @@ export const PERMISSION_GROUPS = {
       { key: 'activity_feed.view', label: 'View Job Change Activity' },
     ],
   },
+  schedule: {
+    label: 'Schedule',
+    permissions: [
+      { key: 'schedule.view', label: 'View Schedule' },
+      { key: 'schedule.edit', label: 'Edit / Reschedule Jobs' },
+    ],
+  },
 } as const;
 
 // Default permissions for legacy roles
@@ -129,6 +138,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     'calls.manage',
     'job_map.view',
     'job_map.use_ai_suggestions',
+    'schedule.view',
+    'schedule.edit',
     'training.view',
     'settings.view',
   ],
