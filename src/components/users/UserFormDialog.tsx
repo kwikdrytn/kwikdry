@@ -78,7 +78,7 @@ export function UserFormDialog({
       phone: user?.phone ?? '',
       role: user?.role ?? 'technician',
       custom_role_id: user?.custom_role_id ?? '',
-      location_id: user?.location_id ?? null,
+      location_id: user ? (user.location_id ?? 'all') : null,
       address: user?.address ?? '',
       city: user?.city ?? '',
       state: user?.state ?? '',
@@ -106,7 +106,7 @@ export function UserFormDialog({
         phone: user.phone ?? '',
         role: user.role,
         custom_role_id: user.custom_role_id,
-        location_id: user.location_id,
+        location_id: user.location_id ?? 'all',
         address: user.address ?? '',
         city: user.city ?? '',
         state: user.state ?? '',
@@ -119,6 +119,8 @@ export function UserFormDialog({
     onSubmit({
       ...data,
       phone: data.phone || '',
+      // Sentinel "all" means no specific location (access to all locations)
+      location_id: (data.location_id as string | null) === 'all' ? null : data.location_id,
     });
   };
 
@@ -340,6 +342,7 @@ function ProfileFormFields({
                 </SelectTrigger>
               </FormControl>
               <SelectContent className="bg-popover">
+                <SelectItem value="all">All Locations (Admin)</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.name}
