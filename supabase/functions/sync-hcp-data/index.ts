@@ -831,6 +831,7 @@ async function syncOrganization(
         
         const record = {
           organization_id,
+          hcp_account_id,
           hcp_zone_id: zone.id,
           name: zone.name,
           color: zone.color || null,
