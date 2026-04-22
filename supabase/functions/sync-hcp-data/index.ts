@@ -1202,6 +1202,7 @@ async function syncOrganization(
 
         const record = {
           organization_id,
+          hcp_account_id,
           location_id: location_id || null,
           hcp_job_id: job.id,
           customer_hcp_id: job.customer?.id || null,
