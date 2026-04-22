@@ -70,20 +70,18 @@ export function AdminDashboard() {
 
   // Fetch pending checklists (technicians who haven't submitted today)
   const { data: pendingChecklists, isLoading: checklistsLoading } = useQuery({
-    queryKey: ['admin-pending-checklists', profile?.organization_id, locationId, todayStr],
+    queryKey: ['admin-pending-checklists', profile?.organization_id, todayStr],
     queryFn: async () => {
       if (!profile?.organization_id) return { count: 0, technicians: [] };
       
       // Get all active technicians (exclude anyone with an Admin custom role override)
-      let techQuery = supabase
+      const { data: technicians, error: techError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, location_id, custom_role:custom_roles(name)')
+        .select('id, first_name, last_name, custom_role:custom_roles(name)')
         .eq('organization_id', profile.organization_id)
         .eq('role', 'technician')
         .eq('is_active', true)
         .is('deleted_at', null);
-      if (locationId) techQuery = techQuery.eq('location_id', locationId);
-      const { data: technicians, error: techError } = await techQuery;
       
       if (techError) throw techError;
 
@@ -113,7 +111,7 @@ export function AdminDashboard() {
 
   // Fetch low stock items
   const { data: lowStockData, isLoading: stockLoading } = useQuery({
-    queryKey: ['admin-low-stock', profile?.organization_id, locationId],
+    queryKey: ['admin-low-stock', profile?.organization_id],
     queryFn: async () => {
       if (!profile?.organization_id) return { count: 0, items: [] };
       
@@ -127,13 +125,11 @@ export function AdminDashboard() {
       
       if (itemsError) throw itemsError;
       
-      // Get stock totals (scoped by location when one is selected)
-      let stockQuery = supabase
+      // Get stock totals
+      const { data: stocks, error: stockError } = await supabase
         .from('inventory_stock')
-        .select('item_id, quantity, location_id')
+        .select('item_id, quantity')
         .is('deleted_at', null);
-      if (locationId) stockQuery = stockQuery.eq('location_id', locationId);
-      const { data: stocks, error: stockError } = await stockQuery;
       
       if (stockError) throw stockError;
       
@@ -474,14 +470,31 @@ function RecentActivityCard() {
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      // When a location is selected, restrict events to jobs at that location
+      // If a specific location is selected, restrict to events for jobs at that location.
+      // Look up jobs (current + historical references) by hcp_job_id at the location.
       let allowedJobIds: Set<string> | null = null;
       if (locationId) {
-        const { data: jobs, error: jobsErr } = await supabase
-          .from('hcp_jobs')
-          .select('hcp_job_id')
+        // Include jobs stamped with this location OR jobs from HCP accounts tied to this location
+        // (covers historical rows synced before location stamping was added).
+        const { data: accounts } = await supabase
+          .from('hcp_accounts')
+          .select('id')
           .eq('organization_id', profile.organization_id)
           .eq('location_id', locationId);
+        const accountIds = (accounts || []).map((a: any) => a.id);
+
+        let jobsQuery = supabase
+          .from('hcp_jobs')
+          .select('hcp_job_id')
+          .eq('organization_id', profile.organization_id);
+        if (accountIds.length > 0) {
+          jobsQuery = jobsQuery.or(
+            `location_id.eq.${locationId},hcp_account_id.in.(${accountIds.join(',')})`
+          );
+        } else {
+          jobsQuery = jobsQuery.eq('location_id', locationId);
+        }
+        const { data: jobs, error: jobsErr } = await jobsQuery;
         if (jobsErr) throw jobsErr;
         allowedJobIds = new Set((jobs || []).map((j: any) => j.hcp_job_id));
         if (allowedJobIds.size === 0) return [];
@@ -492,14 +505,15 @@ function RecentActivityCard() {
         .select('*')
         .eq('organization_id', profile.organization_id)
         .order('detected_at', { ascending: false })
-        .limit(allowedJobIds ? 100 : 5);
+        .limit(locationId ? 200 : 5);
+
+      if (allowedJobIds) {
+        query = query.in('hcp_job_id', Array.from(allowedJobIds));
+      }
+
       const { data, error } = await query;
       if (error) throw error;
-      const rows = (data as any[]) || [];
-      const filtered = allowedJobIds
-        ? rows.filter((r) => allowedJobIds!.has(r.hcp_job_id)).slice(0, 5)
-        : rows;
-      return filtered;
+      return ((data as any[]) || []).slice(0, 5);
     },
     enabled: !!profile?.organization_id,
     refetchInterval: 60000,
