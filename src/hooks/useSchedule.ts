@@ -144,7 +144,9 @@ export function useUnscheduledJobs() {
         .limit(50);
 
       if (error) throw error;
-      return (data ?? []) as HCPJob[];
+      return ((data ?? []) as HCPJob[]).filter(
+        (j) => normalizeStatus(j.status) !== "cancelled",
+      );
     },
     enabled: !!profile?.organization_id,
   });
