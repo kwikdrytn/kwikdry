@@ -741,6 +741,7 @@ async function syncOrganization(
       for (const service of services) {
         const record = {
           organization_id,
+          hcp_account_id,
           hcp_service_id: service.id,
           name: service.name || 'Unknown Service',
           description: service.description || null,
