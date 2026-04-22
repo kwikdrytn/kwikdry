@@ -464,18 +464,40 @@ export function AdminDashboard() {
 function RecentActivityCard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const locationId = useSelectedLocationId();
   const { data: events, isLoading } = useQuery({
-    queryKey: ['dashboard-recent-activity', profile?.organization_id],
+    queryKey: ['dashboard-recent-activity', profile?.organization_id, locationId],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
-      const { data, error } = await supabase
+
+      // If a specific location is selected, restrict to events for jobs at that location.
+      // Look up jobs (current + historical references) by hcp_job_id at the location.
+      let allowedJobIds: Set<string> | null = null;
+      if (locationId) {
+        const { data: jobs, error: jobsErr } = await supabase
+          .from('hcp_jobs')
+          .select('hcp_job_id')
+          .eq('organization_id', profile.organization_id)
+          .eq('location_id', locationId);
+        if (jobsErr) throw jobsErr;
+        allowedJobIds = new Set((jobs || []).map((j: any) => j.hcp_job_id));
+        if (allowedJobIds.size === 0) return [];
+      }
+
+      let query = supabase
         .from('job_change_events' as any)
         .select('*')
         .eq('organization_id', profile.organization_id)
         .order('detected_at', { ascending: false })
-        .limit(5);
+        .limit(locationId ? 200 : 5);
+
+      if (allowedJobIds) {
+        query = query.in('hcp_job_id', Array.from(allowedJobIds));
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return (data as any[]) || [];
+      return ((data as any[]) || []).slice(0, 5);
     },
     enabled: !!profile?.organization_id,
     refetchInterval: 60000,
