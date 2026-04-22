@@ -90,6 +90,9 @@ export function useScheduleJobs(filters: ScheduleFilters) {
 
       let jobs = (data ?? []) as HCPJob[];
 
+      // Always hide cancelled jobs from the schedule
+      jobs = jobs.filter((j) => normalizeStatus(j.status) !== "cancelled");
+
       if (!filters.technicians.includes("all")) {
         jobs = jobs.filter((job) => {
           if (filters.technicians.includes("unassigned") && !job.technician_hcp_id) return true;
