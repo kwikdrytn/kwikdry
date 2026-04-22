@@ -106,7 +106,7 @@ export function UserFormDialog({
         phone: user.phone ?? '',
         role: user.role,
         custom_role_id: user.custom_role_id,
-        location_id: user.location_id,
+        location_id: user.location_id ?? 'all',
         address: user.address ?? '',
         city: user.city ?? '',
         state: user.state ?? '',
