@@ -98,6 +98,7 @@ export const DAY_COLORS = [
 
 export function useJobsForDateRange(filters: MapFilters) {
   const { profile } = useAuth();
+  const locationId = useSelectedLocationId();
 
   const startDate = startOfDay(filters.startDate);
   const endDate = filters.weekView ? addDays(startDate, 6) : startDate;
@@ -106,6 +107,7 @@ export function useJobsForDateRange(filters: MapFilters) {
     queryKey: [
       'job-map-jobs-range',
       profile?.organization_id,
+      locationId,
       format(startDate, 'yyyy-MM-dd'),
       format(endDate, 'yyyy-MM-dd'),
       filters.technicians,
@@ -121,6 +123,8 @@ export function useJobsForDateRange(filters: MapFilters) {
         .eq('organization_id', profile.organization_id)
         .gte('scheduled_date', format(startDate, 'yyyy-MM-dd'))
         .lte('scheduled_date', format(endDate, 'yyyy-MM-dd'));
+
+      if (locationId) query = query.eq('location_id', locationId);
 
       const { data, error } = await query.order('scheduled_date').order('scheduled_time');
 
