@@ -688,15 +688,16 @@ async function fetchJobLineItems(apiKey: string, jobId: string): Promise<HCPLine
   }
 }
 
-// Core sync logic extracted so it can be called per-org
+// Core sync logic extracted so it can be called per-account
 async function syncOrganization(
   organization_id: string,
   api_key: string,
   location_id: string | null,
   supabase: any,
   mapboxToken: string | null,
+  hcp_account_id: string | null = null,
 ) {
-  console.log(`Starting HCP sync for organization: ${organization_id}`);
+  console.log(`Starting HCP sync for organization: ${organization_id}, account: ${hcp_account_id ?? '(none)'}`);
 
   // Calculate date range: 90 days back (for completed/paid jobs) + 30 days forward
   const today = new Date();
