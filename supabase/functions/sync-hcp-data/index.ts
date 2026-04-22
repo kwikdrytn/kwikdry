@@ -788,6 +788,7 @@ async function syncOrganization(
         
         return {
           organization_id,
+          hcp_account_id,
           hcp_customer_id: cust.id,
           name,
           email: cust.email || null,
