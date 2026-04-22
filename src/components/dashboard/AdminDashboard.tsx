@@ -74,16 +74,20 @@ export function AdminDashboard() {
     queryFn: async () => {
       if (!profile?.organization_id) return { count: 0, technicians: [] };
       
-      // Get all active technicians
+      // Get all active technicians (exclude anyone with an Admin custom role override)
       const { data: technicians, error: techError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, custom_role:custom_roles(name)')
         .eq('organization_id', profile.organization_id)
         .eq('role', 'technician')
         .eq('is_active', true)
         .is('deleted_at', null);
       
       if (techError) throw techError;
+
+      const technicianList = (technicians || []).filter(
+        (t: any) => !t.custom_role || t.custom_role.name?.toLowerCase() !== 'admin'
+      );
       
       // Get today's submissions
       const { data: submissions, error: subError } = await supabase
@@ -95,7 +99,7 @@ export function AdminDashboard() {
       if (subError) throw subError;
       
       const submittedIds = new Set(submissions?.map(s => s.technician_id) || []);
-      const pending = technicians?.filter(t => !submittedIds.has(t.id)) || [];
+      const pending = technicianList.filter(t => !submittedIds.has(t.id));
       
       return { 
         count: pending.length, 
