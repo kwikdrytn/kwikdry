@@ -35,6 +35,7 @@ import { QuickBookingPopover } from "@/components/calls/QuickBookingPopover";
 import { CallRecordingPlayer } from "@/components/calls/CallRecordingPlayer";
 import { CallCardList } from "@/components/calls/CallCardList";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -130,6 +131,7 @@ export default function CallLog() {
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin";
   const isMobile = useIsMobile();
+  const selectedLocationId = useSelectedLocationId();
 
   // Date range state
   const [dateFrom, setDateFrom] = useState<Date>(startOfDay(new Date()));
@@ -150,7 +152,7 @@ export default function CallLog() {
 
   // Fetch call log
   const { data: calls, isLoading, refetch } = useQuery({
-    queryKey: ["call-log", profile?.organization_id, profile?.location_id, isAdmin, dateFrom, dateTo],
+    queryKey: ["call-log", profile?.organization_id, profile?.location_id, isAdmin, selectedLocationId, dateFrom, dateTo],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
@@ -165,6 +167,9 @@ export default function CallLog() {
       // Non-admins can only see their location's calls
       if (!isAdmin && profile.location_id) {
         query = query.eq("location_id", profile.location_id);
+      } else if (isAdmin && selectedLocationId) {
+        // Admins respect the global location selector
+        query = query.eq("location_id", selectedLocationId);
       }
 
       const { data, error } = await query;

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,23 +23,26 @@ import { TodaysJobsCard } from "@/components/dashboard/TodaysJobsCard";
 export function CallStaffDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const locationId = useSelectedLocationId();
   const firstName = profile?.first_name || "User";
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
 
   // Fetch today's call stats
   const { data: callStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['call-staff-stats', profile?.organization_id, todayStr],
+    queryKey: ['call-staff-stats', profile?.organization_id, locationId, todayStr],
     queryFn: async () => {
       if (!profile?.organization_id) return null;
 
       // Get all calls for today
-      const { data, error } = await supabase
+      let q = supabase
         .from('call_log')
         .select('id, status, resulted_in_booking, direction')
         .eq('organization_id', profile.organization_id)
         .gte('started_at', `${todayStr}T00:00:00`)
         .lt('started_at', `${todayStr}T23:59:59`);
+      if (locationId) q = q.eq('location_id', locationId);
+      const { data, error } = await q;
 
       if (error) throw error;
 
@@ -56,11 +60,11 @@ export function CallStaffDashboard() {
 
   // Fetch recent calls
   const { data: recentCalls, isLoading: callsLoading } = useQuery({
-    queryKey: ['call-staff-recent-calls', profile?.organization_id],
+    queryKey: ['call-staff-recent-calls', profile?.organization_id, locationId],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      const { data, error } = await supabase
+      let q = supabase
         .from('call_log')
         .select(`
           id,
@@ -75,6 +79,8 @@ export function CallStaffDashboard() {
         .eq('organization_id', profile.organization_id)
         .order('started_at', { ascending: false })
         .limit(10);
+      if (locationId) q = q.eq('location_id', locationId);
+      const { data, error } = await q;
 
       if (error) throw error;
       return data || [];

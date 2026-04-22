@@ -19,11 +19,13 @@ import {
   EquipmentStatus,
 } from "@/hooks/useEquipment";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 
 type ViewMode = "cards" | "table";
 
 export default function EquipmentPage() {
   const navigate = useNavigate();
+  const selectedLocationId = useSelectedLocationId();
   
   // View toggle
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
@@ -41,11 +43,14 @@ export default function EquipmentPage() {
   
   const debouncedSearch = useDebounce(search, 300);
   
+  // Global location selector takes precedence over the page-level filter.
+  const effectiveLocationId = selectedLocationId ?? locationFilter;
+
   const { data: equipment = [], isLoading } = useEquipmentList({
     search: debouncedSearch || null,
     type: typeFilter,
     status: statusFilter,
-    locationId: locationFilter,
+    locationId: effectiveLocationId,
     assignedTo: assignedToFilter === "unassigned" ? null : assignedToFilter,
   });
 

@@ -54,9 +54,10 @@ export function LocationSelector() {
 
   // Set default to 'all' for admins, or user's location for others
   useEffect(() => {
-    if (profile?.role === 'admin' && selectedLocationId === null) {
-      setSelectedLocationId('all');
-    } else if (profile?.role !== 'admin' && profile?.location_id) {
+    if (!profile) return;
+    if (profile.role === 'admin') {
+      if (selectedLocationId === null) setSelectedLocationId('all');
+    } else if (profile.location_id && selectedLocationId !== profile.location_id) {
       setSelectedLocationId(profile.location_id);
     }
   }, [profile, selectedLocationId, setSelectedLocationId]);

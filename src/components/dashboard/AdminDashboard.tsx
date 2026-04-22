@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEquipmentNeedingMaintenance } from "@/hooks/useEquipment";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { ChecklistComplianceHeatmap } from "@/components/checklists/ChecklistComplianceHeatmap";
 import { TodaysJobsCard } from "@/components/dashboard/TodaysJobsCard";
 
@@ -38,6 +39,7 @@ function getGreeting(): string {
 export function AdminDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const locationId = useSelectedLocationId();
   const firstName = profile?.first_name || "Admin";
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
@@ -48,15 +50,17 @@ export function AdminDashboard() {
 
   // Fetch today's jobs count (placeholder - will integrate HCP later)
   const { data: jobsCount, isLoading: jobsLoading } = useQuery({
-    queryKey: ['admin-jobs-today', profile?.organization_id, todayStr],
+    queryKey: ['admin-jobs-today', profile?.organization_id, locationId, todayStr],
     queryFn: async () => {
       if (!profile?.organization_id) return 0;
       
-      const { count, error } = await supabase
+      let q = supabase
         .from('hcp_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', profile.organization_id)
         .eq('scheduled_date', todayStr);
+      if (locationId) q = q.eq('location_id', locationId);
+      const { count, error } = await q;
       
       if (error) throw error;
       return count || 0;
@@ -146,17 +150,19 @@ export function AdminDashboard() {
 
   // Fetch missed calls today
   const { data: missedCalls, isLoading: callsLoading } = useQuery({
-    queryKey: ['admin-missed-calls', profile?.organization_id, todayStr],
+    queryKey: ['admin-missed-calls', profile?.organization_id, locationId, todayStr],
     queryFn: async () => {
       if (!profile?.organization_id) return 0;
       
-      const { count, error } = await supabase
+      let q = supabase
         .from('call_log')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', profile.organization_id)
         .eq('status', 'missed')
         .gte('started_at', `${todayStr}T00:00:00`)
         .lt('started_at', `${todayStr}T23:59:59`);
+      if (locationId) q = q.eq('location_id', locationId);
+      const { count, error } = await q;
       
       if (error) throw error;
       return count || 0;

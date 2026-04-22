@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format, addDays, startOfDay, startOfWeek } from "date-fns";
 import { toast } from "sonner";
 import type { HCPJob } from "@/hooks/useJobMap";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 
 export type ScheduleViewMode = "day" | "week" | "list";
 
@@ -141,19 +142,24 @@ export function useScheduleJobs(filters: ScheduleFilters) {
 
 export function useUnscheduledJobs() {
   const { profile } = useAuth();
+  const locationId = useSelectedLocationId();
 
   return useQuery({
-    queryKey: ["schedule-unscheduled", profile?.organization_id],
+    queryKey: ["schedule-unscheduled", profile?.organization_id, locationId],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("hcp_jobs")
         .select("*")
         .eq("organization_id", profile.organization_id)
         .is("scheduled_date", null)
         .order("synced_at", { ascending: false })
         .limit(50);
+
+      if (locationId) query = query.eq("location_id", locationId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return ((data ?? []) as HCPJob[]).filter(
