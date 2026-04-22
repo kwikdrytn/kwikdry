@@ -1303,7 +1303,7 @@ Deno.serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch { /* empty body is fine for cron */ }
 
-    const { location_id } = body;
+    const { location_id, hcp_account_id } = body;
 
     // ── Mode 1: Manual trigger from UI (requires auth) ──
     const authHeader = req.headers.get('Authorization');
@@ -1331,59 +1331,136 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Fetch org's HCP API key from DB instead of request body
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('hcp_api_key')
-        .eq('id', authProfile.organization_id)
-        .single();
+      // ── Path A: explicit hcp_account_id was provided → use that account's creds ──
+      if (hcp_account_id) {
+        const { data: account, error: accErr } = await supabase
+          .from('hcp_accounts')
+          .select('id, organization_id, location_id, hcp_api_key, is_active')
+          .eq('id', hcp_account_id)
+          .eq('organization_id', authProfile.organization_id)
+          .maybeSingle();
 
-      if (!org?.hcp_api_key) {
-        return new Response(JSON.stringify({ success: false, error: 'HCP API key not configured' }), {
+        if (accErr || !account) {
+          return new Response(JSON.stringify({ success: false, error: 'HCP account not found' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (!account.hcp_api_key) {
+          return new Response(JSON.stringify({ success: false, error: 'HCP account has no API key' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const result = await syncOrganization(
+          account.organization_id,
+          account.hcp_api_key,
+          account.location_id ?? location_id ?? null,
+          supabase,
+          mapboxToken,
+          account.id,
+        );
+
+        // Stamp last_synced_at on the account
+        await supabase
+          .from('hcp_accounts')
+          .update({ last_synced_at: new Date().toISOString() })
+          .eq('id', account.id);
+
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // ── Path B: legacy fallback → use first hcp_account row, else organizations.hcp_api_key ──
+      const { data: firstAccount } = await supabase
+        .from('hcp_accounts')
+        .select('id, location_id, hcp_api_key')
+        .eq('organization_id', authProfile.organization_id)
+        .eq('is_active', true)
+        .not('hcp_api_key', 'is', null)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      let apiKey = firstAccount?.hcp_api_key as string | undefined;
+      let accountId = firstAccount?.id as string | undefined;
+      let resolvedLocationId = firstAccount?.location_id ?? location_id ?? null;
+
+      if (!apiKey) {
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('hcp_api_key')
+          .eq('id', authProfile.organization_id)
+          .single();
+        apiKey = org?.hcp_api_key ?? undefined;
+      }
+
+      if (!apiKey) {
+        return new Response(JSON.stringify({ success: false, error: 'No HCP account configured' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const result = await syncOrganization(authProfile.organization_id, org.hcp_api_key, location_id || null, supabase, mapboxToken);
+      const result = await syncOrganization(
+        authProfile.organization_id,
+        apiKey,
+        resolvedLocationId,
+        supabase,
+        mapboxToken,
+        accountId ?? null,
+      );
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ── Mode 2: Sync all orgs with HCP API keys (cron / syncAll) ──
-    console.log('Running sync-all mode: discovering organizations with HCP API keys...');
-    const { data: orgs, error: orgsError } = await supabase
-      .from('organizations')
-      .select('id, hcp_api_key')
+    // ── Mode 2: Sync all hcp_accounts (cron / syncAll) ──
+    console.log('Running sync-all mode: discovering active hcp_accounts...');
+    const { data: allAccounts, error: accsError } = await supabase
+      .from('hcp_accounts')
+      .select('id, organization_id, location_id, hcp_api_key, label')
+      .eq('is_active', true)
       .not('hcp_api_key', 'is', null)
       .neq('hcp_api_key', '');
 
-    if (orgsError || !orgs || orgs.length === 0) {
-      console.log('No organizations with HCP API keys found:', orgsError);
+    if (accsError || !allAccounts || allAccounts.length === 0) {
+      console.log('No active hcp_accounts found:', accsError);
       return new Response(
-        JSON.stringify({ success: true, message: 'No organizations configured for HCP sync' }),
+        JSON.stringify({ success: true, message: 'No HCP accounts configured for sync' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Found ${orgs.length} organizations to sync`);
-    const results: Array<{ org: string; success: boolean; error?: string }> = [];
+    console.log(`Found ${allAccounts.length} HCP accounts to sync`);
+    const results: Array<{ account: string; org: string; success: boolean; error?: string }> = [];
 
-    for (const org of orgs) {
+    for (const acc of allAccounts) {
       try {
-        const result = await syncOrganization(org.id, org.hcp_api_key, null, supabase, mapboxToken);
-        results.push({ org: org.id, success: result.success });
-        console.log(`Org ${org.id} sync: ${result.success ? 'OK' : 'FAILED'}`);
+        const result = await syncOrganization(
+          acc.organization_id,
+          acc.hcp_api_key,
+          acc.location_id ?? null,
+          supabase,
+          mapboxToken,
+          acc.id,
+        );
+        await supabase
+          .from('hcp_accounts')
+          .update({ last_synced_at: new Date().toISOString() })
+          .eq('id', acc.id);
+        results.push({ account: acc.id, org: acc.organization_id, success: result.success });
+        console.log(`Account ${acc.label} (${acc.id}) sync: ${result.success ? 'OK' : 'FAILED'}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
-        results.push({ org: org.id, success: false, error: msg });
-        console.error(`Org ${org.id} sync error:`, msg);
+        results.push({ account: acc.id, org: acc.organization_id, success: false, error: msg });
+        console.error(`Account ${acc.id} sync error:`, msg);
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, organizations: results }),
+      JSON.stringify({ success: true, accounts: results }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
