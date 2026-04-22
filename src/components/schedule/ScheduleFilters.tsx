@@ -72,8 +72,8 @@ export function ScheduleFiltersBar({ filters, onChange }: Props) {
 
   const dateLabel =
     filters.view === "week"
-      ? `${format(startOfWeek(filters.date, { weekStartsOn: 1 }), "MMM d")} – ${format(
-          endOfWeek(filters.date, { weekStartsOn: 1 }),
+      ? `${format(startOfWeek(filters.date, { weekStartsOn: 0 }), "MMM d")} – ${format(
+          endOfWeek(filters.date, { weekStartsOn: 0 }),
           "MMM d, yyyy",
         )}`
       : format(filters.date, "EEE, MMM d, yyyy");

@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function ScheduleWeekView({ date, jobs, onJobClick, onDayClick }: Props) {
-  const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(date, { weekStartsOn: 0 });
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
