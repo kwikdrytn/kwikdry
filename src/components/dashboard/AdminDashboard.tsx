@@ -468,18 +468,38 @@ export function AdminDashboard() {
 function RecentActivityCard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const locationId = useSelectedLocationId();
   const { data: events, isLoading } = useQuery({
-    queryKey: ['dashboard-recent-activity', profile?.organization_id],
+    queryKey: ['dashboard-recent-activity', profile?.organization_id, locationId],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
-      const { data, error } = await supabase
+
+      // When a location is selected, restrict events to jobs at that location
+      let allowedJobIds: Set<string> | null = null;
+      if (locationId) {
+        const { data: jobs, error: jobsErr } = await supabase
+          .from('hcp_jobs')
+          .select('hcp_job_id')
+          .eq('organization_id', profile.organization_id)
+          .eq('location_id', locationId);
+        if (jobsErr) throw jobsErr;
+        allowedJobIds = new Set((jobs || []).map((j: any) => j.hcp_job_id));
+        if (allowedJobIds.size === 0) return [];
+      }
+
+      let query = supabase
         .from('job_change_events' as any)
         .select('*')
         .eq('organization_id', profile.organization_id)
         .order('detected_at', { ascending: false })
-        .limit(5);
+        .limit(allowedJobIds ? 100 : 5);
+      const { data, error } = await query;
       if (error) throw error;
-      return (data as any[]) || [];
+      const rows = (data as any[]) || [];
+      const filtered = allowedJobIds
+        ? rows.filter((r) => allowedJobIds!.has(r.hcp_job_id)).slice(0, 5)
+        : rows;
+      return filtered;
     },
     enabled: !!profile?.organization_id,
     refetchInterval: 60000,
