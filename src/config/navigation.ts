@@ -75,7 +75,8 @@ export const navItems: NavItem[] = [
     allowedRoles: ['admin', 'call_staff'],
     requiredPermission: 'job_map.view'
   },
-  
+  { 
+    title: "Training", 
     url: "/training", 
     icon: GraduationCap,
     allowedRoles: ['admin', 'call_staff', 'technician'],
