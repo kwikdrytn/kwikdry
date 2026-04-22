@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format, addDays, startOfDay, startOfWeek } from "date-fns";
 import { toast } from "sonner";
 import type { HCPJob } from "@/hooks/useJobMap";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 
 export type ScheduleViewMode = "day" | "week" | "list";
 
