@@ -34,6 +34,13 @@ export const navItems: NavItem[] = [
     requiredPermission: 'dashboard.view'
   },
   { 
+    title: "Schedule", 
+    url: "/schedule", 
+    icon: CalendarDays,
+    allowedRoles: ['admin', 'call_staff'],
+    requiredPermission: 'schedule.view'
+  },
+  { 
     title: "Inventory", 
     url: "/inventory", 
     icon: Package,
@@ -67,13 +74,6 @@ export const navItems: NavItem[] = [
     icon: Map,
     allowedRoles: ['admin', 'call_staff'],
     requiredPermission: 'job_map.view'
-  },
-  { 
-    title: "Schedule", 
-    url: "/schedule", 
-    icon: CalendarDays,
-    allowedRoles: ['admin', 'call_staff'],
-    requiredPermission: 'schedule.view'
   },
   { 
     title: "Training", 
