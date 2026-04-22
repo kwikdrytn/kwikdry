@@ -342,6 +342,7 @@ function ProfileFormFields({
                 </SelectTrigger>
               </FormControl>
               <SelectContent className="bg-popover">
+                <SelectItem value="all">All Locations (Admin)</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.name}
