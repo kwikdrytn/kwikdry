@@ -119,6 +119,8 @@ export function UserFormDialog({
     onSubmit({
       ...data,
       phone: data.phone || '',
+      // Sentinel "all" means no specific location (access to all locations)
+      location_id: (data.location_id as string | null) === 'all' ? null : data.location_id,
     });
   };
 
