@@ -66,13 +66,13 @@ export function useScheduleJobs(filters: ScheduleFilters) {
   const start = startOfDay(filters.date);
   let end = start;
   if (filters.view === "week") {
-    const weekStart = startOfWeek(start, { weekStartsOn: 1 });
+    const weekStart = startOfWeek(start, { weekStartsOn: 0 });
     end = addDays(weekStart, 6);
   } else if (filters.view === "list") {
     // For list view, show a 7-day window centered on date
     end = addDays(start, 6);
   }
-  const queryStart = filters.view === "week" ? startOfWeek(start, { weekStartsOn: 1 }) : start;
+  const queryStart = filters.view === "week" ? startOfWeek(start, { weekStartsOn: 0 }) : start;
 
   return useQuery({
     queryKey: [
