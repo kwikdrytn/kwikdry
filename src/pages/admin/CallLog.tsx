@@ -35,6 +35,7 @@ import { QuickBookingPopover } from "@/components/calls/QuickBookingPopover";
 import { CallRecordingPlayer } from "@/components/calls/CallRecordingPlayer";
 import { CallCardList } from "@/components/calls/CallCardList";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSelectedLocationId } from "@/hooks/useSelectedLocation";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -130,6 +131,7 @@ export default function CallLog() {
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin";
   const isMobile = useIsMobile();
+  const selectedLocationId = useSelectedLocationId();
 
   // Date range state
   const [dateFrom, setDateFrom] = useState<Date>(startOfDay(new Date()));
