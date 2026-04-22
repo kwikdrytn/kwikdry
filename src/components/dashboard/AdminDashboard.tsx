@@ -150,17 +150,19 @@ export function AdminDashboard() {
 
   // Fetch missed calls today
   const { data: missedCalls, isLoading: callsLoading } = useQuery({
-    queryKey: ['admin-missed-calls', profile?.organization_id, todayStr],
+    queryKey: ['admin-missed-calls', profile?.organization_id, locationId, todayStr],
     queryFn: async () => {
       if (!profile?.organization_id) return 0;
       
-      const { count, error } = await supabase
+      let q = supabase
         .from('call_log')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', profile.organization_id)
         .eq('status', 'missed')
         .gte('started_at', `${todayStr}T00:00:00`)
         .lt('started_at', `${todayStr}T23:59:59`);
+      if (locationId) q = q.eq('location_id', locationId);
+      const { count, error } = await q;
       
       if (error) throw error;
       return count || 0;

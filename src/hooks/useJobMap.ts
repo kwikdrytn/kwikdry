@@ -169,16 +169,20 @@ export function useJobsForDateRange(filters: MapFilters) {
 
 export function useServiceZones() {
   const { profile } = useAuth();
+  const { accountIds } = useScopedHcpAccountIds();
 
   return useQuery({
-    queryKey: ['service-zones-map', profile?.organization_id],
+    queryKey: ['service-zones-map', profile?.organization_id, accountIds],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      const { data, error } = await supabase
+      let q = supabase
         .from('hcp_service_zones')
-        .select('id, name, color, polygon_geojson')
+        .select('id, name, color, polygon_geojson, hcp_account_id')
         .eq('organization_id', profile.organization_id);
+      if (accountIds) q = q.in('hcp_account_id', accountIds);
+
+      const { data, error } = await q;
 
       if (error) throw error;
       return (data || []) as ServiceZone[];
@@ -189,18 +193,22 @@ export function useServiceZones() {
 
 export function useTechnicians() {
   const { profile } = useAuth();
+  const { accountIds } = useScopedHcpAccountIds();
 
   return useQuery({
-    queryKey: ['job-map-technicians', profile?.organization_id],
+    queryKey: ['job-map-technicians', profile?.organization_id, accountIds],
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      // Get HCP employees (prefer linked ones)
-      const { data: hcpEmployees, error: hcpError } = await supabase
+      // Get HCP employees scoped by location's HCP accounts (if any)
+      let q = supabase
         .from('hcp_employees')
-        .select('hcp_employee_id, name, linked_user_id')
+        .select('hcp_employee_id, name, linked_user_id, hcp_account_id')
         .eq('organization_id', profile.organization_id)
         .order('name');
+      if (accountIds) q = q.in('hcp_account_id', accountIds);
+
+      const { data: hcpEmployees, error: hcpError } = await q;
 
       if (hcpError) throw hcpError;
       
