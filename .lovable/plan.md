@@ -1,73 +1,101 @@
 
 
-# Recommended Enhancements for KwikDry Owner Portal
+## Schedule Page (HCP-style)
 
-## 1. Payroll CSV/PDF Export
-Currently there's no way to download or export payroll data. Add a "Download CSV" and "Download PDF" button to the payroll page so reports can be shared with accountants or saved for records.
+A new `/schedule` route that mirrors HouseCall Pro's scheduling experience — letting admins/call staff view, filter, and edit jobs across day/week views, all driven by the existing `hcp_jobs` data and the working `update-hcp-job` edge function.
 
-**Scope**: Add export buttons to `PayrollReports.tsx` that generate a CSV (client-side) and optionally a PDF summary.
+### Layout
 
----
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ Schedule                              [Day] [Week] [List]  ← →  │
+│ Mon, Apr 22  │  Filters: Tech ▾  Status ▾  Service ▾  Search 🔍 │
+├──────────┬──────────────────────────────────────────────────────┤
+│ Time     │ Tech A          │ Tech B          │ Unassigned       │
+│ 8 AM     │ ┌────────────┐  │                 │                  │
+│ 9 AM     │ │ Smith - CR │  │ ┌───────────┐   │                  │
+│ 10 AM    │ │ 9:00–11:00 │  │ │ Jones-Tile│   │                  │
+│ 11 AM    │ └────────────┘  │ └───────────┘   │                  │
+│ 12 PM    │                 │                 │ ┌─────────────┐  │
+│ ...      │                 │                 │ │ Pending job │  │
+└──────────┴──────────────────────────────────────────────────────┘
+                              ▲ click any block → Job Details panel
+```
 
-## 2. Automated HCP Sync (Cron Job)
-The HCP data sync currently requires a manual button press. Set up a Supabase cron job (via `pg_cron` or a scheduled Edge Function invocation) to auto-sync HCP data every 15-30 minutes, so job changes, tips, and payment data stay current without manual intervention.
+### Three views
 
-**Scope**: Configure `supabase/config.toml` with a cron schedule that calls `sync-hcp-data` with `syncAll=true`.
+1. **Day view** — vertical timeline (6 AM–8 PM), one column per technician + an "Unassigned" column. Job blocks sized by duration, color-coded by status.
+2. **Week view** — 7-day grid, each cell shows a stacked count + mini job chips per tech.
+3. **List view** — sortable table (date, time, customer, tech, services, status, amount) for quick scanning and bulk triage.
 
----
+### Job details panel
 
-## 3. Technician-Facing Pay Stub View
-Technicians currently have no visibility into their own pay. Add a "My Pay" section to the technician dashboard or settings page showing their weekly earnings breakdown (jobs, tips, CC fees, net pay) — read-only, using the same payroll logic.
+Clicking any job opens a slide-out side panel (right side, 480px) showing:
 
-**Scope**: New component under `/settings` or `/dashboard` for technician role, querying `hcp_jobs` filtered to their `technician_hcp_id`.
+- Customer name, address (with map link), phone (click-to-call)
+- Schedule, technician, status (all editable inline)
+- Services & line items with prices, total amount
+- Notes (append-only history) + add-note field
+- Payment status, tip, CC fee (read-only from sync)
+- Buttons: **Save changes**, **Open in HCP**, **View on Map**
 
----
+Editing reuses the existing `update-hcp-job` edge function — no new backend work needed.
 
-## 4. In-App Notification Center
-Push notifications exist but there's no in-app notification bell/inbox. The `notification_log` table already stores notifications. Add a bell icon in the header with an unread count badge and a dropdown showing recent notifications.
+### Filters & search
 
-**Scope**: New `NotificationBell` component in `AppHeader.tsx`, querying `notification_log` for the current user, with mark-as-read support.
+- Technician multi-select (with "Unassigned")
+- Status multi-select (Scheduled / In Progress / Completed / Cancelled)
+- Service type multi-select (from `hcp_services`)
+- Free-text search (customer name, address, job ID)
+- Date picker + Today / ← → arrows
+- URL-synced filters (shareable links, same pattern as Job Map)
 
----
+### Suggested additions
 
-## 5. Payroll Date Range Totals & YTD Summary
-Add a year-to-date or month-to-date summary card on the payroll page showing cumulative earnings per technician. Useful for tax planning and performance tracking.
+- **Drag-to-reschedule** in Day view — drag a job block to a new time slot or different tech column → calls `update-hcp-job`. Big productivity win vs. opening a dialog every time.
+- **"Sync Now" button** — invokes `sync-hcp-data` so users can pull fresh HCP data on demand instead of waiting for the cron.
+- **Unscheduled queue** — collapsible panel listing jobs without a `scheduled_date` (drafts/needs-scheduling) so they're not lost.
+- **Conflict warnings** — highlight overlapping jobs for the same tech in red.
+- **Daily totals strip** — top of Day view shows: # jobs, total revenue, jobs per tech.
+- **Print / export day** — print-friendly version of the day's schedule for techs without smartphones.
+- **Quick-create** — "+ New Job" button opens the existing booking flow (reuse `BookingSuggestionPanel` logic or a simpler form) → creates via `create-hcp-job`.
 
-**Scope**: Additional summary card in `PayrollReports.tsx` with a broader date query.
+### Permissions
 
----
+- Add new permission `schedule.view` (admin + call_staff by default).
+- Editing requires `schedule.edit` (admin + call_staff).
+- Reuses existing `RoleGuard` pattern.
 
-## 6. Equipment Maintenance Reminders
-Equipment maintenance records exist but there's no proactive alerting. Add dashboard alerts or push notifications when `next_due` dates are approaching (e.g., within 7 days).
+### Files to create
 
-**Scope**: Dashboard query for upcoming maintenance + optional push notification via a new Edge Function or extending the existing sync.
+- `src/pages/Schedule.tsx` — page shell with view tabs and `DashboardLayout`.
+- `src/components/schedule/ScheduleDayView.tsx` — timeline grid.
+- `src/components/schedule/ScheduleWeekView.tsx` — 7-day grid.
+- `src/components/schedule/ScheduleListView.tsx` — sortable table.
+- `src/components/schedule/JobBlock.tsx` — draggable job card.
+- `src/components/schedule/JobDetailsPanel.tsx` — slide-out editor (Sheet component).
+- `src/components/schedule/ScheduleFilters.tsx` — filter bar.
+- `src/components/schedule/UnscheduledQueue.tsx` — collapsible draft list.
+- `src/hooks/useSchedule.ts` — queries (`useScheduleJobs`, `useScheduleTechnicians`) reusing existing `hcp_jobs` patterns.
 
----
+### Files to update
 
-## 7. Checklist Compliance Dashboard Improvements
-The compliance data exists (`technician_checklist_compliance` view) but could be surfaced more prominently. Add a visual compliance heatmap or streak tracker showing which technicians consistently submit daily/weekly checklists.
+- `src/App.tsx` — add `/schedule` route guarded by `schedule.view`.
+- `src/config/navigation.ts` — add "Schedule" nav item with calendar icon.
+- `src/hooks/useRoles.ts` — register `schedule.view` and `schedule.edit` permissions.
+- Database migration — add the two permission keys to the enum + grant to admin/call_staff system roles.
 
-**Scope**: New visualization component in the admin dashboard or checklists page.
+### Technical notes
 
----
+- All data is already in `hcp_jobs` (synced via `sync-hcp-data`). No new tables needed.
+- Drag-and-drop via `@dnd-kit/core` (already standard in the React ecosystem; will be added).
+- Slide-out panel uses the existing `Sheet` UI component for consistency with the app's dialog patterns.
+- Time slots respect the org's location timezone (already stored on `locations.timezone`).
+- Optimistic updates on drag-reschedule with rollback on edge-function failure.
 
-## 8. Inventory Reorder Alerts
-Low-stock items are shown on the admin dashboard, but there's no automated notification. Send push or email alerts when items drop below `reorder_threshold`.
+### Open questions
 
-**Scope**: Extend `send-inventory-notifications` Edge Function to trigger on stock changes, or add a cron check.
-
----
-
-## Priority Recommendation
-
-| Priority | Enhancement | Impact |
-|----------|------------|--------|
-| High | Automated HCP Sync | Eliminates manual sync, keeps data fresh |
-| High | Payroll CSV Export | Immediate business need for accounting |
-| Medium | In-App Notification Center | Better UX for existing push system |
-| Medium | Technician Pay Stub View | Transparency, reduces admin questions |
-| Medium | Equipment Maintenance Reminders | Prevents missed maintenance |
-| Lower | YTD Payroll Summary | Nice-to-have reporting |
-| Lower | Checklist Compliance Heatmap | Visual improvement |
-| Lower | Inventory Reorder Alerts | Extends existing low-stock logic |
+1. Should drag-to-reschedule be in v1, or ship view-only first and add drag in v2?
+2. Should "Schedule" replace the **Job Map** in the sidebar, sit alongside it, or be merged as a tab inside one "Jobs" page?
+3. Do you want technicians to also see *their own* schedule (read-only) on this page, or keep it admin/call_staff only?
 
