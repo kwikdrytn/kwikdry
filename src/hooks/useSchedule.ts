@@ -63,6 +63,7 @@ export function getStatusLabel(status: string | null | undefined): string {
 
 export function useScheduleJobs(filters: ScheduleFilters) {
   const { profile } = useAuth();
+  const locationId = useSelectedLocationId();
 
   const start = startOfDay(filters.date);
   let end = start;
@@ -70,7 +71,6 @@ export function useScheduleJobs(filters: ScheduleFilters) {
     const weekStart = startOfWeek(start, { weekStartsOn: 0 });
     end = addDays(weekStart, 6);
   } else if (filters.view === "list") {
-    // For list view, show a 7-day window centered on date
     end = addDays(start, 6);
   }
   const queryStart = filters.view === "week" ? startOfWeek(start, { weekStartsOn: 0 }) : start;
@@ -82,6 +82,7 @@ export function useScheduleJobs(filters: ScheduleFilters) {
       format(queryStart, "yyyy-MM-dd"),
       format(end, "yyyy-MM-dd"),
       filters.view,
+      locationId,
       filters.technicians.join(","),
       filters.statuses.join(","),
       filters.serviceTypes.join(","),
@@ -90,7 +91,7 @@ export function useScheduleJobs(filters: ScheduleFilters) {
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("hcp_jobs")
         .select("*")
         .eq("organization_id", profile.organization_id)
@@ -99,11 +100,25 @@ export function useScheduleJobs(filters: ScheduleFilters) {
         .order("scheduled_date")
         .order("scheduled_time");
 
+      if (locationId) {
+        const { data: accounts } = await supabase
+          .from("hcp_accounts")
+          .select("id")
+          .eq("location_id", locationId);
+        const accountIds = (accounts ?? []).map((a: any) => a.id);
+        if (accountIds.length > 0) {
+          query = query.or(
+            `location_id.eq.${locationId},hcp_account_id.in.(${accountIds.join(",")})`,
+          );
+        } else {
+          query = query.eq("location_id", locationId);
+        }
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       let jobs = (data ?? []) as HCPJob[];
-
-      // Always hide cancelled jobs from the schedule
       jobs = jobs.filter((j) => normalizeStatus(j.status) !== "cancelled");
 
       if (!filters.technicians.includes("all")) {
@@ -157,10 +172,22 @@ export function useUnscheduledJobs() {
         .order("synced_at", { ascending: false })
         .limit(50);
 
-      if (locationId) query = query.eq("location_id", locationId);
+      if (locationId) {
+        const { data: accounts } = await supabase
+          .from("hcp_accounts")
+          .select("id")
+          .eq("location_id", locationId);
+        const accountIds = (accounts ?? []).map((a: any) => a.id);
+        if (accountIds.length > 0) {
+          query = query.or(
+            `location_id.eq.${locationId},hcp_account_id.in.(${accountIds.join(",")})`,
+          );
+        } else {
+          query = query.eq("location_id", locationId);
+        }
+      }
 
       const { data, error } = await query;
-
       if (error) throw error;
       return ((data ?? []) as HCPJob[]).filter(
         (j) => normalizeStatus(j.status) !== "cancelled",
