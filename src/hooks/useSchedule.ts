@@ -18,7 +18,7 @@ export interface ScheduleFilters {
 
 export const DEFAULT_SCHEDULE_FILTERS: ScheduleFilters = {
   date: new Date(),
-  view: "day",
+  view: "week",
   technicians: ["all"],
   statuses: ["all"],
   serviceTypes: ["all"],
