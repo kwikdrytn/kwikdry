@@ -763,6 +763,7 @@ async function syncOrganization(
     if (employees.length > 0) {
       const employeeRecords = employees.map(emp => ({
         organization_id,
+        hcp_account_id,
         hcp_employee_id: emp.id,
         name: [emp.first_name, emp.last_name].filter(Boolean).join(' ') || 'Unknown',
         email: emp.email || null,
