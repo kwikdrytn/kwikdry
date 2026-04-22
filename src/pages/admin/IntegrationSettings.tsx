@@ -17,6 +17,7 @@ import { SyncResult, SyncProgress } from "@/lib/housecallpro";
 import { RCSyncResult, RCSyncProgress } from "@/lib/ringcentral";
 import { EmployeeLinking } from "@/components/integrations/EmployeeLinking";
 import { ServiceMappingsSection } from "@/components/integrations/ServiceMappingsSection";
+import { HcpAccountsSection } from "@/components/integrations/HcpAccountsSection";
 import { 
   CheckCircle2, 
   XCircle, 
