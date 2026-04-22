@@ -633,154 +633,22 @@ export default function IntegrationSettings() {
                       HouseCall Pro
                     </CardTitle>
                     <CardDescription>
-                      Connect to HouseCall Pro to sync jobs, customers, and service zones
+                      Connect one or more HouseCall Pro accounts to sync jobs, customers, and service zones.
                     </CardDescription>
                   </div>
-                  <Badge 
-                    variant={isConnected ? "default" : "secondary"}
-                    className={isConnected ? "bg-green-600 hover:bg-green-600" : ""}
-                  >
-                    {isConnected ? (
-                      <>
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Connected
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Not Connected
-                      </>
-                    )}
-                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* API Credentials */}
-                <div className="space-y-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="api-key">API Key</Label>
-                    <div className="relative">
-                      <Input
-                        id="api-key"
-                        type={showApiKey ? "text" : "password"}
-                        placeholder="Enter your HouseCall Pro API key"
-                        value={apiKey}
-                        onChange={(e) => handleApiKeyChange(e.target.value)}
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                      >
-                        {showApiKey ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Find your API key in HouseCall Pro under Settings → Integrations
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="company-id">Company ID (Optional)</Label>
-                    <Input
-                      id="company-id"
-                      type="text"
-                      placeholder="Enter your HouseCall Pro company ID"
-                      value={companyId}
-                      onChange={(e) => handleCompanyIdChange(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Usually not required unless you have multiple companies
-                    </p>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => saveCredentialsMutation.mutate()}
-                    disabled={!hasChanges || saveCredentialsMutation.isPending}
-                  >
-                    {saveCredentialsMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => testConnectionMutation.mutate()}
-                    disabled={!apiKey || testConnectionMutation.isPending}
-                  >
-                    {testConnectionMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Zap className="h-4 w-4 mr-2" />
-                    )}
-                    Test Connection
-                  </Button>
-                </div>
+                <HcpAccountsSection />
 
                 <Separator />
 
-                {/* Sync Status */}
+                {/* Org-wide totals across all accounts */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Sync Status</h4>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      disabled={!isConnected || isSyncing}
-                      onClick={() => syncDataMutation.mutate()}
-                    >
-                      {isSyncing ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                      )}
-                      {isSyncing ? 'Syncing...' : 'Sync Now'}
-                    </Button>
-                  </div>
-
-                  {/* Sync Progress */}
-                  {syncProgress.stage !== 'idle' && (
-                    <div className="rounded-lg border p-4 space-y-2">
-                      <div className="flex items-center gap-2">
-                        {syncProgress.stage === 'syncing' && (
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        )}
-                        {syncProgress.stage === 'complete' && (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        )}
-                        {syncProgress.stage === 'error' && (
-                          <AlertCircle className="h-4 w-4 text-destructive" />
-                        )}
-                        <span className={`font-medium ${getSyncProgressColor()}`}>
-                          {syncProgress.message}
-                        </span>
-                      </div>
-                      {syncProgress.details && (
-                        <p className="text-sm text-muted-foreground">
-                          {syncProgress.details}
-                        </p>
-                      )}
-                      {syncProgress.stage === 'syncing' && (
-                        <Progress value={undefined} className="h-2" />
-                      )}
-                    </div>
-                  )}
-
+                  <h4 className="font-medium">Synced data totals</h4>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="rounded-lg border p-3">
-                      <p className="text-xs text-muted-foreground">Last Sync</p>
+                      <p className="text-xs text-muted-foreground">Last sync</p>
                       <p className="text-sm font-medium truncate">
                         {formatLastSync(lastSync)}
                       </p>
@@ -802,10 +670,6 @@ export default function IntegrationSettings() {
                       <p className="text-2xl font-semibold">{syncCounts?.serviceZones ?? 0}</p>
                     </div>
                   </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Syncs jobs scheduled for the next 30 days along with customers, employees, and service zones.
-                  </p>
                 </div>
 
                 <Separator />
