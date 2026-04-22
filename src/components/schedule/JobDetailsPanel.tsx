@@ -241,7 +241,7 @@ export function JobDetailsPanel({ job, open, onOpenChange, canEdit }: Props) {
                     </span>
                     {s.price != null && (
                       <span className="tabular-nums text-muted-foreground">
-                        ${Number(s.price).toFixed(2)}
+                        ${(Number(s.price) / 100).toFixed(2)}
                       </span>
                     )}
                   </li>
