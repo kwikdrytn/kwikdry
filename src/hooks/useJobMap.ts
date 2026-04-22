@@ -178,7 +178,7 @@ export function useServiceZones() {
 
       let q = supabase
         .from('hcp_service_zones')
-        .select('id, name, color, polygon_geojson, hcp_account_id')
+        .select('id, name, color, polygon_geojson')
         .eq('organization_id', profile.organization_id);
       if (accountIds) q = q.in('hcp_account_id', accountIds);
 
