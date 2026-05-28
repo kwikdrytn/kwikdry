@@ -33,27 +33,22 @@ function formatPaymentMethod(method: string | null): string {
 }
 
 /**
- * Amount = subtotal - discount.
- * Falls back to total_amount - tip_amount for jobs without subtotal data.
+ * Amount column always shows post-discount (what the customer actually paid).
+ * subtotal - discount, falling back to total - tip for legacy jobs.
  */
 function getDisplayJobAmount(job: PayrollJob): number {
   const subtotal = Number(job.subtotal_amount);
   const discount = Number(job.discount_amount) || 0;
-
   if (!isNaN(subtotal) && subtotal > 0) {
     return Math.max(subtotal - discount, 0);
   }
-
-  // Legacy fallback
   const total = Number(job.total_amount) || 0;
   const tip = Number(job.tip_amount) || 0;
   return Math.max(total - tip, 0);
 }
 
 function getPayModelLabel(tech: TechnicianPayroll): string {
-  if (tech.guaranteeWeeks > 0 && tech.commissionWeeks > 0) {
-    return 'Mixed';
-  }
+  if (tech.guaranteeWeeks > 0 && tech.commissionWeeks > 0) return 'Mixed';
   if (tech.guaranteeWeeks > 0) return 'Guarantee';
   return 'Commission';
 }
@@ -93,20 +88,27 @@ export default function PayrollReports() {
     }), { jobs: 0, revenue: 0, tips: 0, ccFees: 0, netPay: 0 });
   }, [payrollData]);
 
+  // Build the pay settings description shown under the page title
+  const paySettingsLabel = useMemo(() => {
+    if (!orgSettings) return 'Revenue, tips, and CC fees by technician';
+    const basisLabel = orgSettings.commission_basis === 'pre_discount'
+      ? 'Commission on Subtotal (pre-discount)'
+      : 'Commission on Revenue (post-discount)';
+    return `${orgSettings.commission_percent}% ${basisLabel} · min ${formatCurrency(orgSettings.weekly_minimum)}/week · Tips - CC Fees`;
+  }, [orgSettings]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Payroll Reports</h1>
-            <p className="text-muted-foreground text-sm">
-              {orgSettings ? `${orgSettings.commission_percent}% Commission (min ${formatCurrency(orgSettings.weekly_minimum)}/week) + Tips - CC Fees` : 'Revenue, tips, and CC fees by technician'}
-            </p>
+            <p className="text-muted-foreground text-sm">{paySettingsLabel}</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" disabled={!payrollData?.length} onClick={() => {
               if (!payrollData?.length) return;
-              const rows = [['Technician', 'Jobs', 'Revenue', 'Tips', 'CC Fees', 'Base Pay', 'Net Pay', 'Pay Type']];
+              const rows = [['Technician', 'Jobs', 'Revenue', 'Tips', 'CC Fees', 'Base Pay', 'Net Pay', 'Pay Type', 'Commission Basis']];
               payrollData.forEach(t => {
                 rows.push([
                   t.technician_name,
@@ -117,6 +119,7 @@ export default function PayrollReports() {
                   t.basePay.toFixed(2),
                   t.netPay.toFixed(2),
                   getPayModelLabel(t),
+                  t.commissionBasis === 'pre_discount' ? 'Subtotal (pre-discount)' : 'Revenue (post-discount)',
                 ]);
               });
               rows.push([
@@ -127,6 +130,7 @@ export default function PayrollReports() {
                 totals.ccFees.toFixed(2),
                 '',
                 totals.netPay.toFixed(2),
+                '',
                 '',
               ]);
               const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
@@ -297,13 +301,18 @@ export default function PayrollReports() {
                           <td colSpan={8} className="p-0">
                             <div className="bg-muted/30 px-6 py-3 overflow-x-auto">
                               <p className="text-xs font-medium text-muted-foreground mb-2">
-                                {tech.commissionPercent}% Commission (min {formatCurrency(tech.weeklyMinimum)}/week) + Tips - CC Fees on Tips
+                                {tech.commissionPercent}% Commission on {tech.commissionBasis === 'pre_discount' ? 'Subtotal (pre-discount)' : 'Revenue (post-discount)'} · min {formatCurrency(tech.weeklyMinimum)}/week + Tips - CC Fees on Tips
                                 {tech.guaranteeWeeks > 0 && tech.commissionWeeks > 0 && (
                                   <span className="ml-2">
                                     ({tech.guaranteeWeeks} guarantee wk{tech.guaranteeWeeks !== 1 ? 's' : ''}, {tech.commissionWeeks} commission wk{tech.commissionWeeks !== 1 ? 's' : ''})
                                   </span>
                                 )}
                                 <span className="ml-2">• Base Pay: {formatCurrency(tech.basePay)}</span>
+                                {tech.commissionBasis === 'pre_discount' && (
+                                  <span className="ml-2 text-muted-foreground">
+                                    · Subtotal: {formatCurrency(tech.grossSubtotal)}
+                                  </span>
+                                )}
                               </p>
                               <table className="w-full text-sm">
                                 <thead>
@@ -326,6 +335,7 @@ export default function PayrollReports() {
                                     const discount = Number(job.discount_amount) || 0;
                                     const tax = Number(job.tax_amount) || 0;
                                     const jobTip = Number(job.tip_amount) || 0;
+                                    // Amount column always shows post-discount (what customer paid)
                                     const jobAmount = getDisplayJobAmount(job);
                                     const isCard = job.payment_method?.toLowerCase().includes('credit') || job.payment_method === 'credit_card';
                                     const rawTotal = Number(job.total_amount) || 0;
@@ -391,22 +401,23 @@ function PaySettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   const [ccFee, setCcFee] = useState('');
   const [minimum, setMinimum] = useState('');
   const [commission, setCommission] = useState('');
+  const [commissionBasis, setCommissionBasis] = useState<'pre_discount' | 'post_discount'>('post_discount');
 
-  // Sync local state when settings load
   const initialized = useState(false);
   if (settings && !initialized[0]) {
     setCcFee(String(settings.cc_fee_percent));
     setMinimum(String(settings.weekly_minimum));
     setCommission(String(settings.commission_percent));
+    setCommissionBasis(settings.commission_basis ?? 'post_discount');
     initialized[1](true);
   }
 
-  // Also update when dialog opens with fresh data
   const handleOpenChange = (v: boolean) => {
     if (v && settings) {
       setCcFee(String(settings.cc_fee_percent));
       setMinimum(String(settings.weekly_minimum));
       setCommission(String(settings.commission_percent));
+      setCommissionBasis(settings.commission_basis ?? 'post_discount');
     }
     onOpenChange(v);
   };
@@ -416,6 +427,7 @@ function PaySettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       cc_fee_percent: Number(ccFee) || 3.49,
       weekly_minimum: Number(minimum) || 1000,
       commission_percent: Number(commission) || 40,
+      commission_basis: commissionBasis,
     });
     onOpenChange(false);
   };
@@ -431,6 +443,23 @@ function PaySettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange
             <Label className="text-sm">Commission Rate (%)</Label>
             <Input type="number" value={commission} onChange={e => setCommission(e.target.value)} step="1" min="0" max="100" />
             <p className="text-xs text-muted-foreground">Applied to job revenue each week</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-sm">Commission Basis</Label>
+            <Select value={commissionBasis} onValueChange={v => setCommissionBasis(v as 'pre_discount' | 'post_discount')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="post_discount">Revenue (post-discount) — default</SelectItem>
+                <SelectItem value="pre_discount">Subtotal (pre-discount) — ignore discounts</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {commissionBasis === 'pre_discount'
+                ? 'Commission is calculated on the subtotal before any discounts are applied.'
+                : 'Commission is calculated on the amount after discounts (what the customer paid).'}
+            </p>
           </div>
           <div className="space-y-1">
             <Label className="text-sm">Weekly Minimum ($)</Label>
