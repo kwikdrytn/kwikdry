@@ -543,6 +543,15 @@ interface HCPLineItem {
   price?: number;
   quantity?: number;
   service_item_id?: string;
+  // Discount fields — HCP may send a percentage (0-100) or a flat dollar amount
+  discount_percent?: number;
+  discount_percentage?: number;
+  discount_rate?: number;
+  discount_amount?: number;
+  discount?: number;
+  total?: number;         // line total after discount, in dollars
+  line_total?: number;
+  subtotal?: number;
 }
 
 // Fetch products/services catalog from HCP Price Book API
@@ -995,14 +1004,52 @@ async function syncOrganization(
 
         // HCP returns monetary amounts in cents — convert to dollars
         const totalAmountDollars = job.total_amount != null ? job.total_amount / 100 : null;
-        const subtotalAmountDollars = job.subtotal_amount != null ? job.subtotal_amount / 100
-          : job.invoice?.subtotal_amount != null ? job.invoice.subtotal_amount / 100
-          : job.invoice?.subtotal != null ? job.invoice.subtotal / 100
-          : null;
-        const discountAmountDollars = job.discount_amount != null ? job.discount_amount / 100
-          : job.invoice?.discount_amount != null ? job.invoice.discount_amount / 100
-          : job.invoice?.discount != null ? job.invoice.discount / 100
-          : null;
+
+        // --- Subtotal: compute from line items (unit_price * quantity), fall back to total ---
+        // Line items prices from HCP are already in dollars (not cents)
+        let subtotalAmountDollars: number | null = null;
+        let discountAmountDollars: number | null = null;
+
+        if (lineItems.length > 0) {
+          let lineSubtotal = 0;
+          let lineDiscountTotal = 0;
+
+          for (const item of lineItems) {
+            const unitPrice = item.unit_price ?? item.price ?? 0;
+            const qty = item.quantity ?? 1;
+            const itemSubtotal = unitPrice * qty;
+            lineSubtotal += itemSubtotal;
+
+            // Resolve discount: HCP sends either a percentage (e.g. 50 = 50%) or a flat dollar amount
+            // We detect percentage by checking discount_percent / discount_percentage / discount_rate fields first,
+            // then fall back to discount_amount / discount. If the raw value is > 1 and <= 100 and no
+            // explicit flat-amount field is present, treat it as a percentage.
+            const rawPercent = item.discount_percent ?? item.discount_percentage ?? item.discount_rate ?? null;
+            const rawFlat = item.discount_amount ?? null;
+            const rawGeneric = item.discount ?? null;
+
+            if (rawPercent != null && rawPercent > 0) {
+              // Explicit percentage field
+              lineDiscountTotal += itemSubtotal * (rawPercent / 100);
+            } else if (rawFlat != null && rawFlat > 0) {
+              // Explicit flat dollar field
+              lineDiscountTotal += rawFlat * qty;
+            } else if (rawGeneric != null && rawGeneric > 0) {
+              // Ambiguous: if value is > 1 treat as percentage; if <= 1 treat as decimal fraction
+              if (rawGeneric > 1) {
+                lineDiscountTotal += itemSubtotal * (rawGeneric / 100);
+              } else {
+                lineDiscountTotal += itemSubtotal * rawGeneric;
+              }
+            }
+          }
+
+          subtotalAmountDollars = Number(lineSubtotal.toFixed(2));
+          discountAmountDollars = lineDiscountTotal > 0 ? Number(lineDiscountTotal.toFixed(2)) : null;
+        } else if (totalAmountDollars != null) {
+          // No line items — fall back to total_amount as subtotal (no discount resolvable)
+          subtotalAmountDollars = totalAmountDollars;
+        }
         const tipAmountRaw = job.tip_amount ?? job.tip ?? null;
         let tipAmount = tipAmountRaw != null ? tipAmountRaw / 100 : null;
         let ccFeeAmount: number | null = null;
