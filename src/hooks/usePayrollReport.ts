@@ -25,7 +25,10 @@ export interface TechnicianPayroll {
   technician_name: string;
   jobs: PayrollJob[];
   jobCount: number;
+  /** Sum of (subtotal - discount) — what customers actually paid, used for display */
   grossRevenue: number;
+  /** Sum of subtotal_amount only (pre-discount) — used when commission_basis = "pre_discount" */
+  grossSubtotal: number;
   totalTips: number;
   ccFeesOnRevenue: number;
   ccFeesOnTips: number;
@@ -35,6 +38,8 @@ export interface TechnicianPayroll {
   commissionWeeks: number;
   weeklyMinimum: number;
   commissionPercent: number;
+  /** Which amount the commission was calculated on: "pre_discount" | "post_discount" */
+  commissionBasis: "pre_discount" | "post_discount";
 }
 
 function isCardPayment(method: string | null): boolean {
@@ -44,21 +49,31 @@ function isCardPayment(method: string | null): boolean {
 }
 
 /**
- * Returns the job "Amount" = subtotal - discount.
- * Falls back to total_amount - tip_amount if subtotal is not available.
+ * Post-discount amount: what the customer actually paid (subtotal - discount).
+ * Falls back to total_amount - tip_amount for legacy jobs without subtotal data.
  */
-function getBaseJobAmount(job: PayrollJob): number {
+function getPostDiscountAmount(job: PayrollJob): number {
   const subtotal = Number(job.subtotal_amount);
   const discount = Number(job.discount_amount) || 0;
-
   if (!isNaN(subtotal) && subtotal > 0) {
     return Math.max(subtotal - discount, 0);
   }
-
-  // Legacy fallback: total_amount - tip_amount
   const total = Number(job.total_amount) || 0;
   const tip = Number(job.tip_amount) || 0;
   return Math.max(total - tip, 0);
+}
+
+/**
+ * Pre-discount amount: subtotal only, ignoring any discounts.
+ * Falls back to post-discount amount for legacy jobs without subtotal data.
+ */
+function getPreDiscountAmount(job: PayrollJob): number {
+  const subtotal = Number(job.subtotal_amount);
+  if (!isNaN(subtotal) && subtotal > 0) {
+    return subtotal;
+  }
+  // No subtotal stored — fall back to post-discount (best we can do)
+  return getPostDiscountAmount(job);
 }
 
 /** Get all Mon-Sun week boundaries that overlap [rangeStart, rangeEnd] */
@@ -96,8 +111,10 @@ export function usePayrollReport(startDate: string, endDate: string) {
       const ccFeePercent = settings.cc_fee_percent ?? 3.49;
       const weeklyMinimum = settings.weekly_minimum ?? 1000;
       const commissionPercent = settings.commission_percent ?? 40;
+      const commissionBasis: "pre_discount" | "post_discount" =
+        settings.commission_basis === "pre_discount" ? "pre_discount" : "post_discount";
 
-      // Fetch completed jobs in date range — now includes subtotal, discount, tax
+      // Fetch completed jobs in date range
       const { data: jobs, error: jobsError } = await supabase
         .from('hcp_jobs')
         .select('id, hcp_job_id, customer_name, scheduled_date, total_amount, subtotal_amount, discount_amount, tax_amount, tip_amount, cc_fee_amount, payment_method, status, services, technician_hcp_id, technician_name')
@@ -121,28 +138,31 @@ export function usePayrollReport(startDate: string, endDate: string) {
 
       const weeks = getWeekBoundaries(startDate, endDate);
 
-      // Calculate payroll per technician using hybrid model
       const results: TechnicianPayroll[] = [];
       techMap.forEach((data, techId) => {
-        let grossRevenue = 0;
+        let grossRevenue = 0;   // post-discount (display)
+        let grossSubtotal = 0;  // pre-discount (commission on subtotal rule)
         let totalTips = 0;
         let ccFeesOnRevenue = 0;
         let ccFeesOnTips = 0;
 
         data.jobs.forEach(job => {
-          const amount = getBaseJobAmount(job);
+          const postDiscount = getPostDiscountAmount(job);
+          const preDiscount  = getPreDiscountAmount(job);
           const tip = Number(job.tip_amount) || 0;
           const isCard = isCardPayment(job.payment_method);
 
-          grossRevenue += amount;
-          totalTips += tip;
+          grossRevenue  += postDiscount;
+          grossSubtotal += preDiscount;
+          totalTips     += tip;
           if (isCard) {
-            ccFeesOnRevenue += amount * (ccFeePercent / 100);
-            ccFeesOnTips += tip * (ccFeePercent / 100);
+            ccFeesOnRevenue += postDiscount * (ccFeePercent / 100);
+            ccFeesOnTips    += tip * (ccFeePercent / 100);
           }
         });
 
         // Per-week hybrid calculation
+        // commissionBasis controls whether weekly revenue uses pre- or post-discount amounts
         let basePay = 0;
         let guaranteeWeeks = 0;
         let commissionWeeks = 0;
@@ -151,15 +171,15 @@ export function usePayrollReport(startDate: string, endDate: string) {
           const wsStr = format(weekStart, 'yyyy-MM-dd');
           const weStr = format(weekEnd, 'yyyy-MM-dd');
 
-          // Revenue for this week only
           let weekRevenue = 0;
           data.jobs.forEach(job => {
             if (job.scheduled_date && job.scheduled_date >= wsStr && job.scheduled_date <= weStr) {
-              weekRevenue += getBaseJobAmount(job);
+              weekRevenue += commissionBasis === "pre_discount"
+                ? getPreDiscountAmount(job)
+                : getPostDiscountAmount(job);
             }
           });
 
-          // Only count weeks where the tech had jobs (or if it's a single-week view)
           if (weekRevenue > 0 || weeks.length === 1) {
             const commPay = weekRevenue * commissionPercent / 100;
             if (commPay >= weeklyMinimum) {
@@ -180,6 +200,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
           jobs: data.jobs,
           jobCount: data.jobs.length,
           grossRevenue,
+          grossSubtotal,
           totalTips,
           ccFeesOnRevenue,
           ccFeesOnTips,
@@ -189,6 +210,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
           commissionWeeks,
           weeklyMinimum,
           commissionPercent,
+          commissionBasis,
         });
       });
 
@@ -223,7 +245,12 @@ export function useOrgPaySettings() {
   return useQuery({
     queryKey: ['org-pay-settings', profile?.organization_id],
     queryFn: async () => {
-      if (!profile?.organization_id) return { cc_fee_percent: 3.49, weekly_minimum: 1000, commission_percent: 40 };
+      if (!profile?.organization_id) return {
+        cc_fee_percent: 3.49,
+        weekly_minimum: 1000,
+        commission_percent: 40,
+        commission_basis: "post_discount" as "pre_discount" | "post_discount",
+      };
       const { data } = await supabase
         .from('organizations')
         .select('settings')
@@ -234,6 +261,7 @@ export function useOrgPaySettings() {
         cc_fee_percent: s.cc_fee_percent ?? 3.49,
         weekly_minimum: s.weekly_minimum ?? 1000,
         commission_percent: s.commission_percent ?? 40,
+        commission_basis: (s.commission_basis === "pre_discount" ? "pre_discount" : "post_discount") as "pre_discount" | "post_discount",
       };
     },
     enabled: !!profile?.organization_id,
@@ -245,9 +273,14 @@ export function useUpdateOrgPaySettings() {
   const { profile } = useAuth();
 
   return useMutation({
-    mutationFn: async (updates: { cc_fee_percent?: number; weekly_minimum?: number; commission_percent?: number }) => {
+    mutationFn: async (updates: {
+      cc_fee_percent?: number;
+      weekly_minimum?: number;
+      commission_percent?: number;
+      commission_basis?: "pre_discount" | "post_discount";
+    }) => {
       if (!profile?.organization_id) throw new Error('No organization');
-      
+
       const { data: org } = await supabase
         .from('organizations')
         .select('settings')
