@@ -943,8 +943,11 @@ export type Database = {
           scheduled_time: string | null
           services: Json | null
           state: string | null
+          discount_amount: number | null
           status: string | null
+          subtotal_amount: number | null
           synced_at: string | null
+          tax_amount: number | null
           technician_hcp_id: string | null
           technician_name: string | null
           tip_amount: number | null
@@ -972,8 +975,11 @@ export type Database = {
           scheduled_time?: string | null
           services?: Json | null
           state?: string | null
+          discount_amount?: number | null
           status?: string | null
+          subtotal_amount?: number | null
           synced_at?: string | null
+          tax_amount?: number | null
           technician_hcp_id?: string | null
           technician_name?: string | null
           tip_amount?: number | null
@@ -1001,8 +1007,11 @@ export type Database = {
           scheduled_time?: string | null
           services?: Json | null
           state?: string | null
+          discount_amount?: number | null
           status?: string | null
+          subtotal_amount?: number | null
           synced_at?: string | null
+          tax_amount?: number | null
           technician_hcp_id?: string | null
           technician_name?: string | null
           tip_amount?: number | null
