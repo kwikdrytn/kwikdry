@@ -14,7 +14,7 @@ import { Fragment } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarIcon, Settings2, RefreshCw, Download, Printer } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePayrollReport, useOrgPaySettings, useUpdateOrgPaySettings, TechnicianPayroll } from "@/hooks/usePayrollReport";
+import { usePayrollReport, useOrgPaySettings, useUpdateOrgPaySettings, TechnicianPayroll, PayrollJob } from "@/hooks/usePayrollReport";
 import { cn } from "@/lib/utils";
 import { PayrollYTDSummary } from "@/components/payroll/PayrollYTDSummary";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,10 +32,21 @@ function formatPaymentMethod(method: string | null): string {
   return method.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function getDisplayJobAmount(totalAmount: number | null, tipAmount: number | null): number {
-  const total = Number(totalAmount) || 0;
-  const tip = Number(tipAmount) || 0;
-  if (tip <= 0) return total;
+/**
+ * Amount = subtotal - discount.
+ * Falls back to total_amount - tip_amount for jobs without subtotal data.
+ */
+function getDisplayJobAmount(job: PayrollJob): number {
+  const subtotal = Number(job.subtotal_amount);
+  const discount = Number(job.discount_amount) || 0;
+
+  if (!isNaN(subtotal) && subtotal > 0) {
+    return Math.max(subtotal - discount, 0);
+  }
+
+  // Legacy fallback
+  const total = Number(job.total_amount) || 0;
+  const tip = Number(job.tip_amount) || 0;
   return Math.max(total - tip, 0);
 }
 
@@ -297,21 +308,27 @@ export default function PayrollReports() {
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="border-b">
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[14%]">Date</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[18%]">Customer</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[22%]">Service</th>
-                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[12%]">Amount</th>
-                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[10%]">Tip</th>
-                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[10%]">CC Fees</th>
-                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 w-[14%]">Payment</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[10%]">Date</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[16%]">Customer</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[18%]">Service</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[9%]">Subtotal</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[9%]">Discount</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[9%]">Amount</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[7%]">Tax</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[7%]">Tip</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[7%]">CC Fees</th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground py-2 w-[9%]">Payment</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {tech.jobs.map(job => {
-                                    const rawTotal = Number(job.total_amount) || 0;
+                                    const subtotal = Number(job.subtotal_amount) || null;
+                                    const discount = Number(job.discount_amount) || 0;
+                                    const tax = Number(job.tax_amount) || 0;
                                     const jobTip = Number(job.tip_amount) || 0;
-                                    const jobAmount = getDisplayJobAmount(rawTotal, jobTip);
+                                    const jobAmount = getDisplayJobAmount(job);
                                     const isCard = job.payment_method?.toLowerCase().includes('credit') || job.payment_method === 'credit_card';
+                                    const rawTotal = Number(job.total_amount) || 0;
                                     const jobCcFee = Number(job.cc_fee_amount) || (isCard ? (rawTotal || (jobAmount + jobTip)) * ((orgSettings?.cc_fee_percent ?? 3.49) / 100) : 0);
                                     return (
                                     <tr key={job.id} className="border-b last:border-0 text-xs">
@@ -320,7 +337,10 @@ export default function PayrollReports() {
                                       <td className="py-2 pr-4 max-w-[200px] truncate">
                                         {Array.isArray(job.services) ? job.services.map((s: any) => s.name).filter(Boolean).join(', ') : '-'}
                                       </td>
-                                      <td className="py-2 pr-4 text-right">{formatCurrency(jobAmount)}</td>
+                                      <td className="py-2 pr-4 text-right">{subtotal != null ? formatCurrency(subtotal) : '-'}</td>
+                                      <td className="py-2 pr-4 text-right text-destructive">{discount > 0 ? `-${formatCurrency(discount)}` : '-'}</td>
+                                      <td className="py-2 pr-4 text-right font-medium">{formatCurrency(jobAmount)}</td>
+                                      <td className="py-2 pr-4 text-right">{tax > 0 ? formatCurrency(tax) : '-'}</td>
                                       <td className="py-2 pr-4 text-right">{jobTip ? formatCurrency(jobTip) : '-'}</td>
                                       <td className="py-2 pr-4 text-right text-destructive">{jobCcFee ? `-${formatCurrency(jobCcFee)}` : '-'}</td>
                                       <td className="py-2">{formatPaymentMethod(job.payment_method)}</td>
