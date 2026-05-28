@@ -1031,15 +1031,29 @@ async function syncOrganization(
             const rawGeneric = item.discount ?? null;
 
             if (rawPercent != null && rawPercent > 0) {
-              lineDiscountTotal += itemSubtotal * (rawPercent / 100);
+              // Explicit percentage field (e.g. 50 = 50%, 100 = 100%)
+              const pct = Math.min(rawPercent, 100);
+              lineDiscountTotal += itemSubtotal * (pct / 100);
             } else if (rawFlatCents != null && rawFlatCents > 0) {
-              // flat discount is in cents
-              lineDiscountTotal += (rawFlatCents / 100) * qty;
+              // Explicit flat discount field — in cents, divide by 100
+              // Cap at item subtotal so we never exceed 100% discount
+              lineDiscountTotal += Math.min((rawFlatCents / 100) * qty, itemSubtotal);
             } else if (rawGeneric != null && rawGeneric > 0) {
-              if (rawGeneric > 1) {
+              // Ambiguous discount field:
+              // If the value equals itemSubtotal (in cents), it's a flat cent amount (100% discount case)
+              // If the value is <= 100, treat as a percentage
+              // If the value is > 100 and roughly matches itemSubtotal*100, treat as cents
+              const asCents = rawGeneric / 100;
+              const asPct = rawGeneric; // treat as percentage directly
+              if (rawGeneric <= 100) {
+                // Clearly a percentage (0–100%)
                 lineDiscountTotal += itemSubtotal * (rawGeneric / 100);
+              } else if (Math.abs(asCents - itemSubtotal) < 0.02) {
+                // Value in cents matches item subtotal — 100% flat discount
+                lineDiscountTotal += itemSubtotal;
               } else {
-                lineDiscountTotal += itemSubtotal * rawGeneric;
+                // Large number — treat as cents, cap at subtotal
+                lineDiscountTotal += Math.min(asCents, itemSubtotal);
               }
             }
           }
