@@ -995,6 +995,14 @@ async function syncOrganization(
 
         // HCP returns monetary amounts in cents — convert to dollars
         const totalAmountDollars = job.total_amount != null ? job.total_amount / 100 : null;
+        const subtotalAmountDollars = job.subtotal_amount != null ? job.subtotal_amount / 100
+          : job.invoice?.subtotal_amount != null ? job.invoice.subtotal_amount / 100
+          : job.invoice?.subtotal != null ? job.invoice.subtotal / 100
+          : null;
+        const discountAmountDollars = job.discount_amount != null ? job.discount_amount / 100
+          : job.invoice?.discount_amount != null ? job.invoice.discount_amount / 100
+          : job.invoice?.discount != null ? job.invoice.discount / 100
+          : null;
         const tipAmountRaw = job.tip_amount ?? job.tip ?? null;
         let tipAmount = tipAmountRaw != null ? tipAmountRaw / 100 : null;
         let ccFeeAmount: number | null = null;
@@ -1220,6 +1228,8 @@ async function syncOrganization(
           technician_name: newTechName,
           status: newStatus,
           total_amount: totalAmountDollars,
+          subtotal_amount: subtotalAmountDollars,
+          discount_amount: discountAmountDollars,
           tip_amount: tipAmount,
           cc_fee_amount: ccFeeAmount,
           payment_method: paymentMethod,
