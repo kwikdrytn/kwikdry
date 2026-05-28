@@ -1005,63 +1005,28 @@ async function syncOrganization(
         // HCP returns monetary amounts in cents — convert to dollars
         const totalAmountDollars = job.total_amount != null ? job.total_amount / 100 : null;
 
-        // --- Subtotal: compute from line items (unit_price * quantity), fall back to total ---
-        // HCP sends ALL monetary values in cents — unit_price, price, and flat discount_amount must all be /100
+        // --- Subtotal: compute from job-level line_items (unit_price in cents / 100 * qty) ---
+        // The /jobs/{id}/line_items endpoint is unreliable; use line_items on the job object.
+        // Discount and tax are resolved later from the invoice fetch below.
         let subtotalAmountDollars: number | null = null;
         let discountAmountDollars: number | null = null;
+        let taxAmountDollars: number | null = null;
 
-        if (lineItems.length > 0) {
+        const jobLineItems: any[] = lineItems.length > 0 ? lineItems : (job.line_items || job.total_items || []);
+
+        if (jobLineItems.length > 0) {
           let lineSubtotal = 0;
-          let lineDiscountTotal = 0;
-
-          for (const item of lineItems) {
-            // unit_price and price are in cents — divide by 100
+          for (const item of jobLineItems) {
+            // HCP sends unit_price in cents — divide by 100
             const unitPriceCents = item.unit_price ?? item.price ?? 0;
             const unitPrice = unitPriceCents / 100;
             const qty = item.quantity ?? 1;
-            const itemSubtotal = unitPrice * qty;
-            lineSubtotal += itemSubtotal;
-
-            // Resolve discount:
-            // - discount_percent / discount_percentage / discount_rate: already a % value (e.g. 50 = 50%), never in cents
-            // - discount_amount: in cents — divide by 100
-            // - discount (ambiguous): if > 1 treat as percentage, if <= 1 treat as decimal fraction
-            const rawPercent = item.discount_percent ?? item.discount_percentage ?? item.discount_rate ?? null;
-            const rawFlatCents = item.discount_amount ?? null;
-            const rawGeneric = item.discount ?? null;
-
-            if (rawPercent != null && rawPercent > 0) {
-              // Explicit percentage field (e.g. 50 = 50%, 100 = 100%)
-              const pct = Math.min(rawPercent, 100);
-              lineDiscountTotal += itemSubtotal * (pct / 100);
-            } else if (rawFlatCents != null && rawFlatCents > 0) {
-              // Explicit flat discount field — in cents, divide by 100
-              // Cap at item subtotal so we never exceed 100% discount
-              lineDiscountTotal += Math.min((rawFlatCents / 100) * qty, itemSubtotal);
-            } else if (rawGeneric != null && rawGeneric > 0) {
-              // Ambiguous discount field:
-              // If the value equals itemSubtotal (in cents), it's a flat cent amount (100% discount case)
-              // If the value is <= 100, treat as a percentage
-              // If the value is > 100 and roughly matches itemSubtotal*100, treat as cents
-              const asCents = rawGeneric / 100;
-              const asPct = rawGeneric; // treat as percentage directly
-              if (rawGeneric <= 100) {
-                // Clearly a percentage (0–100%)
-                lineDiscountTotal += itemSubtotal * (rawGeneric / 100);
-              } else if (Math.abs(asCents - itemSubtotal) < 0.02) {
-                // Value in cents matches item subtotal — 100% flat discount
-                lineDiscountTotal += itemSubtotal;
-              } else {
-                // Large number — treat as cents, cap at subtotal
-                lineDiscountTotal += Math.min(asCents, itemSubtotal);
-              }
-            }
+            lineSubtotal += unitPrice * qty;
           }
-
           subtotalAmountDollars = Number(lineSubtotal.toFixed(2));
-          discountAmountDollars = lineDiscountTotal > 0 ? Number(lineDiscountTotal.toFixed(2)) : null;
+          // discountAmountDollars and taxAmountDollars resolved from invoice below
         } else if (totalAmountDollars != null) {
-          // No line items — fall back to total_amount as subtotal (no discount resolvable)
+          // No line items at all — fall back to total_amount as subtotal
           subtotalAmountDollars = totalAmountDollars;
         }
         const tipAmountRaw = job.tip_amount ?? job.tip ?? null;
@@ -1210,6 +1175,46 @@ async function syncOrganization(
 
                 ccFeeAmount = invoiceFee ?? sumInvoiceFees(payments, totalAmountDollars);
               }
+
+              // --- Resolve subtotal, discount, and tax from invoice ---
+              // These are only reliably available on the invoice response.
+
+              // Subtotal (invoice value already in dollars via normalizeInvoiceMoney)
+              const invoiceSubtotalRaw =
+                invoiceObj?.subtotal_amount ?? invoiceObj?.subtotal ?? invoiceObj?.sub_total ??
+                invoiceObj?.amount_subtotal ?? invoiceObj?.line_items_total ?? invoiceObj?.service_total ??
+                firstEntry?.subtotal_amount ?? firstEntry?.subtotal ?? firstEntry?.sub_total ??
+                firstEntry?.line_items_total ?? null;
+              if (invoiceSubtotalRaw != null) {
+                const parsed = normalizeInvoiceMoney(invoiceSubtotalRaw, totalAmountDollars);
+                if (parsed != null && parsed > 0) subtotalAmountDollars = parsed;
+              }
+
+              // Discount — percentage takes priority over flat amount
+              const invoiceDiscountPct =
+                invoiceObj?.discount_percent ?? invoiceObj?.discount_percentage ?? invoiceObj?.discount_rate ??
+                firstEntry?.discount_percent ?? firstEntry?.discount_percentage ?? null;
+              const invoiceDiscountFlat =
+                invoiceObj?.discount_amount ?? invoiceObj?.discount ?? invoiceObj?.total_discount ??
+                firstEntry?.discount_amount ?? firstEntry?.discount ?? firstEntry?.total_discount ?? null;
+              if (invoiceDiscountPct != null && invoiceDiscountPct > 0 && subtotalAmountDollars != null) {
+                const pct = Math.min(invoiceDiscountPct, 100);
+                discountAmountDollars = Number((subtotalAmountDollars * pct / 100).toFixed(2));
+              } else if (invoiceDiscountFlat != null) {
+                const parsedFlat = normalizeInvoiceMoney(invoiceDiscountFlat, subtotalAmountDollars ?? totalAmountDollars);
+                if (parsedFlat != null && parsedFlat > 0) discountAmountDollars = parsedFlat;
+              }
+
+              // Tax
+              const invoiceTaxRaw =
+                invoiceObj?.tax_amount ?? invoiceObj?.tax ?? invoiceObj?.total_tax ??
+                invoiceObj?.taxes_total ?? invoiceObj?.amount_tax ??
+                firstEntry?.tax_amount ?? firstEntry?.tax ?? firstEntry?.total_tax ?? null;
+              if (invoiceTaxRaw != null) {
+                const parsedTax = normalizeInvoiceMoney(invoiceTaxRaw, totalAmountDollars);
+                if (parsedTax != null && parsedTax > 0) taxAmountDollars = parsedTax;
+              }
+
             } else {
               console.log(`No invoice records found for completed job ${job.id}. Invoice response keys: ${Object.keys(invoiceData || {}).join(', ')}`);
             }
@@ -1291,6 +1296,7 @@ async function syncOrganization(
           total_amount: totalAmountDollars,
           subtotal_amount: subtotalAmountDollars,
           discount_amount: discountAmountDollars,
+          tax_amount: taxAmountDollars,
           tip_amount: tipAmount,
           cc_fee_amount: ccFeeAmount,
           payment_method: paymentMethod,
