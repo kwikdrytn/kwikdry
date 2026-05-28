@@ -10,6 +10,9 @@ export interface PayrollJob {
   customer_name: string | null;
   scheduled_date: string | null;
   total_amount: number | null;
+  subtotal_amount: number | null;
+  discount_amount: number | null;
+  tax_amount: number | null;
   tip_amount: number | null;
   cc_fee_amount: number | null;
   payment_method: string | null;
@@ -40,10 +43,21 @@ function isCardPayment(method: string | null): boolean {
   return lower.includes('card') || lower.includes('credit') || lower.includes('debit') || lower.includes('stripe');
 }
 
-function getBaseJobAmount(totalAmount: number | null, tipAmount: number | null): number {
-  const total = Number(totalAmount) || 0;
-  const tip = Number(tipAmount) || 0;
-  if (tip <= 0) return total;
+/**
+ * Returns the job "Amount" = subtotal - discount.
+ * Falls back to total_amount - tip_amount if subtotal is not available.
+ */
+function getBaseJobAmount(job: PayrollJob): number {
+  const subtotal = Number(job.subtotal_amount);
+  const discount = Number(job.discount_amount) || 0;
+
+  if (!isNaN(subtotal) && subtotal > 0) {
+    return Math.max(subtotal - discount, 0);
+  }
+
+  // Legacy fallback: total_amount - tip_amount
+  const total = Number(job.total_amount) || 0;
+  const tip = Number(job.tip_amount) || 0;
   return Math.max(total - tip, 0);
 }
 
@@ -83,10 +97,10 @@ export function usePayrollReport(startDate: string, endDate: string) {
       const weeklyMinimum = settings.weekly_minimum ?? 1000;
       const commissionPercent = settings.commission_percent ?? 40;
 
-      // Fetch completed jobs in date range
+      // Fetch completed jobs in date range — now includes subtotal, discount, tax
       const { data: jobs, error: jobsError } = await supabase
         .from('hcp_jobs')
-        .select('id, hcp_job_id, customer_name, scheduled_date, total_amount, tip_amount, cc_fee_amount, payment_method, status, services, technician_hcp_id, technician_name')
+        .select('id, hcp_job_id, customer_name, scheduled_date, total_amount, subtotal_amount, discount_amount, tax_amount, tip_amount, cc_fee_amount, payment_method, status, services, technician_hcp_id, technician_name')
         .eq('organization_id', profile.organization_id)
         .gte('scheduled_date', startDate)
         .lte('scheduled_date', endDate)
@@ -116,7 +130,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
         let ccFeesOnTips = 0;
 
         data.jobs.forEach(job => {
-          const amount = getBaseJobAmount(job.total_amount, job.tip_amount);
+          const amount = getBaseJobAmount(job);
           const tip = Number(job.tip_amount) || 0;
           const isCard = isCardPayment(job.payment_method);
 
@@ -141,7 +155,7 @@ export function usePayrollReport(startDate: string, endDate: string) {
           let weekRevenue = 0;
           data.jobs.forEach(job => {
             if (job.scheduled_date && job.scheduled_date >= wsStr && job.scheduled_date <= weStr) {
-              weekRevenue += getBaseJobAmount(job.total_amount, job.tip_amount);
+              weekRevenue += getBaseJobAmount(job);
             }
           });
 
