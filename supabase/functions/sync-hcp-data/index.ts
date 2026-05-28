@@ -1006,7 +1006,7 @@ async function syncOrganization(
         const totalAmountDollars = job.total_amount != null ? job.total_amount / 100 : null;
 
         // --- Subtotal: compute from line items (unit_price * quantity), fall back to total ---
-        // Line items prices from HCP are already in dollars (not cents)
+        // HCP sends ALL monetary values in cents — unit_price, price, and flat discount_amount must all be /100
         let subtotalAmountDollars: number | null = null;
         let discountAmountDollars: number | null = null;
 
@@ -1015,27 +1015,27 @@ async function syncOrganization(
           let lineDiscountTotal = 0;
 
           for (const item of lineItems) {
-            const unitPrice = item.unit_price ?? item.price ?? 0;
+            // unit_price and price are in cents — divide by 100
+            const unitPriceCents = item.unit_price ?? item.price ?? 0;
+            const unitPrice = unitPriceCents / 100;
             const qty = item.quantity ?? 1;
             const itemSubtotal = unitPrice * qty;
             lineSubtotal += itemSubtotal;
 
-            // Resolve discount: HCP sends either a percentage (e.g. 50 = 50%) or a flat dollar amount
-            // We detect percentage by checking discount_percent / discount_percentage / discount_rate fields first,
-            // then fall back to discount_amount / discount. If the raw value is > 1 and <= 100 and no
-            // explicit flat-amount field is present, treat it as a percentage.
+            // Resolve discount:
+            // - discount_percent / discount_percentage / discount_rate: already a % value (e.g. 50 = 50%), never in cents
+            // - discount_amount: in cents — divide by 100
+            // - discount (ambiguous): if > 1 treat as percentage, if <= 1 treat as decimal fraction
             const rawPercent = item.discount_percent ?? item.discount_percentage ?? item.discount_rate ?? null;
-            const rawFlat = item.discount_amount ?? null;
+            const rawFlatCents = item.discount_amount ?? null;
             const rawGeneric = item.discount ?? null;
 
             if (rawPercent != null && rawPercent > 0) {
-              // Explicit percentage field
               lineDiscountTotal += itemSubtotal * (rawPercent / 100);
-            } else if (rawFlat != null && rawFlat > 0) {
-              // Explicit flat dollar field
-              lineDiscountTotal += rawFlat * qty;
+            } else if (rawFlatCents != null && rawFlatCents > 0) {
+              // flat discount is in cents
+              lineDiscountTotal += (rawFlatCents / 100) * qty;
             } else if (rawGeneric != null && rawGeneric > 0) {
-              // Ambiguous: if value is > 1 treat as percentage; if <= 1 treat as decimal fraction
               if (rawGeneric > 1) {
                 lineDiscountTotal += itemSubtotal * (rawGeneric / 100);
               } else {
