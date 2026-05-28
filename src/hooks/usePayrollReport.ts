@@ -55,7 +55,10 @@ function isCardPayment(method: string | null): boolean {
 function getPostDiscountAmount(job: PayrollJob): number {
   const subtotal = Number(job.subtotal_amount);
   const discount = Number(job.discount_amount) || 0;
-  if (!isNaN(subtotal) && subtotal > 0) {
+  // Use subtotal path if subtotal_amount is a valid number (even if zero after discount)
+  // isNaN check + null check is enough — do NOT gate on subtotal > 0,
+  // because a 100%-discounted job has subtotal=199 and discount=199, giving a correct /bin/sh result
+  if (!isNaN(subtotal) && job.subtotal_amount != null) {
     return Math.max(subtotal - discount, 0);
   }
   const total = Number(job.total_amount) || 0;
@@ -65,14 +68,14 @@ function getPostDiscountAmount(job: PayrollJob): number {
 
 /**
  * Pre-discount amount: subtotal only, ignoring any discounts.
- * Falls back to post-discount amount for legacy jobs without subtotal data.
+ * Falls back to total_amount for legacy jobs without subtotal data.
  */
 function getPreDiscountAmount(job: PayrollJob): number {
   const subtotal = Number(job.subtotal_amount);
-  if (!isNaN(subtotal) && subtotal > 0) {
+  // Same fix: don't gate on subtotal > 0 — a valid 99 subtotal with 100% discount is still 99 pre-discount
+  if (!isNaN(subtotal) && job.subtotal_amount != null) {
     return subtotal;
   }
-  // No subtotal stored — fall back to post-discount (best we can do)
   return getPostDiscountAmount(job);
 }
 
