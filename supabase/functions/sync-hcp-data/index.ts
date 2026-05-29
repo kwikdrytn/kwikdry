@@ -1094,8 +1094,9 @@ async function syncOrganization(
         const isCompletedJob = ['complete unrated', 'complete rated', 'completed', 'paid']
           .includes(newStatus || '');
 
-        // If payment details or tip/cc are missing and job is completed, fetch invoice details from HCP
-        if (isCompletedJob && (!paymentMethod || !invoicePaidAt || tipAmount == null || ccFeeAmount == null)) {
+        // Always fetch invoice for completed jobs — subtotal, discount, and tax
+        // are only available on the invoice response, not the base job object.
+        if (isCompletedJob) {
           try {
             const invoiceRes = await fetchWithRetry(`${HCP_BASE_URL}/jobs/${job.id}/invoices`, api_key);
             const invoiceData = await invoiceRes.json();
@@ -1261,14 +1262,22 @@ async function syncOrganization(
                 invoiceObj?.taxes_total ?? invoiceObj?.amount_tax ??
                 firstEntry?.tax_amount ?? firstEntry?.tax ?? firstEntry?.total_tax ?? null;
               if (invoiceTaxRaw != null) {
-                const parsedTax = normalizeInvoiceMoney(invoiceTaxRaw, totalAmountDollars);
-                if (parsedTax != null && parsedTax > 0) taxAmountDollars = parsedTax;
+                // Use normalizeMoney (no ceiling cap) — tax can't exceed total but
+                // normalizeInvoiceMoney's max logic can double-count if both candidates pass
+                const parsedTax = normalizeMoney(invoiceTaxRaw);
+                // Safety cap: tax should never exceed total_amount
+                if (parsedTax != null && parsedTax > 0) {
+                  taxAmountDollars = totalAmountDollars != null
+                    ? Math.min(parsedTax, totalAmountDollars)
+                    : parsedTax;
+                }
               }
 
               if (isTarget) {
                 console.log(`[PAYROLL DEBUG] invoiceData keys=${Object.keys(invoiceData || {}).join(', ')}`);
-                console.log(`[PAYROLL DEBUG] invoiceEntries[0]=${JSON.stringify(invoiceEntries[0] ?? null)}`);
-                console.log(`[PAYROLL DEBUG] invoiceObj=${JSON.stringify(invoiceObj ?? null)}`);
+                console.log(`[PAYROLL DEBUG] invoiceEntries[0] full=${JSON.stringify(invoiceEntries[0] ?? null)}`);
+                console.log(`[PAYROLL DEBUG] invoiceObj full=${JSON.stringify(invoiceObj ?? null)}`);
+                console.log(`[PAYROLL DEBUG] raw subtotalRaw=${JSON.stringify(invoiceSubtotalRaw)} discountFlat=${JSON.stringify(invoiceDiscountFlat)} discountPct=${JSON.stringify(invoiceDiscountPct)} taxRaw=${JSON.stringify(invoiceTaxRaw)}`);
                 console.log(`[PAYROLL DEBUG] After invoice: subtotal=${subtotalAmountDollars} discount=${discountAmountDollars} tax=${taxAmountDollars}`);
               }
 
