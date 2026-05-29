@@ -735,17 +735,24 @@ async function syncOrganization(
 ) {
   console.log(`Starting HCP sync for organization: ${organization_id}, account: ${hcp_account_id ?? '(none)'}`);
 
-  // Fetch window: 120 days back + 60 days forward by SCHEDULED date.
-  // We cast a wide net because jobs may be scheduled weeks in advance
-  // but serviced on a different date. The actual stored date will be
-  // the service_date from the invoice when available.
-  const today = new Date();
-  const pastDate = new Date(today);
-  pastDate.setDate(pastDate.getDate() - 120);
-  const dateFrom = pastDate.toISOString().split('T')[0];
-  const futureDate = new Date(today);
-  futureDate.setDate(futureDate.getDate() + 60);
-  const dateTo = futureDate.toISOString().split('T')[0];
+  // Use the date range passed from the UI when available (matches the payroll report
+  // date range the user is viewing). Fall back to 120-day window for cron syncs.
+  let dateFrom: string;
+  let dateTo: string;
+  if (overrideDateFrom && overrideDateTo) {
+    dateFrom = overrideDateFrom;
+    dateTo = overrideDateTo;
+    console.log(`Using UI-provided date range: ${dateFrom} to ${dateTo}`);
+  } else {
+    const today = new Date();
+    const pastDate = new Date(today);
+    pastDate.setDate(pastDate.getDate() - 120);
+    dateFrom = pastDate.toISOString().split('T')[0];
+    const futureDate = new Date(today);
+    futureDate.setDate(futureDate.getDate() + 60);
+    dateTo = futureDate.toISOString().split('T')[0];
+    console.log(`Using default date range: ${dateFrom} to ${dateTo}`);
+  }
 
     // Fetch data from HCP
     console.log('Fetching jobs from HCP...');
@@ -1564,7 +1571,7 @@ Deno.serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch { /* empty body is fine for cron */ }
 
-    const { location_id, hcp_account_id } = body;
+    const { location_id, hcp_account_id, date_from, date_to } = body;
 
     // ── Mode 1: Manual trigger from UI (requires auth) ──
     const authHeader = req.headers.get('Authorization');
