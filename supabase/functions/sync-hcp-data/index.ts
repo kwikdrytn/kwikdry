@@ -1596,47 +1596,69 @@ Deno.serve(async (req) => {
         });
       }
 
-      // ── Path B: legacy fallback → use first hcp_account row, else organizations.hcp_api_key ──
-      const { data: firstAccount } = await supabase
+      // ── Path B: sync ALL active hcp_accounts for this organization ──
+      // Previously this only synced the first account — now it syncs all of them
+      // (e.g. both Knoxville and Chattanooga accounts).
+      const { data: orgAccounts } = await supabase
         .from('hcp_accounts')
-        .select('id, location_id, hcp_api_key')
+        .select('id, location_id, hcp_api_key, label')
         .eq('organization_id', authProfile.organization_id)
         .eq('is_active', true)
         .not('hcp_api_key', 'is', null)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
-      let apiKey = firstAccount?.hcp_api_key as string | undefined;
-      let accountId = firstAccount?.id as string | undefined;
-      let resolvedLocationId = firstAccount?.location_id ?? location_id ?? null;
-
-      if (!apiKey) {
+      if (!orgAccounts || orgAccounts.length === 0) {
+        // Fall back to org-level API key if no hcp_accounts exist
         const { data: org } = await supabase
           .from('organizations')
           .select('hcp_api_key')
           .eq('id', authProfile.organization_id)
           .single();
-        apiKey = org?.hcp_api_key ?? undefined;
-      }
-
-      if (!apiKey) {
-        return new Response(JSON.stringify({ success: false, error: 'No HCP account configured' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        const apiKey = org?.hcp_api_key;
+        if (!apiKey) {
+          return new Response(JSON.stringify({ success: false, error: 'No HCP account configured' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const result = await syncOrganization(
+          authProfile.organization_id, apiKey, location_id ?? null, supabase, mapboxToken, null,
+        );
+        return new Response(JSON.stringify(result), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const result = await syncOrganization(
-        authProfile.organization_id,
-        apiKey,
-        resolvedLocationId,
-        supabase,
-        mapboxToken,
-        accountId ?? null,
-      );
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      console.log(`Syncing ${orgAccounts.length} HCP account(s) for organization ${authProfile.organization_id}`);
+      const accountResults: Array<{ account: string; label: string; success: boolean; error?: string }> = [];
+      let totalJobs = 0;
+
+      for (const account of orgAccounts) {
+        try {
+          console.log(`Syncing account: ${account.label} (${account.id})`);
+          const result = await syncOrganization(
+            authProfile.organization_id,
+            account.hcp_api_key,
+            account.location_id ?? location_id ?? null,
+            supabase,
+            mapboxToken,
+            account.id,
+          );
+          await supabase
+            .from('hcp_accounts')
+            .update({ last_synced_at: new Date().toISOString() })
+            .eq('id', account.id);
+          totalJobs += result.synced?.jobs ?? 0;
+          accountResults.push({ account: account.id, label: account.label, success: true });
+          console.log(`Account ${account.label} sync complete: ${result.synced?.jobs ?? 0} jobs`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          console.error(`Account ${account.label} sync failed: ${msg}`);
+          accountResults.push({ account: account.id, label: account.label, success: false, error: msg });
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, accounts: accountResults, totalJobs }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
