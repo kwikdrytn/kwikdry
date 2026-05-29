@@ -39,7 +39,9 @@ function formatPaymentMethod(method: string | null): string {
 function getDisplayJobAmount(job: PayrollJob): number {
   const subtotal = Number(job.subtotal_amount);
   const discount = Number(job.discount_amount) || 0;
-  if (!isNaN(subtotal) && subtotal > 0) {
+  // Gate on null check not subtotal > 0 — a 100%-discounted job has
+  // subtotal=199, discount=199, and correctly returns $0 via Math.max
+  if (job.subtotal_amount != null && !isNaN(subtotal)) {
     return Math.max(subtotal - discount, 0);
   }
   const total = Number(job.total_amount) || 0;
