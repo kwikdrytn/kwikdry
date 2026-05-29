@@ -76,6 +76,10 @@ interface HCPJob {
     scheduled_end?: string;
   };
   work_status?: string;
+  service_date?: string;
+  completed_at?: string;
+  work_completed_at?: string;
+  finished_at?: string;
   total_amount?: number;
   tip_amount?: number;
   tip?: number;
@@ -729,13 +733,16 @@ async function syncOrganization(
 ) {
   console.log(`Starting HCP sync for organization: ${organization_id}, account: ${hcp_account_id ?? '(none)'}`);
 
-  // Calculate date range: 90 days back (for completed/paid jobs) + 30 days forward
+  // Fetch window: 120 days back + 60 days forward by SCHEDULED date.
+  // We cast a wide net because jobs may be scheduled weeks in advance
+  // but serviced on a different date. The actual stored date will be
+  // the service_date from the invoice when available.
   const today = new Date();
   const pastDate = new Date(today);
-  pastDate.setDate(pastDate.getDate() - 90);
+  pastDate.setDate(pastDate.getDate() - 120);
   const dateFrom = pastDate.toISOString().split('T')[0];
   const futureDate = new Date(today);
-  futureDate.setDate(futureDate.getDate() + 30);
+  futureDate.setDate(futureDate.getDate() + 60);
   const dateTo = futureDate.toISOString().split('T')[0];
 
     // Fetch data from HCP
@@ -951,6 +958,15 @@ async function syncOrganization(
             const isoMatch = scheduledEnd.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
             if (isoMatch) scheduledEndTime = isoMatch[2];
           }
+        }
+
+        // Prefer service_date (actual date work was done) over scheduled_start.
+        // HCP returns service_date on the job object and/or the invoice.
+        const jobServiceDateRaw = job.service_date ?? job.completed_at
+          ?? job.work_completed_at ?? job.finished_at ?? null;
+        if (jobServiceDateRaw) {
+          const match = jobServiceDateRaw.match(/^(\d{4}-\d{2}-\d{2})/);
+          if (match) scheduledDate = match[1];
         }
 
         const assignedEmployee = job.assigned_employees?.[0];
@@ -1305,12 +1321,26 @@ async function syncOrganization(
                 }
               }
 
+              // Override scheduledDate with invoice service_date — most accurate
+              const invoiceServiceDateRaw = invoiceObj?.service_date
+                ?? invoiceObj?.invoice_date
+                ?? firstEntry?.service_date
+                ?? firstEntry?.invoice_date
+                ?? null;
+              if (invoiceServiceDateRaw) {
+                const match = invoiceServiceDateRaw.match(/^(\d{4}-\d{2}-\d{2})/);
+                if (match) {
+                  scheduledDate = match[1];
+                  if (isTarget) console.log(`[PAYROLL DEBUG] service_date from invoice: ${scheduledDate}`);
+                }
+              }
+
               if (isTarget) {
                 console.log(`[PAYROLL DEBUG] invoiceData keys=${Object.keys(invoiceData || {}).join(', ')}`);
                 console.log(`[PAYROLL DEBUG] invoiceEntries[0] full=${JSON.stringify(invoiceEntries[0] ?? null)}`);
                 console.log(`[PAYROLL DEBUG] invoiceObj full=${JSON.stringify(invoiceObj ?? null)}`);
                 console.log(`[PAYROLL DEBUG] raw subtotalRaw=${JSON.stringify(invoiceSubtotalRaw)} discountFlat=${JSON.stringify(invoiceDiscountFlat)} discountPct=${JSON.stringify(invoiceDiscountPct)} taxRaw=${JSON.stringify(invoiceTaxRaw)}`);
-                console.log(`[PAYROLL DEBUG] After invoice: subtotal=${subtotalAmountDollars} discount=${discountAmountDollars} tax=${taxAmountDollars}`);
+                console.log(`[PAYROLL DEBUG] After invoice: subtotal=${subtotalAmountDollars} discount=${discountAmountDollars} tax=${taxAmountDollars} service_date=${scheduledDate}`);
               }
 
             } else {
