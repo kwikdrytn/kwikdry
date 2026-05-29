@@ -1072,41 +1072,51 @@ async function syncOrganization(
 
         if (jobLineItems.length > 0) {
           // HCP line items have a 'kind' field that tells us what each item is.
-          // 'amount' is already the correct charge in cents (reflects per-item pricing).
-          // We split by kind rather than summing everything:
-          //   labor / service / material / other → subtotal
-          //   fixed discount / discount / percentage discount → discount
-          //   tax → tax
-          const SUBTOTAL_KINDS = new Set(['labor', 'service', 'material', 'other', 'product']);
-          const DISCOUNT_KINDS = new Set(['fixed discount', 'discount', 'percentage discount']);
-          const TAX_KINDS     = new Set(['tax']);
+          // 'amount' is in cents and reflects the actual charge for labor/service items.
+          // For 'percent discount' items, 'unit_price' is the percentage in hundredths
+          //   (e.g. 5000 = 50.00%) — NOT a dollar amount. We must compute the dollar
+          //   discount as subtotal × (unit_price / 10000) in a second pass.
+          // For 'fixed discount' items, 'amount' is the flat dollar discount in cents.
+          const SUBTOTAL_KINDS      = new Set(['labor', 'service', 'material', 'other', 'product']);
+          const FIXED_DISCOUNT_KINDS   = new Set(['fixed discount', 'discount']);
+          const PERCENT_DISCOUNT_KINDS = new Set(['percent discount', 'percentage discount']);
+          const TAX_KINDS           = new Set(['tax']);
 
           let lineSubtotal  = 0;
           let lineDiscount  = 0;
           let lineTax       = 0;
-          let hasKnownKind  = false;
+          // Collect percent discounts for second pass (need subtotal first)
+          const pctDiscounts: number[] = [];
 
+          // Pass 1: sum labor/service/tax and collect percent discount rates
           for (const item of jobLineItems) {
             const kind = (item.kind ?? '').toLowerCase();
-            // amount is in cents
             const amountCents = typeof item.amount === 'number' ? item.amount : 0;
             const amountDollars = amountCents / 100;
-            if (isTarget) console.log(`[PAYROLL DEBUG] line item: name=${item.name} kind=${kind} unit_price=${item.unit_price} amount=${item.amount} amountDollars=${amountDollars}`);
+            if (isTarget) console.log(`[PAYROLL DEBUG] line item: name=${item.name} kind=${kind} unit_price=${item.unit_price} amount=${item.amount}`);
 
             if (SUBTOTAL_KINDS.has(kind)) {
               lineSubtotal += amountDollars;
-              hasKnownKind = true;
-            } else if (DISCOUNT_KINDS.has(kind)) {
-              lineDiscount += amountDollars;
-              hasKnownKind = true;
+            } else if (FIXED_DISCOUNT_KINDS.has(kind)) {
+              // Fixed discount: amount is the dollar value in cents (may be negative)
+              lineDiscount += Math.abs(amountDollars);
+            } else if (PERCENT_DISCOUNT_KINDS.has(kind)) {
+              // Percent discount: unit_price is the percentage in hundredths
+              // (e.g. 5000 = 50.00%). Collect for second pass.
+              const pctHundredths = typeof item.unit_price === 'number' ? item.unit_price : 0;
+              if (pctHundredths > 0) pctDiscounts.push(pctHundredths / 10000);
             } else if (TAX_KINDS.has(kind)) {
               lineTax += amountDollars;
-              hasKnownKind = true;
             } else {
-              // Unknown kind — fall back to unit_price * quantity for subtotal
+              // Unknown kind — treat as labor using unit_price * quantity
               const unitPriceCents = item.unit_price ?? item.price ?? 0;
               lineSubtotal += (unitPriceCents / 100) * (item.quantity ?? 1);
             }
+          }
+
+          // Pass 2: apply percent discounts against the computed subtotal
+          for (const pct of pctDiscounts) {
+            lineDiscount += lineSubtotal * pct;
           }
 
           subtotalAmountDollars = Number(lineSubtotal.toFixed(2));
