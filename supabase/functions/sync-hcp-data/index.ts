@@ -1266,7 +1266,11 @@ async function syncOrganization(
                   if (parsedSubtotals.length > 0) {
                     const bestSubtotal = Math.max(...parsedSubtotals);
                     const derivedTip = Number((totalAmountDollars - bestSubtotal).toFixed(2));
-                    if (derivedTip > 0.01) {
+                    // Only treat the difference as a tip if tax doesn't already
+                    // explain it — otherwise tax gets double-counted as tip
+                    const taxAlreadyAccounts = taxAmountDollars != null &&
+                      Math.abs(derivedTip - taxAmountDollars) < 0.02;
+                    if (derivedTip > 0.01 && !taxAlreadyAccounts) {
                       tipAmount = derivedTip;
                       console.log(`Derived tip for job ${job.id} from totals: $${tipAmount}`);
                     }
