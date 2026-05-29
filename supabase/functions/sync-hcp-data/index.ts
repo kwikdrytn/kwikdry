@@ -186,6 +186,27 @@ function normalizeInvoiceMoney(rawValue: unknown, maxExpected?: number | null): 
   return Math.max(...pool);
 }
 
+/**
+ * Normalize a monetary value that may be in cents or dollars,
+ * WITHOUT an upper-bound cap. Used for subtotal and discount
+ * where the value can legitimately exceed total_amount
+ * (e.g. subtotal > total on a discounted job).
+ *
+ * Heuristic: if the value is >= 100 and has no decimal component,
+ * it is almost certainly in cents — divide by 100.
+ * Otherwise treat as dollars.
+ */
+function normalizeMoney(rawValue: unknown): number | null {
+  const numeric = coerceNumber(rawValue);
+  if (numeric == null || numeric <= 0) return null;
+  // If the value is a whole number >= 100, assume cents
+  if (numeric >= 100 && Number.isInteger(numeric)) {
+    return Number((numeric / 100).toFixed(2));
+  }
+  // Already in dollars (has decimals, or is < 100)
+  return Number(numeric.toFixed(2));
+}
+
 function sumInvoiceFees(payments: any[], maxExpected?: number | null): number | null {
   let rawFeeTotal = 0;
 
@@ -1196,18 +1217,23 @@ async function syncOrganization(
               // --- Resolve subtotal, discount, and tax from invoice ---
               // These are only reliably available on the invoice response.
 
-              // Subtotal (invoice value already in dollars via normalizeInvoiceMoney)
+              // Subtotal — use normalizeMoney() not normalizeInvoiceMoney().
+              // normalizeInvoiceMoney caps against totalAmountDollars, but subtotal is
+              // legitimately larger than total on discounted jobs, so that cap is wrong.
               const invoiceSubtotalRaw =
                 invoiceObj?.subtotal_amount ?? invoiceObj?.subtotal ?? invoiceObj?.sub_total ??
                 invoiceObj?.amount_subtotal ?? invoiceObj?.line_items_total ?? invoiceObj?.service_total ??
                 firstEntry?.subtotal_amount ?? firstEntry?.subtotal ?? firstEntry?.sub_total ??
                 firstEntry?.line_items_total ?? null;
               if (invoiceSubtotalRaw != null) {
-                const parsed = normalizeInvoiceMoney(invoiceSubtotalRaw, totalAmountDollars);
+                const parsed = normalizeMoney(invoiceSubtotalRaw);
                 if (parsed != null && parsed > 0) subtotalAmountDollars = parsed;
               }
 
-              // Discount — percentage takes priority over flat amount
+              // Discount — HCP always stores discount as a flat dollar amount on the invoice
+              // (even if entered as a percentage — HCP converts it before returning).
+              // Use normalizeMoney() for the same reason as subtotal.
+              // Percentage fields are a fallback in case HCP ever returns them.
               const invoiceDiscountPct =
                 invoiceObj?.discount_percent ?? invoiceObj?.discount_percentage ?? invoiceObj?.discount_rate ??
                 firstEntry?.discount_percent ?? firstEntry?.discount_percentage ?? null;
@@ -1215,11 +1241,18 @@ async function syncOrganization(
                 invoiceObj?.discount_amount ?? invoiceObj?.discount ?? invoiceObj?.total_discount ??
                 firstEntry?.discount_amount ?? firstEntry?.discount ?? firstEntry?.total_discount ?? null;
               if (invoiceDiscountPct != null && invoiceDiscountPct > 0 && subtotalAmountDollars != null) {
+                // Explicit percentage field — apply to subtotal
                 const pct = Math.min(invoiceDiscountPct, 100);
                 discountAmountDollars = Number((subtotalAmountDollars * pct / 100).toFixed(2));
               } else if (invoiceDiscountFlat != null) {
-                const parsedFlat = normalizeInvoiceMoney(invoiceDiscountFlat, subtotalAmountDollars ?? totalAmountDollars);
-                if (parsedFlat != null && parsedFlat > 0) discountAmountDollars = parsedFlat;
+                // Flat dollar (or cents) discount — normalize without ceiling cap
+                const parsedFlat = normalizeMoney(invoiceDiscountFlat);
+                // Cap at subtotal so discount never exceeds the job value
+                if (parsedFlat != null && parsedFlat > 0) {
+                  discountAmountDollars = subtotalAmountDollars != null
+                    ? Math.min(parsedFlat, subtotalAmountDollars)
+                    : parsedFlat;
+                }
               }
 
               // Tax
