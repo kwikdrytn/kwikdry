@@ -1146,9 +1146,18 @@ async function syncOrganization(
         const isCompletedJob = ['complete unrated', 'complete rated', 'completed', 'paid']
           .includes(newStatus || '');
 
-        // Always fetch invoice for completed jobs — subtotal, discount, and tax
-        // are only available on the invoice response, not the base job object.
-        if (isCompletedJob) {
+        // Fetch invoice only when we still need data after line items.
+        // Line items give us subtotal/discount/tax for most jobs.
+        // Invoice is needed for: payment method, paid_at, tip, cc_fee,
+        // service_date, and as fallback when line items returned nothing.
+        const needsInvoice = isCompletedJob && (
+          !paymentMethod ||
+          !invoicePaidAt ||
+          tipAmount == null ||
+          ccFeeAmount == null ||
+          subtotalAmountDollars == null  // line items returned nothing
+        );
+        if (needsInvoice) {
           try {
             const invoiceRes = await fetchWithRetry(`${HCP_BASE_URL}/jobs/${job.id}/invoices`, api_key);
             const invoiceData = await invoiceRes.json();
@@ -1448,12 +1457,21 @@ async function syncOrganization(
           })}`);
         }
 
-        const { error } = await supabase
-          .from('hcp_jobs')
-          .upsert(record, { onConflict: 'organization_id,hcp_job_id' });
-        
-        if (error) {
-          console.error(`[UPSERT ERROR] job ${job.id} customer=${customerName}: ${error.message} | code=${error.code} | details=${error.details}`);
+        // Retry upsert up to 3 times on connection reset
+        let upsertError: any = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { error } = await supabase
+            .from('hcp_jobs')
+            .upsert(record, { onConflict: 'organization_id,hcp_job_id' });
+          if (!error) {
+            upsertError = null;
+            break;
+          }
+          upsertError = error;
+          if (attempt < 2) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+        }
+        if (upsertError) {
+          console.error(`[UPSERT ERROR] job ${job.id} customer=${customerName}: ${upsertError.message} | code=${upsertError.code} | details=${upsertError.details}`);
         } else {
           jobsSynced++;
           if (isTarget) console.log(`[PAYROLL DEBUG] Upsert SUCCESS for job ${job.id}`);
@@ -1650,6 +1668,8 @@ Deno.serve(async (req) => {
           totalJobs += result.synced?.jobs ?? 0;
           accountResults.push({ account: account.id, label: account.label, success: true });
           console.log(`Account ${account.label} sync complete: ${result.synced?.jobs ?? 0} jobs`);
+          // Brief pause between accounts to avoid overwhelming the DB connection
+          await new Promise(r => setTimeout(r, 500));
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           console.error(`Account ${account.label} sync failed: ${msg}`);
