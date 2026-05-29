@@ -1050,16 +1050,47 @@ async function syncOrganization(
         }
 
         if (jobLineItems.length > 0) {
-          let lineSubtotal = 0;
+          // HCP line items have a 'kind' field that tells us what each item is.
+          // 'amount' is already the correct charge in cents (reflects per-item pricing).
+          // We split by kind rather than summing everything:
+          //   labor / service / material / other → subtotal
+          //   fixed discount / discount / percentage discount → discount
+          //   tax → tax
+          const SUBTOTAL_KINDS = new Set(['labor', 'service', 'material', 'other', 'product']);
+          const DISCOUNT_KINDS = new Set(['fixed discount', 'discount', 'percentage discount']);
+          const TAX_KINDS     = new Set(['tax']);
+
+          let lineSubtotal  = 0;
+          let lineDiscount  = 0;
+          let lineTax       = 0;
+          let hasKnownKind  = false;
+
           for (const item of jobLineItems) {
-            // HCP sends unit_price in cents — divide by 100
-            const unitPriceCents = item.unit_price ?? item.price ?? 0;
-            const unitPrice = unitPriceCents / 100;
-            const qty = item.quantity ?? 1;
-            lineSubtotal += unitPrice * qty;
+            const kind = (item.kind ?? '').toLowerCase();
+            // amount is in cents
+            const amountCents = typeof item.amount === 'number' ? item.amount : 0;
+            const amountDollars = amountCents / 100;
+
+            if (SUBTOTAL_KINDS.has(kind)) {
+              lineSubtotal += amountDollars;
+              hasKnownKind = true;
+            } else if (DISCOUNT_KINDS.has(kind)) {
+              lineDiscount += amountDollars;
+              hasKnownKind = true;
+            } else if (TAX_KINDS.has(kind)) {
+              lineTax += amountDollars;
+              hasKnownKind = true;
+            } else {
+              // Unknown kind — fall back to unit_price * quantity for subtotal
+              const unitPriceCents = item.unit_price ?? item.price ?? 0;
+              lineSubtotal += (unitPriceCents / 100) * (item.quantity ?? 1);
+            }
           }
+
           subtotalAmountDollars = Number(lineSubtotal.toFixed(2));
-          // discountAmountDollars and taxAmountDollars resolved from invoice below
+          if (lineDiscount > 0) discountAmountDollars = Number(lineDiscount.toFixed(2));
+          if (lineTax > 0)      taxAmountDollars      = Number(lineTax.toFixed(2));
+
         } else if (totalAmountDollars != null) {
           // No line items at all — fall back to total_amount as subtotal
           subtotalAmountDollars = totalAmountDollars;
@@ -1219,58 +1250,54 @@ async function syncOrganization(
               // --- Resolve subtotal, discount, and tax from invoice ---
               // These are only reliably available on the invoice response.
 
-              // Subtotal — use normalizeMoney() not normalizeInvoiceMoney().
-              // normalizeInvoiceMoney caps against totalAmountDollars, but subtotal is
-              // legitimately larger than total on discounted jobs, so that cap is wrong.
-              const invoiceSubtotalRaw =
-                invoiceObj?.subtotal_amount ?? invoiceObj?.subtotal ?? invoiceObj?.sub_total ??
-                invoiceObj?.amount_subtotal ?? invoiceObj?.line_items_total ?? invoiceObj?.service_total ??
-                firstEntry?.subtotal_amount ?? firstEntry?.subtotal ?? firstEntry?.sub_total ??
-                firstEntry?.line_items_total ?? null;
-              if (invoiceSubtotalRaw != null) {
-                const parsed = normalizeMoney(invoiceSubtotalRaw);
-                if (parsed != null && parsed > 0) subtotalAmountDollars = parsed;
-              }
+              // Subtotal / discount / tax from invoice — only used as fallback
+              // if line items didn't already populate these values.
+              // Line items are the authoritative source (kind-based split).
 
-              // Discount — HCP always stores discount as a flat dollar amount on the invoice
-              // (even if entered as a percentage — HCP converts it before returning).
-              // Use normalizeMoney() for the same reason as subtotal.
-              // Percentage fields are a fallback in case HCP ever returns them.
-              const invoiceDiscountPct =
-                invoiceObj?.discount_percent ?? invoiceObj?.discount_percentage ?? invoiceObj?.discount_rate ??
-                firstEntry?.discount_percent ?? firstEntry?.discount_percentage ?? null;
-              const invoiceDiscountFlat =
-                invoiceObj?.discount_amount ?? invoiceObj?.discount ?? invoiceObj?.total_discount ??
-                firstEntry?.discount_amount ?? firstEntry?.discount ?? firstEntry?.total_discount ?? null;
-              if (invoiceDiscountPct != null && invoiceDiscountPct > 0 && subtotalAmountDollars != null) {
-                // Explicit percentage field — apply to subtotal
-                const pct = Math.min(invoiceDiscountPct, 100);
-                discountAmountDollars = Number((subtotalAmountDollars * pct / 100).toFixed(2));
-              } else if (invoiceDiscountFlat != null) {
-                // Flat dollar (or cents) discount — normalize without ceiling cap
-                const parsedFlat = normalizeMoney(invoiceDiscountFlat);
-                // Cap at subtotal so discount never exceeds the job value
-                if (parsedFlat != null && parsedFlat > 0) {
-                  discountAmountDollars = subtotalAmountDollars != null
-                    ? Math.min(parsedFlat, subtotalAmountDollars)
-                    : parsedFlat;
+              if (subtotalAmountDollars == null) {
+                const invoiceSubtotalRaw =
+                  invoiceObj?.subtotal_amount ?? invoiceObj?.subtotal ?? invoiceObj?.sub_total ??
+                  invoiceObj?.amount_subtotal ?? invoiceObj?.line_items_total ?? invoiceObj?.service_total ??
+                  firstEntry?.subtotal_amount ?? firstEntry?.subtotal ?? firstEntry?.sub_total ??
+                  firstEntry?.line_items_total ?? null;
+                if (invoiceSubtotalRaw != null) {
+                  const parsed = normalizeMoney(invoiceSubtotalRaw);
+                  if (parsed != null && parsed > 0) subtotalAmountDollars = parsed;
                 }
               }
 
-              // Tax
-              const invoiceTaxRaw =
-                invoiceObj?.tax_amount ?? invoiceObj?.tax ?? invoiceObj?.total_tax ??
-                invoiceObj?.taxes_total ?? invoiceObj?.amount_tax ??
-                firstEntry?.tax_amount ?? firstEntry?.tax ?? firstEntry?.total_tax ?? null;
-              if (invoiceTaxRaw != null) {
-                // Use normalizeMoney (no ceiling cap) — tax can't exceed total but
-                // normalizeInvoiceMoney's max logic can double-count if both candidates pass
-                const parsedTax = normalizeMoney(invoiceTaxRaw);
-                // Safety cap: tax should never exceed total_amount
-                if (parsedTax != null && parsedTax > 0) {
-                  taxAmountDollars = totalAmountDollars != null
-                    ? Math.min(parsedTax, totalAmountDollars)
-                    : parsedTax;
+              if (discountAmountDollars == null) {
+                const invoiceDiscountPct =
+                  invoiceObj?.discount_percent ?? invoiceObj?.discount_percentage ?? invoiceObj?.discount_rate ??
+                  firstEntry?.discount_percent ?? firstEntry?.discount_percentage ?? null;
+                const invoiceDiscountFlat =
+                  invoiceObj?.discount_amount ?? invoiceObj?.discount ?? invoiceObj?.total_discount ??
+                  firstEntry?.discount_amount ?? firstEntry?.discount ?? firstEntry?.total_discount ?? null;
+                if (invoiceDiscountPct != null && invoiceDiscountPct > 0 && subtotalAmountDollars != null) {
+                  const pct = Math.min(invoiceDiscountPct, 100);
+                  discountAmountDollars = Number((subtotalAmountDollars * pct / 100).toFixed(2));
+                } else if (invoiceDiscountFlat != null) {
+                  const parsedFlat = normalizeMoney(invoiceDiscountFlat);
+                  if (parsedFlat != null && parsedFlat > 0) {
+                    discountAmountDollars = subtotalAmountDollars != null
+                      ? Math.min(parsedFlat, subtotalAmountDollars)
+                      : parsedFlat;
+                  }
+                }
+              }
+
+              if (taxAmountDollars == null) {
+                const invoiceTaxRaw =
+                  invoiceObj?.tax_amount ?? invoiceObj?.tax ?? invoiceObj?.total_tax ??
+                  invoiceObj?.taxes_total ?? invoiceObj?.amount_tax ??
+                  firstEntry?.tax_amount ?? firstEntry?.tax ?? firstEntry?.total_tax ?? null;
+                if (invoiceTaxRaw != null) {
+                  const parsedTax = normalizeMoney(invoiceTaxRaw);
+                  if (parsedTax != null && parsedTax > 0) {
+                    taxAmountDollars = totalAmountDollars != null
+                      ? Math.min(parsedTax, totalAmountDollars)
+                      : parsedTax;
+                  }
                 }
               }
 
