@@ -1088,18 +1088,21 @@ async function syncOrganization(
           //   (e.g. 5000 = 50.00%) — NOT a dollar amount. We must compute the dollar
           //   discount as subtotal × (unit_price / 10000) in a second pass.
           // For 'fixed discount' items, 'amount' is the flat dollar discount in cents.
-          const SUBTOTAL_KINDS      = new Set(['labor', 'service', 'material', 'other', 'product']);
+          const SUBTOTAL_KINDS         = new Set(['labor', 'service', 'material', 'other', 'product']);
           const FIXED_DISCOUNT_KINDS   = new Set(['fixed discount', 'discount']);
           const PERCENT_DISCOUNT_KINDS = new Set(['percent discount', 'percentage discount']);
-          const TAX_KINDS           = new Set(['tax']);
+          const TAX_KINDS              = new Set(['tax']);
+          // Gratuity/tip line items — stored as tip_amount, not subtotal
+          const GRATUITY_KINDS         = new Set(['fixed gratuity', 'gratuity', 'tip', 'tips']);
 
           let lineSubtotal  = 0;
           let lineDiscount  = 0;
           let lineTax       = 0;
+          let lineTip       = 0;
           // Collect percent discounts for second pass (need subtotal first)
           const pctDiscounts: number[] = [];
 
-          // Pass 1: sum labor/service/tax and collect percent discount rates
+          // Pass 1: sum labor/service/tax/tip and collect percent discount rates
           for (const item of jobLineItems) {
             const kind = (item.kind ?? '').toLowerCase();
             const amountCents = typeof item.amount === 'number' ? item.amount : 0;
@@ -1109,19 +1112,19 @@ async function syncOrganization(
             if (SUBTOTAL_KINDS.has(kind)) {
               lineSubtotal += amountDollars;
             } else if (FIXED_DISCOUNT_KINDS.has(kind)) {
-              // Fixed discount: amount is the dollar value in cents (may be negative)
               lineDiscount += Math.abs(amountDollars);
             } else if (PERCENT_DISCOUNT_KINDS.has(kind)) {
-              // Percent discount: unit_price is the percentage in hundredths
-              // (e.g. 5000 = 50.00%). Collect for second pass.
+              // unit_price is the percentage in hundredths (e.g. 5000 = 50.00%)
               const pctHundredths = typeof item.unit_price === 'number' ? item.unit_price : 0;
               if (pctHundredths > 0) pctDiscounts.push(pctHundredths / 10000);
             } else if (TAX_KINDS.has(kind)) {
               lineTax += amountDollars;
+            } else if (GRATUITY_KINDS.has(kind)) {
+              // Gratuity/tip — goes to tip_amount, not subtotal
+              lineTip += amountDollars;
             } else {
-              // Unknown kind — treat as labor using unit_price * quantity
-              const unitPriceCents = item.unit_price ?? item.price ?? 0;
-              lineSubtotal += (unitPriceCents / 100) * (item.quantity ?? 1);
+              // Unknown kind — log it and skip rather than polluting subtotal
+              console.log(`[UNKNOWN KIND] job ${job?.id} item='${item.name}' kind='${kind}' amount=${item.amount} — skipped`);
             }
           }
 
@@ -1133,6 +1136,7 @@ async function syncOrganization(
           subtotalAmountDollars = Number(lineSubtotal.toFixed(2));
           if (lineDiscount > 0) discountAmountDollars = Number(lineDiscount.toFixed(2));
           if (lineTax > 0)      taxAmountDollars      = Number(lineTax.toFixed(2));
+          if (lineTip > 0)      tipAmount             = Number(lineTip.toFixed(2));
 
         } else if (totalAmountDollars != null) {
           // No line items at all — fall back to total_amount as subtotal
