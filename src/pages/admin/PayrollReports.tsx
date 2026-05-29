@@ -328,9 +328,9 @@ export default function PayrollReports() {
                                     <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[18%]">Service</th>
                                     <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[9%]">Subtotal</th>
                                     <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[9%]">Discount</th>
-                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[9%]">Amount</th>
                                     <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[7%]">Tax</th>
                                     <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[7%]">Tip</th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[9%]">Amount</th>
                                     <th className="text-right text-xs font-medium text-muted-foreground py-2 pr-4 w-[7%]">CC Fees</th>
                                     <th className="text-left text-xs font-medium text-muted-foreground py-2 w-[9%]">Payment</th>
                                   </tr>
@@ -355,9 +355,9 @@ export default function PayrollReports() {
                                       </td>
                                       <td className="py-2 pr-4 text-right">{subtotal != null ? formatCurrency(subtotal) : '-'}</td>
                                       <td className="py-2 pr-4 text-right text-destructive">{discount > 0 ? `-${formatCurrency(discount)}` : '-'}</td>
-                                      <td className="py-2 pr-4 text-right font-medium">{formatCurrency(jobAmount)}</td>
                                       <td className="py-2 pr-4 text-right">{tax > 0 ? formatCurrency(tax) : '-'}</td>
                                       <td className="py-2 pr-4 text-right">{jobTip ? formatCurrency(jobTip) : '-'}</td>
+                                      <td className="py-2 pr-4 text-right font-medium">{formatCurrency(jobAmount)}</td>
                                       <td className="py-2 pr-4 text-right text-destructive">{jobCcFee ? `-${formatCurrency(jobCcFee)}` : '-'}</td>
                                       <td className="py-2">{formatPaymentMethod(job.payment_method)}</td>
                                     </tr>
