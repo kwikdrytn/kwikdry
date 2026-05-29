@@ -1036,8 +1036,9 @@ async function syncOrganization(
         const jobLineItems: any[] = lineItems.length > 0 ? lineItems : (job.line_items || job.total_items || []);
 
         const targetCustomers = ['dana karnowski', 'jennie davis', 'chris foster'];
+        const targetJobIds = ['job_9d5dcd71e8054473a8374c16a935890e'];
         const custName = (job.customer ? [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') : '').toLowerCase();
-        const isTarget = targetCustomers.some(t => custName.includes(t));
+        const isTarget = targetCustomers.some(t => custName.includes(t)) || targetJobIds.includes(job.id);
 
         if (isTarget) {
           console.log(`[PAYROLL DEBUG] Job ${job.id} customer=${custName}`);
@@ -1372,11 +1373,30 @@ async function syncOrganization(
           synced_at: now,
         };
 
+        if (isTarget) {
+          console.log(`[PAYROLL DEBUG] About to upsert record for job ${job.id}: ${JSON.stringify({
+            hcp_job_id: record.hcp_job_id,
+            customer_name: record.customer_name,
+            status: record.status,
+            scheduled_date: record.scheduled_date,
+            total_amount: record.total_amount,
+            subtotal_amount: record.subtotal_amount,
+            discount_amount: record.discount_amount,
+            tax_amount: record.tax_amount,
+            tip_amount: record.tip_amount,
+          })}`);
+        }
+
         const { error } = await supabase
           .from('hcp_jobs')
           .upsert(record, { onConflict: 'organization_id,hcp_job_id' });
         
-        if (!error) jobsSynced++;
+        if (error) {
+          console.error(`[UPSERT ERROR] job ${job.id} customer=${customerName}: ${error.message} | code=${error.code} | details=${error.details}`);
+        } else {
+          jobsSynced++;
+          if (isTarget) console.log(`[PAYROLL DEBUG] Upsert SUCCESS for job ${job.id}`);
+        }
       }
 
       // Insert change events
