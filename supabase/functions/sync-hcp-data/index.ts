@@ -1014,6 +1014,19 @@ async function syncOrganization(
 
         const jobLineItems: any[] = lineItems.length > 0 ? lineItems : (job.line_items || job.total_items || []);
 
+        const targetCustomers = ['dana karnowski', 'jennie davis', 'chris foster'];
+        const custName = (job.customer ? [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') : '').toLowerCase();
+        const isTarget = targetCustomers.some(t => custName.includes(t));
+
+        if (isTarget) {
+          console.log(`[PAYROLL DEBUG] Job ${job.id} customer=${custName}`);
+          console.log(`[PAYROLL DEBUG] job.total_amount=${job.total_amount} job.tip_amount=${job.tip_amount}`);
+          console.log(`[PAYROLL DEBUG] job.line_items=${JSON.stringify(job.line_items ?? null)}`);
+          console.log(`[PAYROLL DEBUG] job.total_items=${JSON.stringify(job.total_items ?? null)}`);
+          console.log(`[PAYROLL DEBUG] lineItems from endpoint=${JSON.stringify(lineItems)}`);
+          console.log(`[PAYROLL DEBUG] job.invoice=${JSON.stringify(job.invoice ?? null)}`);
+        }
+
         if (jobLineItems.length > 0) {
           let lineSubtotal = 0;
           for (const item of jobLineItems) {
@@ -1028,6 +1041,10 @@ async function syncOrganization(
         } else if (totalAmountDollars != null) {
           // No line items at all — fall back to total_amount as subtotal
           subtotalAmountDollars = totalAmountDollars;
+        }
+
+        if (isTarget) {
+          console.log(`[PAYROLL DEBUG] After line items: subtotalAmountDollars=${subtotalAmountDollars}`);
         }
         const tipAmountRaw = job.tip_amount ?? job.tip ?? null;
         let tipAmount = tipAmountRaw != null ? tipAmountRaw / 100 : null;
@@ -1213,6 +1230,13 @@ async function syncOrganization(
               if (invoiceTaxRaw != null) {
                 const parsedTax = normalizeInvoiceMoney(invoiceTaxRaw, totalAmountDollars);
                 if (parsedTax != null && parsedTax > 0) taxAmountDollars = parsedTax;
+              }
+
+              if (isTarget) {
+                console.log(`[PAYROLL DEBUG] invoiceData keys=${Object.keys(invoiceData || {}).join(', ')}`);
+                console.log(`[PAYROLL DEBUG] invoiceEntries[0]=${JSON.stringify(invoiceEntries[0] ?? null)}`);
+                console.log(`[PAYROLL DEBUG] invoiceObj=${JSON.stringify(invoiceObj ?? null)}`);
+                console.log(`[PAYROLL DEBUG] After invoice: subtotal=${subtotalAmountDollars} discount=${discountAmountDollars} tax=${taxAmountDollars}`);
               }
 
             } else {
