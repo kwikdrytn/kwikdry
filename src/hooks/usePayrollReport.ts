@@ -55,11 +55,11 @@ function isCardPayment(method: string | null): boolean {
 function getPostDiscountAmount(job: PayrollJob): number {
   const subtotal = Number(job.subtotal_amount);
   const discount = Number(job.discount_amount) || 0;
+  const tax = Number(job.tax_amount) || 0;
   // Use subtotal path if subtotal_amount is a valid number (even if zero after discount)
-  // isNaN check + null check is enough — do NOT gate on subtotal > 0,
-  // because a 100%-discounted job has subtotal=199 and discount=199, giving a correct /bin/sh result
+  // Amount = subtotal - discount + tax (tax is part of what the customer paid)
   if (!isNaN(subtotal) && job.subtotal_amount != null) {
-    return Math.max(subtotal - discount, 0);
+    return Math.max(subtotal - discount, 0) + tax;
   }
   const total = Number(job.total_amount) || 0;
   const tip = Number(job.tip_amount) || 0;
