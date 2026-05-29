@@ -730,6 +730,8 @@ async function syncOrganization(
   supabase: any,
   mapboxToken: string | null,
   hcp_account_id: string | null = null,
+  overrideDateFrom?: string | null,
+  overrideDateTo?: string | null,
 ) {
   console.log(`Starting HCP sync for organization: ${organization_id}, account: ${hcp_account_id ?? '(none)'}`);
 
@@ -1617,6 +1619,8 @@ Deno.serve(async (req) => {
           supabase,
           mapboxToken,
           account.id,
+          date_from ?? null,
+          date_to ?? null,
         );
 
         // Stamp last_synced_at on the account
@@ -1657,6 +1661,7 @@ Deno.serve(async (req) => {
         }
         const result = await syncOrganization(
           authProfile.organization_id, apiKey, location_id ?? null, supabase, mapboxToken, null,
+          date_from ?? null, date_to ?? null,
         );
         return new Response(JSON.stringify(result), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1677,6 +1682,8 @@ Deno.serve(async (req) => {
             supabase,
             mapboxToken,
             account.id,
+            date_from ?? null,
+            date_to ?? null,
           );
           await supabase
             .from('hcp_accounts')
