@@ -1036,7 +1036,11 @@ async function syncOrganization(
         const jobLineItems: any[] = lineItems.length > 0 ? lineItems : (job.line_items || job.total_items || []);
 
         const targetCustomers = ['dana karnowski', 'jennie davis', 'chris foster'];
-        const targetJobIds = ['job_9d5dcd71e8054473a8374c16a935890e'];
+        const targetJobIds = [
+          'job_9d5dcd71e8054473a8374c16a935890e', // Dana Karnowski
+          'job_361570c289cd4f36bd8b54aeb1b37d56', // Jennie Davis
+          'job_c7defe9406104c76af8ff5c3ac0a5564', // Chris Foster
+        ];
         const custName = (job.customer ? [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') : '').toLowerCase();
         const isTarget = targetCustomers.some(t => custName.includes(t)) || targetJobIds.includes(job.id);
 
