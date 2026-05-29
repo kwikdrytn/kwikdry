@@ -1053,12 +1053,13 @@ async function syncOrganization(
 
         const targetCustomers = ['dana karnowski', 'jennie davis', 'chris foster'];
         const targetJobIds = [
-          'job_9d5dcd71e8054473a8374c16a935890e', // Dana Karnowski
-          'job_361570c289cd4f36bd8b54aeb1b37d56', // Jennie Davis
-          'job_c7defe9406104c76af8ff5c3ac0a5564', // Chris Foster
+          'job_9d5dcd71e8054473a8374c16a935890e', // Dana Karnowski (Knoxville)
+          'job_361570c289cd4f36bd8b54aeb1b37d56', // Jennie Davis (Chattanooga)
+          'job_c7defe9406104c76af8ff5c3ac0a5564', // Chris Foster (Chattanooga)
         ];
         const custName = (job.customer ? [job.customer.first_name, job.customer.last_name].filter(Boolean).join(' ') : '').toLowerCase();
         const isTarget = targetCustomers.some(t => custName.includes(t)) || targetJobIds.includes(job.id);
+        if (isTarget) console.log(`[PAYROLL DEBUG] Processing job ${job.id} customer=${custName} account=${hcp_account_id}`);
 
         if (isTarget) {
           console.log(`[PAYROLL DEBUG] Job ${job.id} customer=${custName}`);
@@ -1090,6 +1091,7 @@ async function syncOrganization(
             // amount is in cents
             const amountCents = typeof item.amount === 'number' ? item.amount : 0;
             const amountDollars = amountCents / 100;
+            if (isTarget) console.log(`[PAYROLL DEBUG] line item: name=${item.name} kind=${kind} unit_price=${item.unit_price} amount=${item.amount} amountDollars=${amountDollars}`);
 
             if (SUBTOTAL_KINDS.has(kind)) {
               lineSubtotal += amountDollars;
@@ -1117,7 +1119,7 @@ async function syncOrganization(
         }
 
         if (isTarget) {
-          console.log(`[PAYROLL DEBUG] After line items: subtotalAmountDollars=${subtotalAmountDollars}`);
+          console.log(`[PAYROLL DEBUG] After line items: subtotal=${subtotalAmountDollars} discount=${discountAmountDollars} tax=${taxAmountDollars} total=${totalAmountDollars}`);
         }
         const tipAmountRaw = job.tip_amount ?? job.tip ?? null;
         let tipAmount = tipAmountRaw != null ? tipAmountRaw / 100 : null;
