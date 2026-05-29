@@ -157,7 +157,9 @@ export default function PayrollReports() {
             <Button variant="outline" size="sm" disabled={syncing} onClick={async () => {
               setSyncing(true);
               try {
-                const { error } = await supabase.functions.invoke('sync-hcp-data');
+                const { error } = await supabase.functions.invoke('sync-hcp-data', {
+                  body: { date_from: startDate, date_to: endDate },
+                });
                 if (error) throw error;
                 toast.success('HCP data synced successfully');
                 queryClient.invalidateQueries({ queryKey: ['payroll-report'] });
